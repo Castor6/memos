@@ -80,4 +80,11 @@ jobs:
                 pr.head.ref !== 'changeset-release/main' || pr.base.ref !== 'main') {
               throw new Error('Unexpected version PR source');
             }
+            const notes = pr.body?.split('# Releases\n')[1] ?? pr.body?.split('## 本次版本\n')[1] ?? '详见 CHANGELOG.md。';
+            const body = [
+              '此 PR 汇总 main 中尚未发布的改动；后续 changeset 会继续更新同一个 PR。',
+              '合并后会构建该提交的版本候选产物。当前尚未接入正式镜像发布与服务器部署。',
+              '## 本次版本\n' + notes,
+            ].join('\n\n');
+            await github.rest.pulls.update({...context.repo, pull_number: pr.number, body});
             await github.rest.actions.createWorkflowDispatch({...context.repo, workflow_id: 'ci.yml', ref: pr.head.ref});
