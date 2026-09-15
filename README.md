@@ -1,12 +1,14 @@
-> ✨ Featured Sponsor: [CodeRabbit](https://coderabbit.link/usememos) — Cut code review time & bugs in half, instantly.
-
 # Memos
 
 ## Personal fork / 个人定制
 
-This fork starts from **v0.30.0**, uses `main` for personal customization, and tracks the official repository through `upstream`.
+This personal fork of [usememos/memos](https://github.com/usememos/memos) starts from **v0.30.0**, uses `main` for customization, and selectively imports upstream changes through pull requests.
+Start with [协作与开发入口](docs/README.md) for task records, local development, and browser verification.
 See [个人定制与自动部署记录](docs/customization-and-deployment.zh-CN.md) for the maintenance approach,
 deployment proposal, ACR pricing and usage limits, and outstanding verification work.
+
+Report issues and discuss improvements in [Castor6/memos Issues](https://github.com/Castor6/memos/issues).
+Custom releases are not configured yet; the installation commands below install upstream Memos.
 
 <img align="right" height="96px" src="https://raw.githubusercontent.com/usememos/.github/refs/heads/main/assets/logo-rounded.png" alt="Memos" />
 
@@ -27,7 +29,7 @@ Memos is an open-source, self-hosted note-taking app built for quick capture. It
 - **Deploy anywhere** — Run a single Go binary or Docker container with SQLite, MySQL, or PostgreSQL.
 - **Integrate freely** — Build on the REST and gRPC APIs or adapt the MIT-licensed source to your needs.
 
-## Quick Start
+## Upstream Quick Start
 
 Want to explore Memos first? Open the [live demo](https://demo.usememos.com/).
 
@@ -63,20 +65,14 @@ Save pages, selected text, and images directly to your Memos instance with the o
 
 ## Contributing
 
-Contributions of all kinds are welcome, including bug reports, feature suggestions, pull requests, documentation, and translations.
+Use this fork's issue tracker and pull requests for personal customizations and fixes.
 
-- [Report bugs](https://github.com/usememos/memos/issues/new?template=bug_report.md)
-- [Suggest features](https://github.com/usememos/memos/issues/new?template=feature_request.md)
-- [Submit pull requests](https://github.com/usememos/memos/pulls)
-- [Improve documentation](https://github.com/usememos/dotcom)
-- [Help with translations](https://github.com/usememos/memos/tree/main/web/src/locales)
+- [Report bugs](https://github.com/Castor6/memos/issues/new?template=bug_report.yml)
+- [Suggest features](https://github.com/Castor6/memos/issues/new?template=feature_request.yml)
+- [Submit pull requests](https://github.com/Castor6/memos/pulls)
+- [Development and task records](docs/README.md)
 
-## Sponsors
-
-- [**CodeRabbit** — Cut code review time and bugs in half](https://coderabbit.link/usememos)
-- [**SSD Nodes** — Affordable VPS hosting for self-hosters](https://ssdnodes.com/?utm_source=memos&utm_medium=sponsor)
-
-Love Memos? [Sponsor us on GitHub](https://github.com/sponsors/usememos) to help keep the project growing!
+For the original project, see [upstream Memos](https://github.com/usememos/memos) and its [documentation](https://usememos.com/docs).
 
 ## License
 

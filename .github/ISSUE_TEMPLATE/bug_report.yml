@@ -8,9 +8,9 @@ body:
         Thanks for reporting a bug. Please help maintainers reproduce it on current code.
 
         Before submitting:
-        - Search [existing issues](https://github.com/usememos/memos/issues) to avoid duplicates.
-        - Upgrade and retest with the [latest release](https://github.com/usememos/memos/releases/latest), current `main`, or the [demo site](https://demo.usememos.com/).
-        - Use [Discussions](https://github.com/usememos/memos/discussions) for questions, setup help, or configuration troubleshooting.
+        - Search [this fork's existing issues](https://github.com/Castor6/memos/issues) to avoid duplicates.
+        - Report the installed version or commit. When practical, retest on this fork's current `main`.
+        - For questions or setup help, open a blank issue in this repository.
 
         Maintainers normally fix bugs in current code and future releases, not older released versions.
 
@@ -21,7 +21,7 @@ body:
       options:
         - label: I have searched existing issues and confirmed this has not already been reported
           required: true
-        - label: I have reproduced this bug on the latest Memos release, current `main`, or the demo site, or this report is specifically about upgrading to the latest release
+        - label: I have included the version or commit where I observed this bug
           required: true
         - label: This is a bug report, not a question or configuration request
           required: true
@@ -51,11 +51,10 @@ body:
       label: Reproduced On
       description: Where did you confirm the issue still happens?
       options:
-        - Latest release
-        - Current main branch
-        - Demo site
-        - Upgrade to latest release
-        - I cannot test the latest version
+        - Installed version of this fork
+        - This fork's current main branch
+        - Upgrade between versions
+        - Upstream Memos (comparison)
     validations:
       required: true
 
@@ -64,7 +63,7 @@ body:
     attributes:
       label: Memos Version Tested
       description: Report the exact version where you reproduced the bug. Use the version shown in **Settings > System**, the container image tag, the release binary version, or `memos --version`. Please do not write `latest` only.
-      placeholder: "v0.29.x, ghcr.io/usememos/memos:v0.29.x, main@abcdef, or demo site"
+      placeholder: "main@abcdef, an exact image tag, or upstream v0.30.0"
     validations:
       required: true
 
