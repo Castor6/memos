@@ -2,6 +2,12 @@
 
 # Memos
 
+## Personal fork / 个人定制
+
+This fork starts from **v0.30.0**, uses `main` for personal customization, and tracks the official repository through `upstream`.
+See [个人定制与自动部署记录](docs/customization-and-deployment.zh-CN.md) for the maintenance approach,
+deployment proposal, ACR pricing and usage limits, and outstanding verification work.
+
 <img align="right" height="96px" src="https://raw.githubusercontent.com/usememos/.github/refs/heads/main/assets/logo-rounded.png" alt="Memos" />
 
 Memos is an open-source, self-hosted note-taking app built for quick capture. It is Markdown-native, lightweight, and keeps your data under your control.
