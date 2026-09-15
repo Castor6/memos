@@ -1,6 +1,6 @@
 # TASK-20260915-release-workflow：统一 CI 与版本 PR 自动化
 
-- 状态：进行中（基础设施已合并启用，验证首个机器人版本 PR）
+- 状态：进行中（基础设施已启用，等待专用令牌完成版本 PR 的自动检查链路）
 - 部署状态：未部署
 - 模块与关键词：Fork、BrowserRig、Changesets、Release Please、Version PR、版本号、CI、主分支保护
 - 关联任务：[环境初始化](TASK-20260915-local-environment.md)、[仓库展示](TASK-20260915-repository-presentation.md)
@@ -49,8 +49,8 @@
 - PR #1 已按用户要求合并，提交 `2bf6e786ed1e3d7a54f17eb7f5906ffcbba9e25d`。
 - 合并前在本仓库停用 Canary、Demo、Release Please、Release、Close Stale，避免初始化合并触发旧发布逻辑。
 - 仓库默认工作流权限仍为 read，已启用 Actions 创建 PR 的设置；当前无自定义 Secrets。
-- 版本任务使用临时 GITHUB_TOKEN，局部授予 contents、pull-requests、actions 写权限。普通 CI 只有 contents read。
-- 版本 PR 创建或更新后显式 dispatch 版本分支的 CI，避免依赖令牌派生事件自动运行；首次实际行为待 GitHub 验证。
+- 版本任务优先使用仓库专用 CHANGESETS_TOKEN（Contents / Pull requests 写权限），未配置时回退临时 GITHUB_TOKEN 并提示人工批准工作流。普通 CI 只有 contents read；不需要服务器凭据。
+- GitHub 要求批准内置令牌创建/更新的 PR 工作流。实测显式 dispatch 虽通过，但未满足合并门禁，已改为推荐专用令牌触发正常 PR CI，移除重复 dispatch。
 - 主分支规则模板保存在 `.github/rulesets/main.json`，已应用为 `Protect main`（规则集 ID `23465610`），API 回读确认 active、必须 PR、必须通过 validate、严格保持最新 main、禁止强推和删除。
 - 仓库仅启用 squash 合并，合并后自动删除功能分支。没有配置绕过主分支规则的账号或应用。
 
@@ -81,7 +81,7 @@ Proto 保留 lint/格式检查；部分生成器未固定版本，自动验证�
 - 初次 infrastructure 失败时，validate 同样失败；修正后的最终提交全部通过后才合并，没有绕过检查。
 - 普通 PR #2 合并后的 Release Candidate 工作流按条件跳过，未构建发布候选或部署。
 - [main 的 CI](https://github.com/Castor6/memos/actions/runs/34992893973) 全部通过后，[版本机器人](https://github.com/Castor6/memos/actions/runs/34993294297) 自动成功创建 [Version Packages PR #3](https://github.com/Castor6/memos/pull/3)。文件差异仅包含 package.json、CHANGELOG.md 和已消费的基线 changeset，版本为 0.1.0。
-- [版本分支的显式 CI](https://github.com/Castor6/memos/actions/runs/34993339990) 已自动启动，提交与 PR head 一致。GitHub 另外派生的 PR 事件处于 action_required；没有为它执行人工批准，正在验证显式 CI 对合并门禁的实际效果。
+- [版本分支的显式 CI](https://github.com/Castor6/memos/actions/runs/34993339990) 已全部通过，提交与 PR head 一致，但 PR 的 statusCheckRollup 仍为空、mergeStateStatus 仍为 BLOCKED。GitHub 另外派生的 PR 事件处于 action_required；没有伪造检查结果或降低主分支规则。
 
 ## 参考
 
@@ -89,3 +89,10 @@ Proto 保留 lint/格式检查；部分生成器未固定版本，自动验证�
 - [Changesets Action](https://github.com/changesets/action)
 - [GitHub：工作流事件与临时令牌](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow)
 - [GitHub：显式触发工作流](https://docs.github.com/en/rest/actions/workflows#create-a-workflow-dispatch-event)
+
+### 专用令牌与后续验证
+
+- 文档 PR #4 的首次 [CI](https://github.com/Castor6/memos/actions/runs/34993573485) 成功，只执行基础检查和 validate，应用重检查全部按计划跳过。
+- PR #4 随后扩展为修正版本 CI 授权并记录验证结果；工作流支持 CHANGESETS_TOKEN，移除不能满足门禁的重复 dispatch。
+- 已请用户仅在 GitHub Secrets 配置专用令牌，不读取或复用 BrowserRig 的秘密值，也不把本机 gh 的广泛权限令牌保存进 CI。
+- 待配置后验证同一个 Version Packages PR 被更新、正常 PR CI 自动通过，且主分支门禁认可结果。若选择不配置，需逐次批准 GitHub 的版本 PR 工作流。

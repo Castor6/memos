@@ -16,7 +16,8 @@ jobs:
   candidate:
     if: >-
       github.repository == 'Castor6/memos' && github.event.pull_request.merged == true &&
-      github.event.pull_request.user.login == 'github-actions[bot]' &&
+      (github.event.pull_request.user.login == 'github-actions[bot]' ||
+       github.event.pull_request.user.login == github.repository_owner) &&
       github.event.pull_request.head.ref == 'changeset-release/main' &&
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
