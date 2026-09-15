@@ -1,11 +1,12 @@
 # TASK-20260915-release-workflow：统一 CI 与版本 PR 自动化
 
-- 状态：进行中（实现及本地检查完成，等待 GitHub 验证与启用）
+- 状态：进行中（基础设施已合并启用，验证首个机器人版本 PR）
 - 部署状态：未部署
 - 模块与关键词：Fork、BrowserRig、Changesets、Release Please、Version PR、版本号、CI、主分支保护
 - 关联任务：[环境初始化](TASK-20260915-local-environment.md)、[仓库展示](TASK-20260915-repository-presentation.md)
 - 长期说明：[CI 与版本流程](../release.md)
-- 最后更新：2026-09-15
+- 交付：[PR #2](https://github.com/Castor6/memos/pull/2)，已合并（`3b9c6a5d`）
+- 最后更新：2026-09-16
 
 ## 背景与目标
 
@@ -50,7 +51,8 @@
 - 仓库默认工作流权限仍为 read，已启用 Actions 创建 PR 的设置；当前无自定义 Secrets。
 - 版本任务使用临时 GITHUB_TOKEN，局部授予 contents、pull-requests、actions 写权限。普通 CI 只有 contents read。
 - 版本 PR 创建或更新后显式 dispatch 版本分支的 CI，避免依赖令牌派生事件自动运行；首次实际行为待 GitHub 验证。
-- 主分支规则模板保存在 `.github/rulesets/main.json`，实际应用及回读结果在后续补充。
+- 主分支规则模板保存在 `.github/rulesets/main.json`，已应用为 `Protect main`（规则集 ID `23465610`），API 回读确认 active、必须 PR、必须通过 validate、严格保持最新 main、禁止强推和删除。
+- 仓库仅启用 squash 合并，合并后自动删除功能分支。没有配置绕过主分支规则的账号或应用。
 
 ## 发布边界
 
@@ -66,11 +68,20 @@ Proto 保留 lint/格式检查；部分生成器未固定版本，自动验证�
 - [x] 本地测试覆盖文档轻检查、工作流/版本 PR 路由、失败/取消/意外跳过阻断、应用变更缺少说明、普通 PR 手改版本、多个说明合并成一个版本、伪造版本 PR 文件差异。
 - [x] Changesets 实际执行：两份 patch/minor 说明汇总为一个 0.1.0，并保留两份说明；无 npm 发布。
 - [x] Actionlint 通过，本地版本检查及差异空白检查通过。
-- [ ] GitHub 统一 CI 实际通过；主分支规则已应用并回读。
+- [x] GitHub 统一 CI 实际通过；主分支规则已应用并回读。
 - [ ] 实际机器人版本 PR 正确创建/更新，其 CI 自动运行通过，无重复 PR。
 - [ ] 补充 PR、工作流运行链接及最终启用状态。
 
 本轮未改应用源码或 proto 生成文件。实际产物构建需合并版本 PR 才执行；本轮不为验证发布流程而合并首个版本 PR。
+
+### 已完成的云端验证
+
+- [PR #2 最终提交的 CI](https://github.com/Castor6/memos/actions/runs/34992444731)：全部通过，覆盖前端 lint/255 项测试/构建、Go 静态检查及四组测试、Buf、三驱动升级、容器安装/升级及入口脚本，最终 validate 成功。
+- 初次云端检查发现 Changesets status 依赖本地 main 分支；改为本项目的单包发布说明与变更范围校验，保留真实 Changesets 生成结果比对，并增加无本地 main 的 detached checkout 回归场景。
+- 初次 infrastructure 失败时，validate 同样失败；修正后的最终提交全部通过后才合并，没有绕过检查。
+- 普通 PR #2 合并后的 Release Candidate 工作流按条件跳过，未构建发布候选或部署。
+- [main 的 CI](https://github.com/Castor6/memos/actions/runs/34992893973) 全部通过后，[版本机器人](https://github.com/Castor6/memos/actions/runs/34993294297) 自动成功创建 [Version Packages PR #3](https://github.com/Castor6/memos/pull/3)。文件差异仅包含 package.json、CHANGELOG.md 和已消费的基线 changeset，版本为 0.1.0。
+- [版本分支的显式 CI](https://github.com/Castor6/memos/actions/runs/34993339990) 已自动启动，提交与 PR head 一致。GitHub 另外派生的 PR 事件处于 action_required；没有为它执行人工批准，正在验证显式 CI 对合并门禁的实际效果。
 
 ## 参考
 
