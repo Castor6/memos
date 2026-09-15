@@ -4,6 +4,7 @@
 - 部署状态：不涉及部署
 - 模块与关键词：Fork、Issues、README、赞助、FUNDING、问题模板
 - 关联任务：[发布基础设施讨论](TASK-20260915-release-workflow.md)、[环境初始化](TASK-20260915-local-environment.md)
+- 交付：[PR #1](https://github.com/Castor6/memos/pull/1)，分支 `chore/personal-fork-foundation`，尚未合并
 - 最后更新：2026-09-15
 
 ## 背景与目标
@@ -38,7 +39,7 @@
 2026-09-15：通过 GitHub API 回读 `hasIssuesEnabled: true`；检查文档差异、相对链接和三个问题模板的 YAML 语法。
 本轮未修改应用代码；沿用环境初始化任务中已完成的前后端检查，未重复执行全量测试。
 
-Issues 开关立即生效；README、赞助按钮配置和模板需 PR 合并后才体现在默认分支。未创建测试 Issue，也未执行发布或部署。
+Issues 开关立即生效；README、赞助按钮配置和模板需 PR 合并后才体现在默认分支。PR #1 已创建，当前继承的 CI 路径过滤未为这批文档/本地工具改动产生检查；上述结果来自本地验证，统一必需 CI 仍待发布基础设施任务实施。未创建测试 Issue，也未执行发布或部署。
 
 ## 参考
 
