@@ -1,0 +1,11 @@
+# 任务索引
+
+按编号、标题、模块或关键词搜索，只读取当前工作相关的任务详情。
+
+| 编号 | 标题 | 状态 | 模块 / 关键词 | 详情 |
+| --- | --- | --- | --- | --- |
+| TASK-20260915-repository-presentation | 启用 Issues 与清理上游赞助展示 | 已完成 | Fork、Issues、README、赞助、FUNDING、问题模板 | [详情](TASK-20260915-repository-presentation.md) |
+| TASK-20260915-release-workflow | PR、版本发布与 CI 基础设施约定 | 待讨论 | Fork、BrowserRig、Changesets、Release Please、Version PR、版本号、CI、主分支保护 | [详情](TASK-20260915-release-workflow.md) |
+| TASK-20260915-local-environment | 协作记录与本地验证环境初始化 | 已完成 | 开发环境、按需检索、SQLite、宽屏、窄屏、iPhone 15 Pro Max、内置浏览器 | [详情](TASK-20260915-local-environment.md) |
+
+新增记录使用 [模板](TEMPLATE.md)。目前没有归档索引。

@@ -8,7 +8,7 @@ repo. If a fact here conflicts with source files or CI config, trust the source 
 Memos is a self-hosted note-taking app.
 
 - Backend: Go 1.26.2, Echo v5, Connect RPC, gRPC-Gateway, Protocol Buffers.
-- Frontend: React 19, TypeScript 6, Vite 8, Tailwind CSS v4, React Query v5.
+- Frontend: React 19, TypeScript 7, Vite 8, Tailwind CSS v4, React Query v5.
 - Storage: SQLite, MySQL, PostgreSQL.
 - Generated API outputs: `proto/gen/` for Go/OpenAPI, `web/src/types/proto/` for TypeScript.
 
@@ -21,11 +21,29 @@ Memos is a self-hosted note-taking app.
 - Add public API endpoints to `server/router/api/v1/acl_config.go`.
 - Ask before adding heavy dependencies, changing auth/token behavior, or altering Docker/release workflows.
 
+## Personal Fork Workflow
+
+- Communicate in Chinese. Keep task records in Chinese and update them as work progresses.
+- Use focused branches and PRs targeting `Castor6/memos:main` for changes, including documentation and upstream imports. A version PR is the intended release entry point; ordinary merges must not trigger production deployment. Automation is not configured yet; see `docs/tasks/TASK-20260915-release-workflow.md` for the proposal and implementation status.
+- Retrieve history on demand: search `docs/tasks/INDEX.md` by task ID, keywords or affected module; open only relevant task records and necessary linked documents. Do not load all historical tasks at startup.
+- `docs/README.md` is a navigation entry, not a mandatory reading list. Read `docs/development.md` when running or verifying locally; read deployment documentation only for deployment/upstream work.
+- For substantive work, create or reuse one record from `docs/tasks/TEMPLATE.md`; capture agreed acceptance criteria before implementation and actual verification afterward. Distinguish implemented, verified and deployed. Small related fixes may share a record.
+- Promote durable decisions into this guide or the relevant module documentation. Keep task details, logs and screenshots out of this file; search archived task indexes only when relevant.
+- Default UI verification to the Codex in-app browser with local disposable data: desktop 1440×900; the user's iPhone 15 Pro Max uses a 430px-wide layout, checked at heights 739 and 932 (see `docs/development.md`). Verify no persistent left sidebar on mobile. Restore viewport overrides afterward. Use the regular Chrome profile only for a problem specific to it.
+- Narrow viewport checks do not establish iPhone/Safari, software keyboard, touch or PWA behavior; record any required real-device checks explicitly.
+
 ## Commands
 
 Run from the repository root unless a command starts with `cd`.
 
 ```bash
+# Personal local environment (see docs/development.md)
+./scripts/dev.sh setup             # Node 24 / pinned pnpm / Go dependencies
+./scripts/dev.sh start             # Local SQLite + fixtures, front/back; Ctrl-C stops both
+./scripts/dev.sh reset             # Stop first; archive test data, reseed on next start
+./scripts/dev.sh check frontend    # lint + unit tests + production build
+./scripts/dev.sh check backend     # server/internal race tests + SQLite store tests
+
 # Backend
 go run ./cmd/memos --port 8081    # Start backend dev server
 go test ./...                      # Run all Go tests
@@ -116,6 +134,7 @@ cd proto && buf format -w          # Format proto files
 - Before finishing, run the checks that match the changed surface from "Change Routing".
 - For docs-only changes, `git diff --check` is sufficient unless the docs include runnable examples that should be tested.
 - If a required check cannot run locally, report the reason and the exact command that remains.
+- The local helper's SQLite checks do not replace all-driver store or container upgrade checks required by the changed surface.
 
 ## CI Reference
 

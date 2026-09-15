@@ -8,8 +8,8 @@ body:
         Thanks for suggesting an improvement. Please describe the problem and workflow first so maintainers can evaluate the request.
 
         Before submitting:
-        - Search [existing feature requests](https://github.com/usememos/memos/issues?q=label%3Aenhancement) to avoid duplicates.
-        - Use [Discussions](https://github.com/usememos/memos/discussions) for broad ideas, setup help, or questions.
+        - Search [this fork's existing issues](https://github.com/Castor6/memos/issues) to avoid duplicates.
+        - For broad ideas, setup help, or questions, open a blank issue in this repository.
         - Keep one feature request focused on one user problem.
 
   - type: checkboxes
