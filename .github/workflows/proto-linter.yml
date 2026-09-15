@@ -1,16 +1,10 @@
 name: Proto Linter
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-    paths:
-      - "proto/**"
+  workflow_call:
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+permissions:
+  contents: read
 
 jobs:
   lint:
@@ -33,8 +27,5 @@ jobs:
           input: proto
 
       - name: Check buf format
-        run: |
-          if [[ $(buf format -d) ]]; then
-            echo "❌ Proto files are not formatted. Run 'buf format -w' to fix."
-            exit 1
-          fi
+        working-directory: proto
+        run: buf format --diff --exit-code

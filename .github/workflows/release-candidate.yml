@@ -1,0 +1,81 @@
+name: Release Candidate
+
+on:
+  pull_request:
+    branches: [main]
+    types: [closed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-candidate
+  cancel-in-progress: false
+
+jobs:
+  candidate:
+    if: >-
+      github.repository == 'Castor6/memos' && github.event.pull_request.merged == true &&
+      github.event.pull_request.user.login == 'github-actions[bot]' &&
+      github.event.pull_request.head.ref == 'changeset-release/main' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_COMMIT: ${{ github.event.pull_request.merge_commit_sha }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4.2.0
+        with:
+          version: 11.0.1
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.26.2"
+      - name: Read the personal version
+        id: version
+        run: |
+          node --input-type=module <<'JS'
+          import {readFileSync, appendFileSync} from 'node:fs';
+          const {version} = JSON.parse(readFileSync('package.json', 'utf8'));
+          if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version) || version === '0.0.0') throw Error('Invalid release version');
+          appendFileSync(process.env.GITHUB_OUTPUT, `version=${version}\n`);
+          JS
+      - working-directory: web
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm lint
+          pnpm test
+          pnpm release
+      - name: Build versioned Linux candidates
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          CGO_ENABLED: "0"
+          GOOS: linux
+        run: |
+          mkdir -p build/candidate
+          for arch in amd64 arm64; do
+            GOARCH="$arch" go build -trimpath \
+              -ldflags "-s -w -X github.com/usememos/memos/internal/version.Version=$RELEASE_VERSION -X github.com/usememos/memos/internal/version.Commit=$RELEASE_COMMIT" \
+              -o "build/candidate/memos-linux-$arch" ./cmd/memos
+          done
+          cp CHANGELOG.md LICENSE build/candidate/
+          node --input-type=module <<'JS'
+          import {writeFileSync} from 'node:fs';
+          const version = process.env.RELEASE_VERSION;
+          writeFileSync('build/candidate/release.json', JSON.stringify({version, tag: `castor-v${version}`, commit: process.env.RELEASE_COMMIT}, null, 2) + '\n');
+          JS
+          (cd build/candidate && sha256sum memos-linux-* release.json CHANGELOG.md LICENSE > SHA256SUMS)
+      - uses: actions/upload-artifact@v6
+        with:
+          name: memos-${{ steps.version.outputs.version }}-${{ github.event.pull_request.merge_commit_sha }}
+          path: build/candidate/
+          retention-days: 30
+          if-no-files-found: error
+      - run: echo 'Candidate prepared. Registry publishing and server deployment are not connected yet.' >> "$GITHUB_STEP_SUMMARY"

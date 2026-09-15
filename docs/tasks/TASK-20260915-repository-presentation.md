@@ -1,10 +1,10 @@
 # TASK-20260915-repository-presentation：启用 Issues 与清理上游赞助展示
 
-- 状态：已完成（文件改动通过 PR 交付，默认分支展示以合并为准）
+- 状态：已完成（PR #1 已合并，默认分支展示已更新）
 - 部署状态：不涉及部署
 - 模块与关键词：Fork、Issues、README、赞助、FUNDING、问题模板
 - 关联任务：[发布基础设施讨论](TASK-20260915-release-workflow.md)、[环境初始化](TASK-20260915-local-environment.md)
-- 交付：[PR #1](https://github.com/Castor6/memos/pull/1)，分支 `chore/personal-fork-foundation`，尚未合并
+- 交付：[PR #1](https://github.com/Castor6/memos/pull/1)，分支 `chore/personal-fork-foundation`，已合并（`2bf6e786`）
 - 最后更新：2026-09-15
 
 ## 背景与目标

@@ -31,3 +31,6 @@ dist
 
 # Frontend test coverage output (Vitest + @vitest/coverage-v8).
 web/coverage/
+
+# Version tooling dependencies (frontend has its own ignore rules).
+/node_modules/

@@ -1,0 +1,83 @@
+name: Version Packages
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: version-packages-main
+  cancel-in-progress: false
+
+jobs:
+  version:
+    if: >-
+      github.repository == 'Castor6/memos' &&
+      ((github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_repository.full_name == github.repository))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    steps:
+      - name: Ignore checks for an older main commit
+        id: current
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const {data} = await github.rest.repos.getBranch({...context.repo, branch: 'main'});
+            const expected = context.payload.workflow_run?.head_sha ?? context.sha;
+            core.setOutput('run', data.commit.sha === expected);
+            core.setOutput('sha', data.commit.sha);
+      - uses: actions/checkout@v6
+        if: steps.current.outputs.run == 'true'
+        with:
+          ref: ${{ steps.current.outputs.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4.2.0
+        if: steps.current.outputs.run == 'true'
+        with:
+          version: 11.0.1
+      - uses: actions/setup-node@v6
+        if: steps.current.outputs.run == 'true'
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - if: steps.current.outputs.run == 'true'
+        run: pnpm install --frozen-lockfile
+      - if: steps.current.outputs.run == 'true'
+        run: pnpm check:release
+      - uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1.9.0, same as BrowserRig
+        if: steps.current.outputs.run == 'true'
+        id: changesets
+        with:
+          github-token: ${{ github.token }}
+          branch: main
+          commitMode: github-api
+          version: pnpm version-packages
+          title: Version Packages
+          commit: "chore: version packages"
+          createGithubReleases: false
+      - name: Run CI on the version PR using an explicit dispatch
+        if: steps.changesets.outputs.pullRequestNumber != ''
+        uses: actions/github-script@v8
+        env:
+          VERSION_PR_NUMBER: ${{ steps.changesets.outputs.pullRequestNumber }}
+        with:
+          script: |
+            const {data: pr} = await github.rest.pulls.get({...context.repo, pull_number: Number(process.env.VERSION_PR_NUMBER)});
+            if (pr.state !== 'open' || pr.head.repo?.full_name !== `${context.repo.owner}/${context.repo.repo}` ||
+                pr.head.ref !== 'changeset-release/main' || pr.base.ref !== 'main') {
+              throw new Error('Unexpected version PR source');
+            }
+            await github.rest.actions.createWorkflowDispatch({...context.repo, workflow_id: 'ci.yml', ref: pr.head.ref});

@@ -1,18 +1,10 @@
 name: Backend Tests
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-    paths:
-      - "go.mod"
-      - "go.sum"
-      - "**.go"
+  workflow_call:
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+permissions:
+  contents: read
 
 env:
   GO_VERSION: "1.26.2"
@@ -24,7 +16,7 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
-      
+
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
@@ -53,7 +45,7 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
-      
+
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
@@ -78,16 +70,8 @@ jobs:
               ;;
             other)
               go test -v -race -coverprofile=coverage.out -covermode=atomic \
-                ./cmd/... ./internal/... ./proto/...
+                ./cmd/... ./proto/... ./scripts/...
               ;;
           esac
         env:
           DRIVER: ${{ matrix.test-group == 'store' && '' || 'sqlite' }}
-
-      - name: Upload coverage
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: codecov/codecov-action@v5
-        with:
-          files: ./coverage.out
-          flags: ${{ matrix.test-group }}
-          fail_ci_if_error: false

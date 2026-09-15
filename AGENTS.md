@@ -24,7 +24,8 @@ Memos is a self-hosted note-taking app.
 ## Personal Fork Workflow
 
 - Communicate in Chinese. Keep task records in Chinese and update them as work progresses.
-- Use focused branches and PRs targeting `Castor6/memos:main` for changes, including documentation and upstream imports. A version PR is the intended release entry point; ordinary merges must not trigger production deployment. Automation is not configured yet; see `docs/tasks/TASK-20260915-release-workflow.md` for the proposal and implementation status.
+- Use focused branches and PRs targeting `Castor6/memos:main` for changes, including documentation and upstream imports. `validate` is the required CI check. See `docs/release.md` for CI, Changesets and the version PR flow; actual rollout status is in `docs/tasks/TASK-20260915-release-workflow.md`. Ordinary merges must not trigger production deployment.
+- Add a new `.changeset/*.md` for shipped behavior changes using root `corepack pnpm changeset`. Use patch/minor/major and a Chinese user-facing summary. Only the generated version PR updates the root package version and `CHANGELOG.md`; upstream history lives in `docs/upstream/CHANGELOG.md`. Version PR merges currently build candidate artifacts; registry publishing and server deployment are not connected.
 - Retrieve history on demand: search `docs/tasks/INDEX.md` by task ID, keywords or affected module; open only relevant task records and necessary linked documents. Do not load all historical tasks at startup.
 - `docs/README.md` is a navigation entry, not a mandatory reading list. Read `docs/development.md` when running or verifying locally; read deployment documentation only for deployment/upstream work.
 - For substantive work, create or reuse one record from `docs/tasks/TEMPLATE.md`; capture agreed acceptance criteria before implementation and actual verification afterward. Distinguish implemented, verified and deployed. Small related fixes may share a record.
@@ -43,6 +44,13 @@ Run from the repository root unless a command starts with `cd`.
 ./scripts/dev.sh reset             # Stop first; archive test data, reseed on next start
 ./scripts/dev.sh check frontend    # lint + unit tests + production build
 ./scripts/dev.sh check backend     # server/internal race tests + SQLite store tests
+
+# CI / personal version tooling (Node 24; run from root)
+corepack pnpm install --frozen-lockfile
+corepack pnpm test                 # CI routing, aggregate gate, release guard tests
+corepack pnpm check:release origin/main
+corepack pnpm changeset            # Add release note and relative version bump
+go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -shellcheck=""
 
 # Backend
 go run ./cmd/memos --port 8081    # Start backend dev server
@@ -101,6 +109,7 @@ cd proto && buf format -w          # Format proto files
 | Internal package logic | Relevant `internal/` package tests | `go test -v -race ./internal/...` |
 | Frontend behavior | Components/hooks/contexts under `web/src/` | `cd web && pnpm lint && pnpm test` |
 | Frontend production output | Vite config or release-sensitive UI | `cd web && pnpm build` or `pnpm release` |
+| CI or version tooling | `.github/`, root metadata, `scripts/ci*` and `scripts/release-check*` | Root `corepack pnpm test`, `check:release`, Actionlint; verify affected GitHub jobs |
 | Proto API | `.proto` source plus generated outputs | `cd proto && buf generate && buf lint` |
 | Public unauthenticated route | `server/router/api/v1/acl_config.go` | Targeted server test or manual route check |
 
