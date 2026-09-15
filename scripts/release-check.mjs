@@ -30,7 +30,9 @@ export function checkRelease({ root = process.cwd(), base = "", head = "HEAD", v
     const content = readFileSync(join(root, ".changeset", name), "utf8");
     assert.match(content, /^---\r?\n["']?memos-personal["']?: (patch|minor|major)\r?\n---\r?\n\s*\S/, `Invalid release note: ${name}`);
   }
-  execFileSync(cli, ["status"], { cwd: root, stdio: "pipe" });
+  // Do not use `changeset status` here: its package-wide change heuristic would
+  // require notes for docs-only PRs and depends on a local base branch. The
+  // single-package note schema above and application paths below are our policy.
   if (!base) return;
   const paths = files(root, base, head);
   const previous = at(root, base, "package.json");
@@ -57,7 +59,7 @@ export function checkRelease({ root = process.cwd(), base = "", head = "HEAD", v
   try {
     git(root, "worktree", "add", "--detach", worktree, base);
     symlinkSync(join(project, "node_modules"), join(worktree, "node_modules"), "dir");
-    execFileSync(cli, ["version"], { cwd: worktree, stdio: "pipe" });
+    execFileSync(cli, ["version"], { cwd: worktree, stdio: "pipe", encoding: "utf8" });
     const expected = git(worktree, "diff", "--name-only", "--no-renames", "-z").split("\0").filter(Boolean);
     assert.ok(expected.includes("package.json"), "No pending release exists on main");
     assert.deepEqual([...paths].sort(), expected.sort(), "Version PR file set differs from Changesets output");

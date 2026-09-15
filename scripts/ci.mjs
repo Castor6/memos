@@ -11,11 +11,12 @@ export function isReleasable(path) {
 }
 
 export function classify(paths, { full = false, versionPR = false } = {}) {
+  paths = paths.filter((path) => !path.endsWith(".md"));
   const workflow = paths.some((path) => path.startsWith(".github/workflows/"));
   const all = full || versionPR || workflow;
   return {
     frontend: all || paths.some((path) => path.startsWith("web/") || path.startsWith("proto/") || path === ".node-version"),
-    backend: all || paths.some((path) => path.endsWith(".go") || path.startsWith("proto/") || ["go.mod", "go.sum", ".golangci.yaml"].includes(path)),
+    backend: all || paths.some((path) => path.endsWith(".go") || path.startsWith("proto/") || path.startsWith("store/") || ["go.mod", "go.sum", ".golangci.yaml"].includes(path)),
     proto: all || paths.some((path) => path.startsWith("proto/") && !path.endsWith(".md")),
     upgrade: full || paths.some((path) => /^(store\/(db|migration)\/|store\/migrator\.go$|server\/server\.go$)/.test(path) ||
       ["scripts/Dockerfile", "scripts/entrypoint.sh", "scripts/release_smoke_test.sh", ".github/workflows/upgrade-smoke.yml"].includes(path)),

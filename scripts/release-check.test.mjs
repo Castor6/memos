@@ -57,7 +57,31 @@ test("two changesets aggregate into one minor version; forged version diffs fail
   assert.equal(JSON.parse(readFileSync(join(f.root, "package.json"))).version, "0.1.0");
   const changelog = readFileSync(join(f.root, "CHANGELOG.md"), "utf8");
   assert.match(changelog, /Fix one issue/); assert.match(changelog, /Add one feature/);
+  f.git("checkout", "--detach");
+  f.git("branch", "-D", "main");
   checkRelease({ root: f.root, base, versionPR: true });
+  // Exercise the real event planner for the post-merge push and for explicit
+  // CI dispatches, including the base used to enforce version ownership.
+  const eventDir = mkdtempSync(join(tmpdir(), "memos-ci-event-"));
+  t.after(() => rmSync(eventDir, { recursive: true, force: true }));
+  const eventPath = join(eventDir, "event.json");
+  const outputPath = join(eventDir, "outputs");
+  f.git("update-ref", "refs/remotes/origin/main", base);
+  for (const [name, branch, event, expectedVersion, expectedBase] of [
+    ["push", "main", { before: base }, true, base],
+    ["workflow_dispatch", "changeset-release/main", {}, true, "origin/main"],
+    ["workflow_dispatch", "feature/manual-check", {}, false, "origin/main"],
+  ]) {
+    writeFileSync(eventPath, JSON.stringify(event)); writeFileSync(outputPath, "");
+    execFileSync(process.execPath, [join(project, "scripts/ci.mjs")], { cwd: f.root, stdio: "pipe", env: {
+      ...process.env, GITHUB_EVENT_NAME: name, GITHUB_REF_NAME: branch, GITHUB_REPOSITORY: "Castor6/memos",
+      GITHUB_EVENT_PATH: eventPath, GITHUB_OUTPUT: outputPath,
+    } });
+    const outputs = Object.fromEntries(readFileSync(outputPath, "utf8").trim().split("\n").map((line) => line.split("=")));
+    assert.equal(outputs.version_pr, String(expectedVersion));
+    assert.equal(outputs.base, expectedBase);
+    assert.equal(outputs.frontend, "true");
+  }
   f.write("web/src/App.tsx", "unexpected change\n"); f.commit();
   assert.throws(() => checkRelease({ root: f.root, base, versionPR: true }), /file set differs/);
 });

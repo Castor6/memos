@@ -10,6 +10,8 @@ test("docs skip heavy jobs; workflow and version PRs check the application", () 
   assert.ok(classify(["proto/api/v1/memo.proto"]).frontend);
   assert.ok(classify(["proto/api/v1/memo.proto"]).backend);
   assert.ok(classify(["store/db/sqlite/migration/0.31/00__change.sql"]).upgrade);
+  assert.ok(classify(["store/db/sqlite/migration/0.31/00__change.sql"]).backend);
+  assert.equal(classify(["web/README.md"]).frontend, false);
   assert.ok(classify(["web/tests/editor.test.tsx"]).frontend);
 });
 
