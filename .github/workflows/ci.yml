@@ -1,0 +1,116 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      frontend: ${{ steps.plan.outputs.frontend }}
+      backend: ${{ steps.plan.outputs.backend }}
+      proto: ${{ steps.plan.outputs.proto }}
+      upgrade: ${{ steps.plan.outputs.upgrade }}
+      workflow: ${{ steps.plan.outputs.workflow }}
+      base: ${{ steps.plan.outputs.base }}
+      head: ${{ steps.plan.outputs.head }}
+      version_pr: ${{ steps.plan.outputs.version_pr }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .node-version
+      - id: plan
+        run: node scripts/ci.mjs
+
+  infrastructure:
+    needs: changes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4.2.0
+        with:
+          version: 11.0.1
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+      - name: Check release notes and version ownership
+        run: pnpm check:release
+        env:
+          RELEASE_BASE: ${{ needs.changes.outputs.base }}
+          RELEASE_HEAD: ${{ needs.changes.outputs.head }}
+          VERSION_PR: ${{ needs.changes.outputs.version_pr }}
+      - name: Check whitespace and local script syntax
+        env:
+          DIFF_BASE: ${{ needs.changes.outputs.base }}
+          DIFF_HEAD: ${{ needs.changes.outputs.head }}
+        run: |
+          if [ -n "$DIFF_BASE" ]; then
+            git diff --check "$DIFF_BASE" "$DIFF_HEAD"
+          fi
+          bash -n scripts/dev.sh
+          python3 -c 'import ast; from pathlib import Path; ast.parse(Path("scripts/dev.py").read_text())'
+      - uses: actions/setup-go@v6
+        if: needs.changes.outputs.workflow == 'true'
+        with:
+          go-version: "1.26.2"
+      - name: Validate workflow syntax
+        if: needs.changes.outputs.workflow == 'true'
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -shellcheck=""
+
+  frontend:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    uses: ./.github/workflows/frontend-tests.yml
+
+  backend:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    uses: ./.github/workflows/backend-tests.yml
+
+  proto:
+    needs: changes
+    if: needs.changes.outputs.proto == 'true'
+    uses: ./.github/workflows/proto-linter.yml
+
+  upgrade:
+    needs: changes
+    if: needs.changes.outputs.upgrade == 'true'
+    uses: ./.github/workflows/upgrade-smoke.yml
+
+  validate:
+    name: validate
+    if: always()
+    needs: [changes, infrastructure, frontend, backend, proto, upgrade]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .node-version
+      - run: node scripts/ci.mjs gate
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}

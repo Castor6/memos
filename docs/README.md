@@ -9,6 +9,7 @@
 | 查找某个需求、问题或历史结论 | 搜索 [任务索引](tasks/INDEX.md)，只打开相关详情 |
 | 记录新的实质需求或修复 | 使用 [任务模板](tasks/TEMPLATE.md)，同步更新索引 |
 | 启动本地应用、准备数据或验证修改 | [本地开发与验证](development.md) |
+| 提交发布说明、了解 CI 和版本 PR | [CI 与版本流程](release.md) |
 | 了解上游基线、个人差异、发布和部署方案 | [定制与部署记录](customization-and-deployment.zh-CN.md) |
 | 查看长期协作和代码规则 | [AGENTS.md](../AGENTS.md) |
 

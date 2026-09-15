@@ -1,0 +1,16 @@
+{
+  "name": "memos-personal",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "pnpm@11.0.1",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "check:release": "node scripts/release-check.mjs",
+    "test": "node --test scripts/ci.test.mjs scripts/release-check.test.mjs"
+  },
+  "devDependencies": {
+    "@changesets/cli": "3.0.1"
+  }
+}

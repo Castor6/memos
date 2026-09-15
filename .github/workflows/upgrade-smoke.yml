@@ -6,26 +6,14 @@ name: Upgrade Smoke
 # pull requests and before releases rather than on every backend change.
 #
 # Fast startup coverage (server.NewServer plus route smoke, SQLite only) lives in
-# the `server` group of backend-tests.yml and runs on every pull request.
+# the `server` group of backend-tests.yml and runs on backend changes.
 
 on:
   workflow_call:
   workflow_dispatch:
-  pull_request:
-    branches: [main]
-    paths:
-      # Anything that can change how an existing database is opened or upgraded.
-      - "store/migration/**"
-      - "store/migrator.go"
-      - "store/db/**"
-      - "store/test/containers.go"
-      - "store/test/migrator*_test.go"
-      - "store/test/store.go"
-      - "server/server.go"
-      - "scripts/Dockerfile"
-      - "scripts/entrypoint.sh"
-      - "scripts/release_smoke_test.sh"
-      - ".github/workflows/upgrade-smoke.yml"
+
+permissions:
+  contents: read
 
 concurrency:
   # Keep this distinct from a caller's concurrency group when the workflow is
