@@ -61,6 +61,12 @@ func (d *DB) CreateMemo(ctx context.Context, create *store.Memo) (*store.Memo, e
 
 func (d *DB) ListMemos(ctx context.Context, find *store.FindMemo) ([]*store.Memo, error) {
 	where, having, args := []string{"1 = 1"}, []string{"1 = 1"}, []any{}
+	if v := find.Space; v != nil {
+		where, args = append(where, "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(`memo`.`payload`, '$.space')), '') = ?"), append(args, *v)
+	}
+	if v := find.IsTodo; v != nil {
+		where, args = append(where, "COALESCE(JSON_EXTRACT(`memo`.`payload`, '$.isTodo'), false) = ?"), append(args, *v)
+	}
 
 	engine, err := filter.DefaultEngine()
 	if err != nil {
@@ -258,6 +264,7 @@ func (d *DB) UpdateMemo(ctx context.Context, update *store.UpdateMemo) error {
 
 func (d *DB) DeleteMemo(ctx context.Context, delete *store.DeleteMemo) error {
 	where, args := []string{"`id` = ?"}, []any{delete.ID}
+
 	stmt := "DELETE FROM `memo` WHERE " + strings.Join(where, " AND ")
 	result, err := d.db.ExecContext(ctx, stmt, args...)
 	if err != nil {

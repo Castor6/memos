@@ -1,4 +1,4 @@
-import { BellIcon, EarthIcon, InfoIcon, LibraryIcon, PaperclipIcon, UserCircleIcon } from "lucide-react";
+import { BellIcon, EarthIcon, InfoIcon, LibraryIcon, ListTodoIcon, PaperclipIcon, UserCircleIcon } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import useCurrentUser from "@/hooks/useCurrentUser";
@@ -76,7 +76,13 @@ const Navigation = (props: Props) => {
   };
 
   const primaryNavLinks: NavLinkItem[] = currentUser
-    ? [homeNavLink, exploreNavLink, attachmentsNavLink, inboxNavLink]
+    ? [
+        homeNavLink,
+        { id: "header-todos", path: "/todos", title: "待办", icon: <ListTodoIcon className="w-6 h-auto shrink-0" /> },
+        exploreNavLink,
+        attachmentsNavLink,
+        inboxNavLink,
+      ]
     : [exploreNavLink, aboutNavLink, signInNavLink];
   const inboxAriaLabel = unreadCount > 0 ? `${t("common.inbox")}, ${unreadCount} unread` : t("common.inbox");
 
@@ -102,7 +108,7 @@ const Navigation = (props: Props) => {
               to={navLink.path}
               end={navLink.path === Routes.HOME}
               id={navLink.id}
-              aria-label={navLink.id === "header-inbox" ? inboxAriaLabel : undefined}
+              aria-label={navLink.id === "header-inbox" ? inboxAriaLabel : navLink.title}
               viewTransition
             >
               {props.collapsed ? (

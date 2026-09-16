@@ -1,3 +1,5 @@
+vi.mock("@/components/MemoContent/Tag", () => ({ Tag: ({ children }: { children: React.ReactNode }) => <span>{children}</span> }));
+vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => ({ userGeneralSetting: {} }) }));
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CLAMP_PREVIEW_HEIGHT_PX, CLAMP_TRIGGER_HEIGHT_PX } from "@/components/ClampedSection";
@@ -10,6 +12,7 @@ const mockState = vi.hoisted(() => ({
     relations: [],
     attachments: [],
     reactions: [],
+    tags: [],
   },
 }));
 
@@ -58,6 +61,7 @@ vi.mock("@/components/MemoView/MemoViewContext", () => ({
 const createMemo = (content: string) => ({
   name: "memos/1",
   content,
+  tags: [],
   relations: [],
   attachments: [],
   reactions: [],

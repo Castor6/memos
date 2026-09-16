@@ -54,6 +54,13 @@ func (d *DB) CreateMemo(ctx context.Context, create *store.Memo) (*store.Memo, e
 func (d *DB) ListMemos(ctx context.Context, find *store.FindMemo) ([]*store.Memo, error) {
 	where, args := []string{"1 = 1"}, []any{}
 
+	if v := find.Space; v != nil {
+		where, args = append(where, "COALESCE(JSON_EXTRACT(`memo`.`payload`, '$.space'), '') = ?"), append(args, *v)
+	}
+	if v := find.IsTodo; v != nil {
+		where, args = append(where, "COALESCE(JSON_EXTRACT(`memo`.`payload`, '$.isTodo'), 0) = ?"), append(args, *v)
+	}
+
 	engine, err := filter.DefaultEngine()
 	if err != nil {
 		return nil, err

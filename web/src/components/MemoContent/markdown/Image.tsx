@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { InlineFile } from "../InlineFile";
 import type { ReactMarkdownProps } from "./types";
 
 interface ImageProps extends React.ImgHTMLAttributes<HTMLImageElement>, ReactMarkdownProps {}
@@ -8,6 +9,8 @@ interface ImageProps extends React.ImgHTMLAttributes<HTMLImageElement>, ReactMar
  * Responsive with rounded corners
  */
 export const Image = ({ className, alt, node: _node, height, width, style, ...props }: ImageProps) => {
+  if (props.title?.startsWith("memos:"))
+    return <InlineFile src={typeof props.src === "string" ? props.src : ""} title={props.title} label={alt || "文件"} />;
   return (
     <img
       className={cn("max-w-full my-2", !height && "h-auto", className)}

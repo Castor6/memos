@@ -1,8 +1,13 @@
 import ClampedSection from "@/components/ClampedSection";
-import { AttachmentListView, LocationDisplayView, RelationListView } from "@/components/MemoMetadata";
+import { Tag } from "@/components/MemoContent/Tag";
+import { LocationDisplayView, RelationListView } from "@/components/MemoMetadata";
 import { isReferenceRelation } from "@/components/MemoMetadata/Relation/relationHelpers";
+import { useAuth } from "@/contexts/AuthContext";
+import { FILE_TITLE, fileMarkdown } from "@/lib/inline-media";
 import { cn } from "@/lib/utils";
+import { getAttachmentUrl } from "@/utils/attachment";
 import { useTranslate } from "@/utils/i18n";
+import { visibleCharacterCount } from "@/utils/remark-plugins/remark-preview";
 import MemoContent from "../../MemoContent";
 import { MemoReactionListView } from "../../MemoReactionListView";
 import { useMemoHandlers } from "../hooks";
@@ -21,11 +26,25 @@ const BlurOverlay: React.FC<{ onClick?: () => void }> = ({ onClick }) => {
 };
 
 const MemoBody: React.FC<MemoBodyProps> = ({ compact }) => {
+  const { userGeneralSetting } = useAuth();
+  const limit = userGeneralSetting?.previewCharacters ?? 0;
   const { memo, parentPage, showBlurredContent, blurred, readonly, openEditor, openPreview, toggleBlurVisibility } = useMemoViewContext();
 
   const { handleMemoContentClick, handleMemoContentDoubleClick } = useMemoHandlers({ readonly, openEditor, openPreview });
 
-  const referencedMemos = memo.relations.filter(isReferenceRelation);
+  const referencedMemos = memo.relations
+    .filter(isReferenceRelation)
+    .filter((relation) => !memo.content.includes(`/${relation.relatedMemo?.name}`));
+  const content =
+    memo.content +
+    memo.attachments
+      .filter((file) => !memo.content.includes(file.name) && !memo.content.includes(getAttachmentUrl(file)))
+      .map(
+        (file) => `
+
+${fileMarkdown(getAttachmentUrl(file), FILE_TITLE + file.type, file.filename)}`,
+      )
+      .join("");
 
   return (
     <>
@@ -37,17 +56,31 @@ const MemoBody: React.FC<MemoBodyProps> = ({ compact }) => {
       >
         {/* Compact bounds the whole body — attachments included — behind one Show more.
             Reactions stay outside so they never hide under the fade. */}
-        <ClampedSection enabled={Boolean(compact)}>
-          <MemoContent
-            memoName={memo.name}
-            content={memo.content}
-            onClick={handleMemoContentClick}
-            onDoubleClick={handleMemoContentDoubleClick}
-            compact={Boolean(compact)}
-          />
-          <AttachmentListView attachments={memo.attachments} onImagePreview={openPreview} />
-          <RelationListView relations={referencedMemos} currentMemoName={memo.name} parentPage={parentPage} />
-          {memo.location && <LocationDisplayView location={memo.location} />}
+        <ClampedSection enabled={Boolean(compact)} characterLimit={limit} textLength={visibleCharacterCount(content)}>
+          {(collapsed) => (
+            <>
+              {memo.tags.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {memo.tags.map((tag) => (
+                    <Tag key={tag} data-tag={tag}>
+                      {tag}
+                    </Tag>
+                  ))}
+                </div>
+              )}
+              <MemoContent
+                memoName={memo.name}
+                content={content}
+                explicitTags={memo.explicitTags}
+                maxCharacters={collapsed ? limit : 0}
+                onClick={handleMemoContentClick}
+                onDoubleClick={handleMemoContentDoubleClick}
+                compact={Boolean(compact)}
+              />
+              <RelationListView relations={referencedMemos} currentMemoName={memo.name} parentPage={parentPage} />
+              {memo.location && <LocationDisplayView location={memo.location} />}
+            </>
+          )}
         </ClampedSection>
         <MemoReactionListView memo={memo} reactions={memo.reactions} />
       </div>

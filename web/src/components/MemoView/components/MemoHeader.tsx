@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { Visibility } from "@/types/proto/api/v1/memo_service_pb";
 import type { User } from "@/types/proto/api/v1/user_service_pb";
 import { useTranslate } from "@/utils/i18n";
+import { extractTasksFromAst } from "@/utils/markdown-manipulation";
 import { convertVisibilityToString } from "@/utils/memo";
 import MemoActionMenu from "../../MemoActionMenu";
 import { ReactionSelector } from "../../MemoReactionListView";
@@ -24,6 +25,7 @@ const MemoHeader: React.FC<MemoHeaderProps> = ({ showCreator, showVisibility, sh
   const [reactionSelectorOpen, setReactionSelectorOpen] = useState(false);
 
   const { memo, creator, currentUser, parentPage, isArchived, readonly, openEditor } = useMemoViewContext();
+  const tasks = memo.isTodo ? extractTasksFromAst(memo.content) : [];
   const { createTime, updateTime, displayTime: memoDisplayTime, isDisplayingUpdatedTime, relativeTimeFormat } = useMemoViewDerived();
   const { newMemoName } = useNewMemo();
 
@@ -104,6 +106,11 @@ const MemoHeader: React.FC<MemoHeaderProps> = ({ showCreator, showVisibility, sh
           </TooltipProvider>
         )}
 
+        {memo.isTodo && (
+          <span className="text-sm text-muted-foreground" aria-label="待办完成进度">
+            ☑ {tasks.filter((task) => task.checked).length}/{tasks.length}
+          </span>
+        )}
         <MemoActionMenu memo={memo} readonly={readonly} onEdit={openEditor} />
       </div>
     </div>

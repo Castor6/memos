@@ -34,7 +34,7 @@ func validateUserTagsSetting(setting *v1pb.UserSetting_TagsSetting) error {
 		return errors.New("tags setting is required")
 	}
 	for tag, metadata := range setting.Tags {
-		if strings.TrimSpace(tag) == "" {
+		if strings.TrimSpace(tag) == "" || strings.Contains(tag, spaceTagSeparator) {
 			return errors.New("tag key cannot be empty")
 		}
 		if _, err := regexp.Compile(tag); err != nil {
@@ -42,6 +42,9 @@ func validateUserTagsSetting(setting *v1pb.UserSetting_TagsSetting) error {
 		}
 		if metadata == nil {
 			return errors.Errorf("tag metadata is required for %q", tag)
+		}
+		if len(metadata.Emoji) > 64 {
+			return errors.New("emoji is too long")
 		}
 		if metadata.GetBackgroundColor() != nil {
 			if err := validateInstanceColor(metadata.GetBackgroundColor()); err != nil {
@@ -309,10 +312,10 @@ func (s *APIV1Service) UpdateUser(ctx context.Context, request *v1pb.UpdateUserR
 		return nil, status.Errorf(codes.PermissionDenied, "permission denied")
 	}
 
-	currentTs := time.Now().Unix()
+	currentTimeSec := time.Now().Unix()
 	update := &store.UpdateUser{
 		ID:        user.ID,
-		UpdatedTs: &currentTs,
+		UpdatedTs: &currentTimeSec,
 	}
 	instanceGeneralSetting, err := s.Store.GetInstanceGeneralSetting(ctx)
 	if err != nil {

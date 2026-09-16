@@ -55,8 +55,10 @@ type Memo struct {
 }
 
 type FindMemo struct {
-	ID  *int32
-	UID *string
+	Space  *string
+	IsTodo *bool
+	ID     *int32
+	UID    *string
 
 	IDList  []int32
 	UIDList []string
@@ -110,11 +112,21 @@ func (s *Store) CreateMemo(ctx context.Context, create *Memo) (*Memo, error) {
 	if !base.UIDMatcher.MatchString(create.UID) {
 		return nil, errors.New("invalid uid")
 	}
+	if space, scoped := SpaceFromContext(ctx); scoped {
+		if create.Payload == nil {
+			create.Payload = &storepb.MemoPayload{}
+		}
+		create.Payload.Space = space
+	}
 	return s.driver.CreateMemo(ctx, create)
 }
 
 func (s *Store) ListMemos(ctx context.Context, find *FindMemo) ([]*Memo, error) {
-	return s.driver.ListMemos(ctx, find)
+	scopedFind := *find
+	if space, scoped := SpaceFromContext(ctx); scoped {
+		scopedFind.Space = &space
+	}
+	return s.driver.ListMemos(ctx, &scopedFind)
 }
 
 func (s *Store) GetMemo(ctx context.Context, find *FindMemo) (*Memo, error) {

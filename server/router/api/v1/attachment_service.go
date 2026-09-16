@@ -61,6 +61,10 @@ func (s *APIV1Service) CreateAttachment(ctx context.Context, request *v1pb.Creat
 		return nil, status.Errorf(codes.Unauthenticated, "user not authenticated")
 	}
 
+	if _, err := s.validateSelectedSpace(ctx, user.ID); err != nil {
+		return nil, err
+	}
+
 	// Validate required fields
 	if request.Attachment == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "attachment is required")
@@ -287,10 +291,10 @@ func (s *APIV1Service) UpdateAttachment(ctx context.Context, request *v1pb.Updat
 		return nil, status.Errorf(codes.PermissionDenied, "permission denied")
 	}
 
-	currentTs := time.Now().Unix()
+	currentTimeSec := time.Now().Unix()
 	update := &store.UpdateAttachment{
 		ID:        attachment.ID,
-		UpdatedTs: &currentTs,
+		UpdatedTs: &currentTimeSec,
 	}
 	for _, field := range request.UpdateMask.Paths {
 		if field == "filename" {

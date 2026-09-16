@@ -11,6 +11,13 @@ message MemoPayload {
 
   repeated string tags = 3;
 
+  // Personal space; empty means the original personal space.
+  string space = 4;
+  // Separates independent todo cards from notes.
+  bool is_todo = 5;
+  // Explicit tags must not be overwritten by Markdown extraction.
+  bool explicit_tags = 6;
+
   // The calculated properties from the memo content.
   message Property {
     bool has_link = 1;

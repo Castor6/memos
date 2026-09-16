@@ -38,6 +38,8 @@ export const useMemoInit = ({
       dispatch(actions.initMemo(initialState));
     } else {
       const cachedContent = cacheService.load(key);
+      const cachedMetadata = cacheService.loadMetadata(key);
+      if (cachedMetadata) dispatch(actions.setMetadata(cachedMetadata));
       if (cachedContent) {
         dispatch(actions.updateContent(cachedContent));
       }

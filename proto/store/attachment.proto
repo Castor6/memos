@@ -45,6 +45,9 @@ message AttachmentPayload {
 
   MotionMedia motion_media = 10;
 
+  // Personal space owning this file.
+  string space = 11;
+
   message S3Object {
     StorageS3Config s3_config = 1;
     // key is the S3 object key.

@@ -614,6 +614,11 @@ paths:
             description: ListMemos lists memos with pagination and filter.
             operationId: MemoService_ListMemos
             parameters:
+                - name: isTodo
+                  in: query
+                  description: Select independent todo cards instead of notes.
+                  schema:
+                    type: boolean
                 - name: pageSize
                   in: query
                   description: |-
@@ -3273,11 +3278,10 @@ components:
                          PUBLIC (anyone). Defaults to PRIVATE on creation when unspecified.
                     format: enum
                 tags:
-                    readOnly: true
                     type: array
                     items:
                         type: string
-                    description: Output only. The tags extracted from the content.
+                    description: Optional. Explicit tags, independent of the body.
                 pinned:
                     type: boolean
                     description: Whether the memo is pinned.
@@ -3316,6 +3320,15 @@ components:
                     allOf:
                         - $ref: '#/components/schemas/Location'
                     description: Optional. The location of the memo.
+                space:
+                    type: string
+                    description: Personal space; empty means the original personal space.
+                isTodo:
+                    type: boolean
+                    description: True for an independent todo card.
+                explicitTags:
+                    type: boolean
+                    description: True when tags are managed separately from Markdown.
         MemoRelation:
             required:
                 - memo
@@ -3921,6 +3934,23 @@ components:
                         The preferred theme of the user.
                          This references a CSS file in the web/public/themes/ directory.
                          If not set, the default theme will be used.
+                spaces:
+                    type: object
+                    additionalProperties:
+                        type: string
+                    description: User-created personal spaces, keyed by immutable IDs.
+                enterToSave:
+                    type: boolean
+                    description: Desktop Enter saves when enabled; mobile Enter always inserts a line.
+                commonWords:
+                    type: array
+                    items:
+                        type: string
+                    description: User-configured words, inserted only through the toolbar.
+                previewCharacters:
+                    type: integer
+                    description: Visible character limit in feed cards; zero disables text folding.
+                    format: int32
             description: General user settings configuration.
         UserSetting_TagMetadata:
             type: object
@@ -3934,6 +3964,9 @@ components:
                 blurContent:
                     type: boolean
                     description: Whether memos with this tag should have their content blurred.
+                emoji:
+                    type: string
+                    description: Optional display emoji.
             description: Tag metadata for user-specific display rules.
         UserSetting_TagsSetting:
             type: object

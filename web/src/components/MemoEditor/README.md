@@ -1,125 +1,33 @@
-# MemoEditor Architecture
+# 笔记与待办编辑器
 
-## Overview
+正文使用 Tiptap / ProseMirror 所见即所得编辑，`EditorController` 仍以 Markdown 与既有保存接口交互。状态与保存逻辑沿用 `state/`、`services/`、`hooks/`；工具栏不能直接操作 ProseMirror 内部状态。
 
-MemoEditor is a three-layer component. At its core is a single editor — `Editor/`, a CodeMirror 6 "decorated source" editor. It stores the memo as **raw markdown, verbatim** (no parse/serialize round-trip) and styles that source in place with CodeMirror decorations: the markers (`#`, `*`, `` ` ``, list bullets, fences) stay visible but de-emphasized while the styled text leads. There is one editor and one storage format; everything above the editor boundary talks markdown through the `EditorController` contract.
+## 内容与兼容
 
-## Architecture
+- `Editor/index.tsx` 装配段落、标题、列表、任务列表、代码、表格、高亮、媒体与兼容内容扩展。编辑时不展示格式标记；序列化会规范化 Markdown 的空白及列表编号。
+- `Editor/preserved-content.tsx` 对历史 HTML、公式、脚注采用保留原文的内容块并安全渲染预览。这些块可整体移动/删除，周围可继续编辑，暂不提供其内部的富文本编辑。避免未知内容经过转换丢失。
+- `Editor/media.ts` 在光标位置显示媒体或文件卡片；`lib/inline-media.ts` 统一 Markdown 编码。图片语法的 title 以 `memos:file:<mime>` 或 `memos:reference` 标明类型，链接仍指向原附件/笔记。
+- 历史底部附件在展示时按原顺序补到正文末尾；进入编辑后转为正文块。删除块后保存会移除对应附件关联，沿用服务端的附件清理规则。
+- 笔记引用保存插入时的摘要，并链接到原笔记；摘要不是实时同步镜像。仅允许同空间的笔记相互引用，待办不参与引用。
+- 旧 CodeMirror 辅助文件暂保留供已有纯函数测试使用，运行时入口不再加载旧编辑器。
 
-```
-┌─────────────────────────────────────────┐
-│   Presentation Layer (Components)       │
-│   - EditorToolbar, EditorContent, etc.  │
-└─────────────────┬───────────────────────┘
-                  │ EditorController
-┌─────────────────▼───────────────────────┐
-│   State Layer (Reducer + Context)       │
-│   - state/, useEditorContext()          │
-│   - state.content  ← markdown (the      │
-│     single source of truth)             │
-└─────────────────┬───────────────────────┘
-                  │
-┌─────────────────▼───────────────────────┐
-│   Service Layer (Business Logic)        │
-│   - services/ (pure functions)          │
-└─────────────────────────────────────────┘
-```
+## 标签与待办
 
-## Directory Structure
+标签由 `components/EditorTags.tsx` 固定在编辑框上方管理，保存在 memo payload，正文输入 `#` 不触发标签操作。旧笔记提取出的标签在首次编辑时保留，原文不进行破坏性替换；之后正文变化不再重算独立标签。
 
-```
-MemoEditor/
-├── state/                  # State management (reducer, actions, context)
-├── services/               # Business logic (pure functions)
-├── components/             # UI components
-│   ├── EditorContent.tsx   # Hosts Editor; forwards its EditorController ref
-│   ├── EditorToolbar.tsx   # Toolbar
-│   └── ...
-├── hooks/                  # React hooks (utilities)
-│   ├── useMemoSave.ts      # Save transaction, cache invalidation, and reset
-│   └── useFocusMode.ts     # Scroll lock and layout-stable focus presentation
-├── Editor/           # The CodeMirror 6 decorated-source editor
-│   ├── index.tsx               # React wrapper: mounts the EditorView, owns the
-│   │                           #   controller refs, syncs initialContent in/out
-│   ├── extensions.ts           # buildEditorExtensions(): assembles the CM extension set
-│   ├── theme.ts                # Syntax-highlight style + editor theme (CSS-var colors)
-│   ├── tagMentionDecorations.ts# ViewPlugin that decorates #tag / @mention spans
-│   ├── tagAutocomplete.ts      # CM autocompletion source for #tag
-│   ├── formatting.ts           # FormattingController impl (toggle marks, headings, lists)
-│   └── controller.ts           # EditorController impl over an EditorView
-├── formatting/
-│   └── commands.ts         # Backend-agnostic catalog of formatting verbs
-├── Toolbar/                # Toolbar sub-components (InsertMenu, VisibilitySelector)
-├── constants.ts
-└── types/
-    └── editorController.ts # EditorController / FormattingController interfaces
-```
+待办使用相同正文编辑基础，`isTodo` 区分持久化类型和列表查询。新建时从一个空复选框开始；卡片按 Markdown AST 统计实际事项，代码中的复选框文本不计入完成进度。不增加标题、截止时间或提醒字段。
 
-## Key Concepts
+## 键盘、上传与草稿
 
-### State Management
+- 默认 Enter 换行、Ctrl/Cmd + Enter 保存；账号偏好可切换为桌面 Enter 保存、Ctrl/Cmd/Shift + Enter 换行。
+- 触摸设备 Enter 始终换行，点击保存按钮提交；输入法组合期间不提交。列表换行续接，空项换行退出。
+- 文件粘贴、拖入、选择均在正文插入占位并立即上传；上传完成前不可保存。失败后可重试或移除。成功后替换为服务端地址。
+- 草稿按账号、编辑入口与空间隔离；缓存正文、独立标签、已上传附件和引用。上传未完成时保留此前可恢复的草稿，不缓存失效的 blob 地址。
 
-Uses `useReducer` + Context for predictable state transitions. All state changes go through action creators.
+## 空间与设置
 
-`state.content` holds the document as a **markdown string** and is the single source of truth. Because the editor stores markdown verbatim, `state.content` is exactly the editor's document — there is no encoding or normalization step.
+空间定义、Enter 偏好、常用词与预览字数保存在服务端账号设置；标签 Emoji 等元数据按空间分开。当前选中的空间仅属于当前标签页，切换时完整导航以丢弃旧空间查询及进行中的响应。
 
-### The editor contract
+API 通过 `X-Memos-Space` 传递空间，Store 上下文强制约束笔记和附件查询；无该头时属于默认个人空间。后台任务用无范围上下文处理全部数据。空间和内容类型创建后不可通过修改笔记接口改变。
 
-`types/editorController.ts` defines `EditorController` — `focus`, `getMarkdown`, `setMarkdown`, `insertMarkdown`, `selectAll`, `scrollToCursor`, plus an optional `formatting` capability. Callers outside the editor implementation use this interface exclusively and never reach into CodeMirror internals.
-
-`Editor/controller.ts` implements `EditorController` over a CodeMirror `EditorView`: `getMarkdown` is just `view.state.doc.toString()`, `setMarkdown` replaces the whole document, and `insertMarkdown` block-pads the insertion so it lands as its own block.
-
-`FormattingController` (same file in `types/`) is the rich-formatting surface the focus-mode `FormattingToolbar` drives: `run(commandId, ctx?)`, `getActiveFormats()`, `getSelectedText()`, and `subscribe(listener)`. `Editor/formatting.ts` implements it by editing the markdown source directly — toggling inline marks (`**`/`*`/`` ` ``), line prefixes (`- `, `1. `, `- [ ] `), and ATX heading prefixes (`#`…) — and by reading active state from the Lezer syntax tree at the caret.
-
-### Formatting command catalog
-
-`formatting/commands.ts` is the single, editor-agnostic catalog of formatting verbs (`EDITOR_COMMANDS`, `EditorCommandId`, `ActiveFormatState`, `isCommandActive`). It is metadata only — labels (i18n keys), icons, and grouping — with no dependency on any concrete editor. The toolbar and the active-state highlighting derive everything from this catalog; `Editor/formatting.ts` supplies how each verb is applied to the live CodeMirror document. To add a verb, add one entry here (and its field on `ActiveFormatState`).
-
-### Editor extensions
-
-`Editor/extensions.ts` exports `buildEditorExtensions()`, which composes the CodeMirror extension set: `@codemirror/lang-markdown` (with GFM), line wrapping, a reconfigurable placeholder, the editor theme, the `#tag`/`@mention` decoration plugin, the `#tag` autocomplete, and an update listener that pushes document changes back to the reducer via `onChange`. Native CodeMirror paste/drop handlers intercept file payloads before its text insertion behavior and pass them to the attachment layer; ordinary markdown text paste/drop remains CodeMirror-owned.
-
-`Editor/theme.ts` defines the decorated-source look: a `HighlightStyle` over the Lezer markdown highlight tags (headings, strong, emphasis, code, links, quotes, markers) and an `EditorView.theme`. Colors come from CSS custom properties so light/dark themes just work. This is the editor's own styling — the read-only memo view styles itself separately via `@/lib/markdownStyles`.
-
-### Tags and mentions
-
-`#tag` autocomplete and `#tag`/`@mention` decoration both reuse the shared grammar so the editor can't drift from the rest of the app:
-
-- `Editor/tagMentionDecorations.ts` is a `ViewPlugin` that scans the visible ranges and adds `cm-memo-tag` / `cm-memo-mention` marks, matching against `TAG_RUN` (`@/utils/tag-grammar`) and `MENTION_RUN` (`@/utils/mention-grammar`).
-- `Editor/tagAutocomplete.ts` is a CodeMirror autocompletion source for `#tag`, matching the in-progress token with `TAG_CHAR_CLASS` (`@/utils/tag-grammar`) and offering known tags (from `useTagCounts`).
-
-### Services
-
-Pure TypeScript functions containing business logic. No React hooks, easy to test.
-
-### Lifecycle hooks
-
-Cross-cutting React workflows stay outside the editor shell. `useMemoSave`
-coordinates validation, persistence, query invalidation, and post-save reducer
-state. `useFocusMode` owns focus mode's DOM lifecycle, including restoring the
-previous body scroll style and preserving the editor's place in grid layouts.
-
-### Components
-
-Thin presentation components that dispatch actions and render UI.
-
-## Usage
-
-```typescript
-import MemoEditor from "@/components/MemoEditor";
-
-<MemoEditor
-  memoName="memos/123"
-  onConfirm={(name) => console.log('Saved:', name)}
-  onCancel={() => console.log('Cancelled')}
-/>
-```
-
-## Testing
-
-Services are pure functions — easy to unit test without React.
-
-```typescript
-const state = mockEditorState();
-const result = await memoService.save(state, { memoName: 'memos/123' });
-```
+历史数据缺少 space 时自然属于默认个人空间。新增信息使用现有 JSON payload/settings，未增加数据库表或列，因此无需结构迁移；三个驱动均需验证 JSON 查询条件。

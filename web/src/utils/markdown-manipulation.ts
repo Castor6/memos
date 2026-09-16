@@ -14,7 +14,7 @@ interface TaskInfo {
 
 // Extract all task list items from markdown using AST parsing
 // This correctly ignores task-like patterns inside code blocks
-function extractTasksFromAst(markdown: string): TaskInfo[] {
+export function extractTasksFromAst(markdown: string): TaskInfo[] {
   const tree = fromMarkdown(markdown, {
     extensions: [gfm()],
     mdastExtensions: [gfmFromMarkdown()],

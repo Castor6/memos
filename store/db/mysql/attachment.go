@@ -49,6 +49,10 @@ func (d *DB) CreateAttachment(ctx context.Context, create *store.Attachment) (*s
 func (d *DB) ListAttachments(ctx context.Context, find *store.FindAttachment) ([]*store.Attachment, error) {
 	where, args := []string{"1 = 1"}, []any{}
 
+	if v := find.Space; v != nil {
+		where, args = append(where, "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(`attachment`.`payload`, '$.space')), '') = ?"), append(args, *v)
+	}
+
 	if v := find.ID; v != nil {
 		where, args = append(where, "`attachment`.`id` = ?"), append(args, *v)
 	}

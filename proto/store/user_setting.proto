@@ -45,6 +45,15 @@ message GeneralUserSetting {
   // The user's theme preference.
   // This references a CSS file in the web/public/themes/ directory.
   string theme = 3;
+
+  // User-created personal spaces, keyed by immutable IDs.
+  map<string, string> spaces = 4;
+  // Desktop Enter saves when enabled; mobile Enter always inserts a line.
+  bool enter_to_save = 5;
+  // User-configured words, inserted only through the toolbar.
+  repeated string common_words = 6;
+  // Visible character limit in feed cards; zero disables text folding.
+  int32 preview_characters = 7;
 }
 
 message UserTagMetadata {
@@ -53,6 +62,8 @@ message UserTagMetadata {
   google.type.Color background_color = 1;
   // Whether memos with this tag should have their content blurred.
   bool blur_content = 2;
+  // Optional display emoji.
+  string emoji = 3;
 }
 
 message TagsUserSetting {

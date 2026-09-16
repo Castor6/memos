@@ -15,6 +15,7 @@ import (
 
 	"github.com/usememos/memos/internal/httpgetter"
 	v1pb "github.com/usememos/memos/proto/gen/api/v1"
+	storepb "github.com/usememos/memos/proto/gen/store"
 	"github.com/usememos/memos/server/runner/memopayload"
 	"github.com/usememos/memos/store"
 )
@@ -76,6 +77,19 @@ func (s *APIV1Service) CreateMemo(ctx context.Context, request *v1pb.CreateMemoR
 		return nil, status.Errorf(codes.Unauthenticated, "user not authenticated")
 	}
 
+	if request.Memo == nil {
+		return nil, status.Errorf(codes.InvalidArgument, "memo is required")
+	}
+	space, err := s.validateSelectedSpace(ctx, user.ID)
+	if err != nil {
+		return nil, err
+	}
+	if request.Memo.Space != "" && request.Memo.Space != space {
+		return nil, status.Errorf(codes.InvalidArgument, "space does not match the selected space")
+	}
+	if err := validateExplicitTags(request.Memo.Tags); err != nil {
+		return nil, err
+	}
 	memoUID, err := ValidateAndGenerateUID(request.MemoId)
 	if err != nil {
 		return nil, err
@@ -83,6 +97,7 @@ func (s *APIV1Service) CreateMemo(ctx context.Context, request *v1pb.CreateMemoR
 
 	create := &store.Memo{
 		UID:        memoUID,
+		Payload:    &storepb.MemoPayload{Space: space, IsTodo: request.Memo.IsTodo, ExplicitTags: request.Memo.ExplicitTags, Tags: request.Memo.Tags},
 		CreatorID:  user.ID,
 		Content:    request.Memo.Content,
 		Visibility: convertVisibilityToStore(request.Memo.Visibility),
@@ -110,6 +125,13 @@ func (s *APIV1Service) CreateMemo(ctx context.Context, request *v1pb.CreateMemoR
 	}
 	if request.Memo.Location != nil {
 		create.Payload.Location = convertLocationToStore(request.Memo.Location)
+	}
+
+	if err := s.validateMemoRelations(ctx, create, request.Memo.Relations); err != nil {
+		return nil, err
+	}
+	if _, err := s.normalizeMemoAttachmentRequest(ctx, user, nil, request.Memo.Attachments); err != nil {
+		return nil, err
 	}
 
 	memo, err := s.Store.CreateMemo(ctx, create)
@@ -179,6 +201,7 @@ func (s *APIV1Service) ListMemos(ctx context.Context, request *v1pb.ListMemosReq
 	memoFind := &store.FindMemo{
 		// Exclude comments by default.
 		ExcludeComments: true,
+		IsTodo:          &request.IsTodo,
 	}
 	currentUser, err := s.fetchCurrentUser(ctx)
 	if err != nil {
@@ -449,6 +472,15 @@ func (s *APIV1Service) UpdateMemo(ctx context.Context, request *v1pb.UpdateMemoR
 			}
 			update.Content = &memo.Content
 			update.Payload = memo.Payload
+		} else if path == "tags" {
+			if err := validateExplicitTags(request.Memo.Tags); err != nil {
+				return nil, err
+			}
+			memo.Payload.Tags = request.Memo.Tags
+			memo.Payload.ExplicitTags = true
+			update.Payload = memo.Payload
+		} else if path == "space" || path == "is_todo" {
+			return nil, status.Errorf(codes.InvalidArgument, "space and content type cannot be changed")
 		} else if path == "visibility" {
 			visibility := convertVisibilityToStore(request.Memo.Visibility)
 			if memo.ParentUID != nil {
@@ -471,11 +503,11 @@ func (s *APIV1Service) UpdateMemo(ctx context.Context, request *v1pb.UpdateMemoR
 			createdTs := request.Memo.CreateTime.AsTime().Unix()
 			update.CreatedTs = &createdTs
 		} else if path == "update_time" {
-			updatedTs := time.Now().Unix()
+			updatedTimeSec := time.Now().Unix()
 			if request.Memo.UpdateTime != nil {
-				updatedTs = request.Memo.UpdateTime.AsTime().Unix()
+				updatedTimeSec = request.Memo.UpdateTime.AsTime().Unix()
 			}
-			update.UpdatedTs = &updatedTs
+			update.UpdatedTs = &updatedTimeSec
 		} else if path == "display_time" {
 			return nil, status.Errorf(codes.InvalidArgument, "display_time is not supported")
 		} else if path == "location" {

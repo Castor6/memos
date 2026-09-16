@@ -1,5 +1,5 @@
 import { uniqBy } from "lodash-es";
-import { CheckIcon, FileIcon, ImageIcon, LinkIcon, LoaderIcon, MapPinIcon, Maximize2Icon, MicIcon, PlusIcon, TypeIcon } from "lucide-react";
+import { FileIcon, ImageIcon, LinkIcon, LoaderIcon, MapPinIcon, Maximize2Icon, MicIcon, PlusIcon } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { LinkMemoDialog, LocationDialog } from "@/components/MemoMetadata";
 import type { MapPoint } from "@/components/map/types";
@@ -23,15 +23,9 @@ import type { LocalFile } from "../types/attachment";
 const InsertMenu = (props: InsertMenuProps) => {
   const t = useTranslate();
   const { actions, dispatch } = useEditorContext();
+  const isTodo = useEditorSelector((s) => s.metadata.isTodo);
   const relations = useEditorSelector((s) => s.metadata.relations);
-  const {
-    location: initialLocation,
-    onLocationChange,
-    onToggleFocusMode,
-    onToggleFormattingToolbar,
-    isFormattingToolbarVisible,
-    isUploading: isUploadingProp,
-  } = props;
+  const { location: initialLocation, onLocationChange, onToggleFocusMode, isUploading: isUploadingProp } = props;
 
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [locationDialogOpen, setLocationDialogOpen] = useState(false);
@@ -46,6 +40,7 @@ const InsertMenu = (props: InsertMenuProps) => {
     existingRelations: relations,
     onAddRelation: (relation: MemoRelation) => {
       dispatch(actions.setMetadata({ relations: uniqBy([...relations, relation], (r) => r.relatedMemo?.name) }));
+      if (relation.relatedMemo) props.onInsertReference?.(relation.relatedMemo);
       setLinkDialogOpen(false);
     },
   });
@@ -134,26 +129,20 @@ const InsertMenu = (props: InsertMenuProps) => {
   return (
     <>
       <DropdownMenu>
-        <DropdownMenuTrigger render={<Button variant="secondary" size="icon" disabled={isUploading} />}>
+        <DropdownMenuTrigger render={<Button variant="secondary" size="icon" disabled={isUploading} aria-label="插入内容" />}>
           {isUploading ? <LoaderIcon className="size-4 animate-spin" /> : <PlusIcon className="size-4" />}
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start">
           {insertItems.map((item) => (
-            <DropdownMenuItem key={item.key} onClick={item.onClick}>
+            <DropdownMenuItem key={item.key} onClick={item.onClick} disabled={item.key === "link" && isTodo}>
               <item.icon className="w-4 h-4" />
               {item.label}
             </DropdownMenuItem>
           ))}
           <DropdownMenuSeparator />
-          {/* View toggles: focus mode + formatting-toolbar visibility. */}
           <DropdownMenuItem onClick={onToggleFocusMode}>
             <Maximize2Icon className="w-4 h-4" />
             {t("editor.focus-mode")}
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={onToggleFormattingToolbar}>
-            <TypeIcon className="w-4 h-4" />
-            {t("editor.formatting-toolbar")}
-            {isFormattingToolbarVisible && <CheckIcon className="w-4 h-4 ml-auto" />}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

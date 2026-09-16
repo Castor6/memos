@@ -36,14 +36,17 @@ const hexToColor = (hex: string) =>
   });
 
 interface LocalTagMeta {
+  emoji?: string;
   color?: string;
   blur: boolean;
 }
 
 const toLocalTagMeta = (meta: {
+  emoji?: string;
   backgroundColor?: { red?: number; green?: number; blue?: number };
   blurContent: boolean;
 }): LocalTagMeta => ({
+  emoji: meta.emoji ?? "",
   color: colorToHex(meta.backgroundColor),
   blur: meta.blurContent,
 });
@@ -133,6 +136,7 @@ const TagsSection = () => {
         name,
         create(UserSetting_TagMetadataSchema, {
           blurContent: meta.blur,
+          emoji: meta.emoji ?? "",
           ...(meta.color ? { backgroundColor: hexToColor(meta.color) } : {}),
         }),
       ]),
@@ -240,6 +244,16 @@ const TagsSection = () => {
                       <span>{t("setting.tags.matching-rule")}</span>
                       <span className="text-border">/</span>
                       <span>{t("setting.tags.used-count", { count: row.count })}</span>
+                      <Input
+                        aria-label={`标签 ${row.name} 的 Emoji`}
+                        placeholder="Emoji"
+                        className="w-20"
+                        value={localTags[row.name].emoji || ""}
+                        maxLength={16}
+                        onChange={(event) =>
+                          setLocalTags((previous) => ({ ...previous, [row.name]: { ...previous[row.name], emoji: event.target.value } }))
+                        }
+                      />
                     </div>
                   </div>
 

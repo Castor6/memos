@@ -82,7 +82,9 @@ func RebuildMemoPayload(_ context.Context, memo *store.Memo, markdownService mar
 		return errors.Wrap(err, "failed to extract markdown metadata")
 	}
 
-	memo.Payload.Tags = data.Tags
+	if !memo.Payload.ExplicitTags {
+		memo.Payload.Tags = data.Tags
+	}
 	memo.Payload.Property = data.Property
 	return nil
 }

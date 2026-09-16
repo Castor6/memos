@@ -12,7 +12,9 @@ export const CLAMP_TRIGGER_HEIGHT_PX = 420;
 interface ClampedSectionProps {
   /** When false, children render untouched with no measurement. */
   enabled: boolean;
-  children: ReactNode;
+  characterLimit?: number;
+  textLength?: number;
+  children: ReactNode | ((collapsed: boolean) => ReactNode);
 }
 
 /**
@@ -21,9 +23,10 @@ interface ClampedSectionProps {
  * toggle. The inner div is never clamped, so observing it keeps the measurement live
  * while images and embeds load.
  */
-const ClampedSection = ({ enabled, children }: ClampedSectionProps) => {
+const ClampedSection = ({ enabled, children, characterLimit = 0, textLength = 0 }: ClampedSectionProps) => {
   const t = useTranslate();
   const measureRef = useRef<HTMLDivElement>(null);
+  const textTooLong = characterLimit > 0 && textLength > characterLimit;
   const [clamped, setClamped] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
@@ -33,15 +36,15 @@ const ClampedSection = ({ enabled, children }: ClampedSectionProps) => {
       setClamped(false);
       return;
     }
-    const check = () => setClamped(el.offsetHeight > CLAMP_TRIGGER_HEIGHT_PX);
+    const check = () => setClamped(textTooLong || el.offsetHeight > CLAMP_TRIGGER_HEIGHT_PX);
     check();
     if (typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver(check);
     observer.observe(el);
     return () => observer.disconnect();
-  }, [enabled]);
+  }, [enabled, textTooLong]);
 
-  const collapsed = clamped && !expanded;
+  const collapsed = enabled && (clamped || textTooLong) && !expanded;
 
   return (
     <>
@@ -50,13 +53,13 @@ const ClampedSection = ({ enabled, children }: ClampedSectionProps) => {
         style={collapsed ? { maxHeight: CLAMP_PREVIEW_HEIGHT_PX } : undefined}
       >
         <div ref={measureRef} className="w-full flex flex-col justify-start items-start gap-2">
-          {children}
+          {typeof children === "function" ? children(collapsed) : children}
         </div>
         {collapsed && (
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-linear-to-t from-card from-0% via-card/60 via-40% to-transparent to-100%" />
         )}
       </div>
-      {clamped && (
+      {enabled && (clamped || textTooLong) && (
         <button
           type="button"
           className="inline-flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors"

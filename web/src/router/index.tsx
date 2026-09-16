@@ -89,6 +89,7 @@ export const routeConfig: RouteObject[] = [
                 element: <RequireAuthRoute />,
                 children: [
                   { path: Routes.ARCHIVED, element: <Archived /> },
+                  { path: "todos", element: <Home isTodo /> },
                   {
                     element: <RequireFullInitializationRoute />,
                     children: [{ path: Routes.SHORTCUTS, element: <Shortcuts /> }],

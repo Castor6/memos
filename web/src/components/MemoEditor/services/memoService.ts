@@ -2,12 +2,14 @@ import { create } from "@bufbuild/protobuf";
 import { FieldMaskSchema, timestampDate, timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { isEqual } from "lodash-es";
 import { memoServiceClient } from "@/connect";
+import { FILE_TITLE, fileMarkdown, REFERENCE_TITLE } from "@/lib/inline-media";
+import { getActiveSpace } from "@/lib/personal-space";
 import type { Attachment } from "@/types/proto/api/v1/attachment_service_pb";
 import { AttachmentSchema } from "@/types/proto/api/v1/attachment_service_pb";
 import type { Memo } from "@/types/proto/api/v1/memo_service_pb";
-import { MemoSchema } from "@/types/proto/api/v1/memo_service_pb";
+import { MemoRelation_Type, MemoSchema } from "@/types/proto/api/v1/memo_service_pb";
+import { getAttachmentUrl } from "@/utils/attachment";
 import type { EditorState } from "../state";
-import { uploadService } from "./uploadService";
 
 /**
  * Converts attachments to reference format for API requests.
@@ -32,6 +34,10 @@ function buildUpdateMask(
     mask.add("content");
     patch.content = state.content;
   }
+  if (!isEqual(state.metadata.tags ?? [], prevMemo.tags) || !prevMemo.explicitTags) {
+    mask.add("tags");
+    patch.tags = state.metadata.tags ?? [];
+  }
   if (!isEqual(state.metadata.visibility, prevMemo.visibility)) {
     mask.add("visibility");
     patch.visibility = state.metadata.visibility;
@@ -50,7 +56,7 @@ function buildUpdateMask(
   }
 
   // Auto-update timestamp if content changed
-  if (["content", "attachments", "relations", "location"].some((key) => mask.has(key))) {
+  if (["content", "attachments", "relations", "location", "tags"].some((key) => mask.has(key))) {
     mask.add("update_time");
   }
 
@@ -81,9 +87,23 @@ export const memoService = {
       parentMemoName?: string;
     },
   ): Promise<{ memoName: string; hasChanges: boolean }> {
-    // 1. Upload local files first
-    const newAttachments = await uploadService.uploadFiles(state.localFiles);
-    const allAttachments = [...state.metadata.attachments, ...newAttachments];
+    // Uploads are completed in place by EditorContent before saving.
+    if (state.localFiles.length) throw new Error("请等待文件上传完成");
+    const allAttachments = state.metadata.attachments.filter(
+      (attachment) =>
+        state.content.includes(attachment.name) ||
+        state.content.includes(getAttachmentUrl(attachment)) ||
+        state.content.includes(encodeURI(getAttachmentUrl(attachment))),
+    );
+    state = {
+      ...state,
+      metadata: {
+        ...state.metadata,
+        relations: state.metadata.relations.filter(
+          (relation) => relation.type !== MemoRelation_Type.REFERENCE || state.content.includes(`/${relation.relatedMemo?.name}`),
+        ),
+      },
+    };
 
     // 2. Update existing memo
     if (options.memoName) {
@@ -104,6 +124,10 @@ export const memoService = {
     // 3. Create new memo or comment
     const memoData = create(MemoSchema, {
       content: state.content,
+      tags: state.metadata.tags ?? [],
+      explicitTags: true,
+      space: getActiveSpace(),
+      isTodo: state.metadata.isTodo ?? false,
       visibility: state.metadata.visibility,
       attachments: toAttachmentReferences(allAttachments),
       relations: state.metadata.relations,
@@ -129,8 +153,32 @@ export const memoService = {
    */
   fromMemo(memo: Memo): Pick<EditorState, "content" | "metadata" | "timestamps"> {
     return {
-      content: memo.content,
+      content:
+        memo.content +
+        memo.attachments
+          .filter((attachment) => !memo.content.includes(attachment.name) && !memo.content.includes(getAttachmentUrl(attachment)))
+          .map(
+            (attachment) => `
+
+${fileMarkdown(getAttachmentUrl(attachment), FILE_TITLE + attachment.type, attachment.filename)}`,
+          )
+          .join("") +
+        memo.relations
+          .filter(
+            (relation) =>
+              relation.type === MemoRelation_Type.REFERENCE &&
+              relation.memo?.name === memo.name &&
+              relation.relatedMemo &&
+              !memo.content.includes(`/${relation.relatedMemo.name}`),
+          )
+          .map(
+            (relation) =>
+              `\n\n${fileMarkdown(`/${relation.relatedMemo!.name}`, REFERENCE_TITLE, relation.relatedMemo!.snippet || "笔记引用")}`,
+          )
+          .join(""),
       metadata: {
+        tags: memo.tags,
+        isTodo: memo.isTodo,
         visibility: memo.visibility,
         attachments: memo.attachments,
         relations: memo.relations,

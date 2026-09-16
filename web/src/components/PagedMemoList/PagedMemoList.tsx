@@ -35,6 +35,7 @@ const Loader = () => (
 );
 
 interface Props {
+  isTodo?: boolean;
   renderer: (memo: Memo, options: { compact: boolean }) => ReactElement;
   listSort?: (list: Memo[]) => Memo[];
   state?: State;
@@ -113,7 +114,7 @@ function useAutoFetchWhenNotScrollable({
 
 const PagedMemoList = (props: Props) => {
   const t = useTranslate();
-  const { isInitialized: authInitialized } = useAuth();
+  const { isInitialized: authInitialized, userGeneralSetting } = useAuth();
   const { isInitialized: instanceInitialized } = useInstance();
   const { filters } = useMemoFilterContext();
   const { maxColumns, compactMode } = useView();
@@ -141,13 +142,14 @@ const PagedMemoList = (props: Props) => {
   // Grid tiles are always bounded/compact; the narrow-width fallback behaves exactly like
   // maxColumns = 1, so it respects the user's own compact setting. Centralized here so the
   // pages don't each repeat the policy.
-  const effectiveCompact = compactMode || useGrid;
+  const effectiveCompact = compactMode || useGrid || (userGeneralSetting?.previewCharacters ?? 0) > 0;
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } = useInfiniteMemos(
     {
       state: props.state || State.NORMAL,
       orderBy: props.orderBy || "create_time desc",
       filter: props.filter,
+      isTodo: props.isTodo ?? false,
       pageSize: props.pageSize || DEFAULT_LIST_MEMOS_PAGE_SIZE,
     },
     { enabled: props.enabled ?? true },

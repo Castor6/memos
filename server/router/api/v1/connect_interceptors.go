@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	"github.com/usememos/memos/server/auth"
+	"github.com/usememos/memos/store"
 )
 
 // MetadataInterceptor converts Connect HTTP headers to gRPC metadata.
@@ -30,6 +31,7 @@ func (*MetadataInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc 
 	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
 		// Convert HTTP headers to gRPC metadata
 		header := req.Header()
+		ctx = store.WithSpace(ctx, header.Get("X-Memos-Space"))
 		md := metadata.MD{}
 
 		// Copy important headers for client info extraction
