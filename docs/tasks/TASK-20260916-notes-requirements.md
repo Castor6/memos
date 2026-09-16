@@ -1,6 +1,6 @@
 # TASK-20260916-notes-requirements：笔记编辑、个人空间与独立待办需求
 
-- 状态：进行中（按用户要求补齐核心字段迁移和查询索引，草稿 PR #8）
+- 状态：已实现、已验证，待用户验收（含核心字段迁移与索引，草稿 PR #8）
 - 部署状态：未部署
 - 模块与关键词：编辑器、标签、Emoji、快捷键、文件、常用词、空间隔离、待办、引用卡片、折叠
 - 关联任务：无；本期不包含备份实现
@@ -93,8 +93,10 @@
 - [x] SQLite/MySQL/PostgreSQL 增量迁移与全新安装结构一致；回填旧 JSON 中的预览数据，旧版无空间数据归入默认空间。
 - [x] 针对创建/更新时间、置顶列表、附件关联和引用反向查询添加索引，并验证查询计划。
 - [x] 保留正文、标签、附件及引用，重复启动不会重复迁移。
-- [ ] 用批量数据记录查询与写入成本，通过后端、三驱动及升级 CI；不手动修改生产数据库。
+- [x] 用批量数据记录查询与写入成本，通过后端、三驱动及升级 CI；不手动修改生产数据库。
 
-实现：结构版本 0.30.2，新增 memo.space / memo.is_todo / attachment.space 与七个索引；移除旧 JSON 属性与内部 proto 字段，外部 API 不变。SQLite 真实查询计划覆盖四种列表与附件/引用路径；10 万条模拟数据的收益与写入代价见模块文档。SQLite 存储测试、server/internal race tests、golangci-lint 通过。待 CI 三驱动和容器升级验证。
+实现：结构版本 0.30.2，新增 memo.space / memo.is_todo / attachment.space 与七个索引；移除旧 JSON 属性与内部 proto 字段，外部 API 不变。SQLite 真实查询计划覆盖四种列表与附件/引用路径；10 万条模拟数据的收益与写入代价见模块文档。SQLite 存储测试、server/internal race tests、golangci-lint 通过。三驱动和容器升级验证结果见下。
 
 本地预览已实际从 0.30.1 自动迁移到 0.30.2；迁移前后 9 条内容的正文 SHA-256、空间、类型、标签一致，3 个附件保留。内置浏览器重载后验证个人/公司空间、原引用卡片和待办完成状态，页面恢复至个人笔记。生产未操作。
+
+最终代码提交 `015943ab` 的 [CI 全部通过](https://github.com/Castor6/memos/actions/runs/35125894821)，包括必需检查 `validate`。store 日志确认 SQLite/MySQL/PostgreSQL 各自执行并通过 `TestPersonalSpaceMigration`、`TestPersonalSpaceFreshIndexes`、`TestPersonalSpaceQueries`，最后输出 `PASS: all drivers`。三驱动旧版升级和发布镜像安装/升级检查通过。首次 CI 暴露的旧样本行尾空格及 MySQL 测试 SQL 的 blob 保留字引用已修正。实现提交验证后仅补充本验收记录和索引文档，按文档规则执行 `git diff --check`。
