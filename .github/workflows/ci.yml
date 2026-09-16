@@ -55,6 +55,10 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
+      - name: Test deployment failure and recovery behavior
+        run: |
+          python3 -m unittest discover -s scripts/deploy -p 'test_*.py'
+          python3 -m unittest discover -s scripts -p 'test_publish_image.py'
       - name: Check release notes and version ownership
         run: pnpm check:release
         env:

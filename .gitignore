@@ -34,3 +34,6 @@ web/coverage/
 
 # Version tooling dependencies (frontend has its own ignore rules).
 /node_modules/
+
+# Python deployment checks.
+__pycache__/
