@@ -41,7 +41,7 @@ func (d *DB) ListAttachments(ctx context.Context, find *store.FindAttachment) ([
 	where, args := []string{"1 = 1"}, []any{}
 
 	if v := find.Space; v != nil {
-		where = append(where, "COALESCE(attachment.payload->>'space', '') = "+placeholder(len(args)+1))
+		where = append(where, "COALESCE(attachment.payload::jsonb->>'space', '') = "+placeholder(len(args)+1))
 		args = append(args, *v)
 	}
 

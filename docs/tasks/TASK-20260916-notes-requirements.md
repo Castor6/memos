@@ -75,5 +75,6 @@
 ## 尚待完成
 
 - 代码提交 `59adf8bf` 的 [CI](https://github.com/Castor6/memos/actions/runs/35120860893) 全绿，包含 `validate`、三个驱动的升级和发布镜像安装/升级检查。审计日志发现 backend store 的 `&& '' || 'sqlite'` 表达式始终回落到 SQLite；已改成反向条件，等待 CI 补齐 MySQL/PostgreSQL 的完整存储测试。
+- 完整三驱动测试暴露 MySQL JSON 布尔比较的隐式转换以及 PostgreSQL 附件 payload 为 text 的差异；分别改为显式布尔字符串比较和 jsonb 转换，等待重跑。
 - 真实 iPhone 输入法、软键盘、文件粘贴和播放操作。
 - 尚未部署，线上界面不代表此工作目录的实现。

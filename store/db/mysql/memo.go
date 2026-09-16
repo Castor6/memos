@@ -3,6 +3,7 @@ package mysql
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -65,7 +66,7 @@ func (d *DB) ListMemos(ctx context.Context, find *store.FindMemo) ([]*store.Memo
 		where, args = append(where, "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(`memo`.`payload`, '$.space')), '') = ?"), append(args, *v)
 	}
 	if v := find.IsTodo; v != nil {
-		where, args = append(where, "COALESCE(JSON_EXTRACT(`memo`.`payload`, '$.isTodo'), false) = ?"), append(args, *v)
+		where, args = append(where, "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(`memo`.`payload`, '$.isTodo')), 'false') = ?"), append(args, strconv.FormatBool(*v))
 	}
 
 	engine, err := filter.DefaultEngine()
