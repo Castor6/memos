@@ -107,3 +107,9 @@ Proto 保留 lint/格式检查；部分生成器未固定版本，自动验证�
 - 最终 PR #3 head 为 `a3c03690c3434dc473e462b8ca0441123060137f`，[正常 PR 事件 CI](https://github.com/Castor6/memos/actions/runs/35106112573) 全部必需检查通过，容器升级按范围跳过。`validate` 进入 PR 的 statusCheckRollup 且为 SUCCESS，GitHub 回读 `mergeStateStatus=CLEAN`；没有人工批准该次 CI，也没有降低主分支保护。
 - 回读确认只有一个开放的 `changeset-release/main` PR；差异仅为 package.json、CHANGELOG.md 与已消费的基线 changeset。版本仍为 0.1.0。
 - Version Packages PR #3 保持未合并。本次没有发布或部署。
+
+### 自动部署任务的后续进展
+
+- 后续 [自动部署任务](TASK-20260916-automated-deployment.md) 已通过 PR #6 接入免费 ACR 镜像发布。普通 PR #6 合并后发布工作流按条件跳过。
+- 版本 PR #3 在最新 CI 和主分支门禁通过后已合并，提交 `f27396441d80f1e2870c6174776a5dff292d5025`；[0.1.0 的首次发布](https://github.com/Castor6/memos/actions/runs/35113178916) 成功，包含真实容器新装及升级检查。
+- 服务器升级和定时更新的当前状态以自动部署任务记录为准；本记录前面的未发布状态属于当时验收范围。
