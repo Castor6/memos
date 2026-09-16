@@ -54,7 +54,7 @@ main 的 CI 成功后，`Version Packages` 工作流对仍为当前 main 的提�
 
 推荐在 GitHub 创建仅授权 `Castor6/memos` 的细粒度 Token，Contents 和 Pull requests 设为 Read and write，在仓库 Settings → Secrets and variables → Actions 中保存为 `CHANGESETS_TOKEN`。它用于维护版本分支和 PR，不需要服务器权限；令牌只保存在 GitHub Secrets，不写入代码或聊天。
 
-配置后，版本 PR 的创建和更新事件正常触发 CI，与 BrowserRig 一致。令牌应设置有效期，到期后在 GitHub Secrets 中更新；版本 PR 可能显示仓库所有者为创建者。
+配置后，版本 PR 的创建和更新事件正常触发 CI，与 BrowserRig 一致。按仓库所有者选择，当前 `memos-changesets` 令牌设为不过期；需要轮换时在 GitHub 重新生成并同步更新 `CHANGESETS_TOKEN`。版本 PR 可能显示仓库所有者为创建者。
 
 未配置时仍可使用 GitHub 临时 `GITHUB_TOKEN` 自动维护版本 PR，但 GitHub 会要求有写权限的人批准其工作流。实际验证发现：额外 dispatch 的 CI 即使成功，也没有进入该 PR 的必需检查汇总，因此不能把它当作自动门禁的替代；已移除这条重复运行路径。
 
