@@ -259,10 +259,8 @@ type AttachmentPayload struct {
 	// Types that are valid to be assigned to Payload:
 	//
 	//	*AttachmentPayload_S3Object_
-	Payload     isAttachmentPayload_Payload `protobuf_oneof:"payload"`
-	MotionMedia *MotionMedia                `protobuf:"bytes,10,opt,name=motion_media,json=motionMedia,proto3" json:"motion_media,omitempty"`
-	// Personal space owning this file.
-	Space         string `protobuf:"bytes,11,opt,name=space,proto3" json:"space,omitempty"`
+	Payload       isAttachmentPayload_Payload `protobuf_oneof:"payload"`
+	MotionMedia   *MotionMedia                `protobuf:"bytes,10,opt,name=motion_media,json=motionMedia,proto3" json:"motion_media,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -318,13 +316,6 @@ func (x *AttachmentPayload) GetMotionMedia() *MotionMedia {
 		return x.MotionMedia
 	}
 	return nil
-}
-
-func (x *AttachmentPayload) GetSpace() string {
-	if x != nil {
-		return x.Space
-	}
-	return ""
 }
 
 type isAttachmentPayload_Payload interface {
@@ -410,17 +401,16 @@ const file_store_attachment_proto_rawDesc = "" +
 	"\x04role\x18\x02 \x01(\x0e2\x1c.memos.store.MotionMediaRoleR\x04role\x12\x19\n" +
 	"\bgroup_id\x18\x03 \x01(\tR\agroupId\x12:\n" +
 	"\x19presentation_timestamp_us\x18\x04 \x01(\x03R\x17presentationTimestampUs\x12,\n" +
-	"\x12has_embedded_video\x18\x05 \x01(\bR\x10hasEmbeddedVideo\"\xdf\x02\n" +
+	"\x12has_embedded_video\x18\x05 \x01(\bR\x10hasEmbeddedVideo\"\xd6\x02\n" +
 	"\x11AttachmentPayload\x12F\n" +
 	"\ts3_object\x18\x01 \x01(\v2'.memos.store.AttachmentPayload.S3ObjectH\x00R\bs3Object\x12;\n" +
 	"\fmotion_media\x18\n" +
-	" \x01(\v2\x18.memos.store.MotionMediaR\vmotionMedia\x12\x14\n" +
-	"\x05space\x18\v \x01(\tR\x05space\x1a\xa3\x01\n" +
+	" \x01(\v2\x18.memos.store.MotionMediaR\vmotionMedia\x1a\xa3\x01\n" +
 	"\bS3Object\x129\n" +
 	"\ts3_config\x18\x01 \x01(\v2\x1c.memos.store.StorageS3ConfigR\bs3Config\x12\x10\n" +
 	"\x03key\x18\x02 \x01(\tR\x03key\x12J\n" +
 	"\x13last_presigned_time\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\x11lastPresignedTimeB\t\n" +
-	"\apayload*a\n" +
+	"\apayloadJ\x04\b\v\x10\fR\x05space*a\n" +
 	"\x15AttachmentStorageType\x12'\n" +
 	"#ATTACHMENT_STORAGE_TYPE_UNSPECIFIED\x10\x00\x12\t\n" +
 	"\x05LOCAL\x10\x01\x12\x06\n" +

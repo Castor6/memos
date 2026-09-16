@@ -26,10 +26,6 @@ type MemoPayload struct {
 	Property *MemoPayload_Property  `protobuf:"bytes,1,opt,name=property,proto3" json:"property,omitempty"`
 	Location *MemoPayload_Location  `protobuf:"bytes,2,opt,name=location,proto3" json:"location,omitempty"`
 	Tags     []string               `protobuf:"bytes,3,rep,name=tags,proto3" json:"tags,omitempty"`
-	// Personal space; empty means the original personal space.
-	Space string `protobuf:"bytes,4,opt,name=space,proto3" json:"space,omitempty"`
-	// Separates independent todo cards from notes.
-	IsTodo bool `protobuf:"varint,5,opt,name=is_todo,json=isTodo,proto3" json:"is_todo,omitempty"`
 	// Explicit tags must not be overwritten by Markdown extraction.
 	ExplicitTags  bool `protobuf:"varint,6,opt,name=explicit_tags,json=explicitTags,proto3" json:"explicit_tags,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -85,20 +81,6 @@ func (x *MemoPayload) GetTags() []string {
 		return x.Tags
 	}
 	return nil
-}
-
-func (x *MemoPayload) GetSpace() string {
-	if x != nil {
-		return x.Space
-	}
-	return ""
-}
-
-func (x *MemoPayload) GetIsTodo() bool {
-	if x != nil {
-		return x.IsTodo
-	}
-	return false
 }
 
 func (x *MemoPayload) GetExplicitTags() bool {
@@ -250,13 +232,11 @@ var File_store_memo_proto protoreflect.FileDescriptor
 
 const file_store_memo_proto_rawDesc = "" +
 	"\n" +
-	"\x10store/memo.proto\x12\vmemos.store\"\x8a\x04\n" +
+	"\x10store/memo.proto\x12\vmemos.store\"\xf7\x03\n" +
 	"\vMemoPayload\x12=\n" +
 	"\bproperty\x18\x01 \x01(\v2!.memos.store.MemoPayload.PropertyR\bproperty\x12=\n" +
 	"\blocation\x18\x02 \x01(\v2!.memos.store.MemoPayload.LocationR\blocation\x12\x12\n" +
-	"\x04tags\x18\x03 \x03(\tR\x04tags\x12\x14\n" +
-	"\x05space\x18\x04 \x01(\tR\x05space\x12\x17\n" +
-	"\ais_todo\x18\x05 \x01(\bR\x06isTodo\x12#\n" +
+	"\x04tags\x18\x03 \x03(\tR\x04tags\x12#\n" +
 	"\rexplicit_tags\x18\x06 \x01(\bR\fexplicitTags\x1a\xac\x01\n" +
 	"\bProperty\x12\x19\n" +
 	"\bhas_link\x18\x01 \x01(\bR\ahasLink\x12\"\n" +
@@ -267,7 +247,7 @@ const file_store_memo_proto_rawDesc = "" +
 	"\bLocation\x12 \n" +
 	"\vplaceholder\x18\x01 \x01(\tR\vplaceholder\x12\x1a\n" +
 	"\blatitude\x18\x02 \x01(\x01R\blatitude\x12\x1c\n" +
-	"\tlongitude\x18\x03 \x01(\x01R\tlongitudeB\x94\x01\n" +
+	"\tlongitude\x18\x03 \x01(\x01R\tlongitudeJ\x04\b\x04\x10\x05J\x04\b\x05\x10\x06R\x05spaceR\ais_todoB\x94\x01\n" +
 	"\x0fcom.memos.storeB\tMemoProtoP\x01Z)github.com/usememos/memos/proto/gen/store\xa2\x02\x03MSX\xaa\x02\vMemos.Store\xca\x02\vMemos\\Store\xe2\x02\x17Memos\\Store\\GPBMetadata\xea\x02\fMemos::Storeb\x06proto3"
 
 var (

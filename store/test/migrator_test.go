@@ -126,28 +126,9 @@ func TestMigrationCopiesInstanceTagsToUserSettings(t *testing.T) {
 	db, err := sql.Open("sqlite", dsn)
 	require.NoError(t, err)
 
-	_, err = db.ExecContext(ctx, `
-		CREATE TABLE system_setting (
-			name TEXT NOT NULL,
-			value TEXT NOT NULL,
-			description TEXT NOT NULL DEFAULT '',
-			UNIQUE(name)
-		);
-		CREATE TABLE user (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			username TEXT NOT NULL UNIQUE,
-			role TEXT NOT NULL DEFAULT 'USER'
-		);
-		CREATE TABLE user_setting (
-			user_id INTEGER NOT NULL,
-			key TEXT NOT NULL,
-			value TEXT NOT NULL,
-			UNIQUE(user_id, key)
-		);
-		CREATE TABLE memo (
-			id INTEGER PRIMARY KEY AUTOINCREMENT
-		);
-	`)
+	schema, err := prePersonalIndexSchemas.ReadFile("testdata/pre_personal_indexes/sqlite.sql")
+	require.NoError(t, err)
+	_, err = db.ExecContext(ctx, string(schema))
 	require.NoError(t, err)
 
 	basicSettingBytes, err := protojson.Marshal(&storepb.InstanceBasicSetting{SchemaVersion: "0.29.1"})
@@ -174,7 +155,7 @@ func TestMigrationCopiesInstanceTagsToUserSettings(t *testing.T) {
 
 	_, err = db.ExecContext(ctx, "INSERT INTO system_setting (name, value) VALUES ('BASIC', ?), ('TAGS', ?)", string(basicSettingBytes), string(tagsSettingBytes))
 	require.NoError(t, err)
-	_, err = db.ExecContext(ctx, "INSERT INTO user (id, username, role) VALUES (1, 'tag-owner', 'USER'), (2, 'keeps-existing', 'USER')")
+	_, err = db.ExecContext(ctx, "INSERT INTO user (id, username, role, password_hash) VALUES (1, 'tag-owner', 'USER', ''), (2, 'keeps-existing', 'USER', '')")
 	require.NoError(t, err)
 	_, err = db.ExecContext(ctx, "INSERT INTO user_setting (user_id, key, value) VALUES (2, 'TAGS', ?)", string(existingUserTagsBytes))
 	require.NoError(t, err)

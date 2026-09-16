@@ -25,6 +25,7 @@ type Attachment struct {
 	UpdatedTs int64
 
 	// Domain specific fields
+	Space       string
 	Filename    string
 	Blob        []byte
 	Type        string
@@ -92,10 +93,7 @@ func (s *Store) CreateAttachment(ctx context.Context, create *Attachment) (*Atta
 		return nil, errors.New("invalid uid")
 	}
 	if space, scoped := SpaceFromContext(ctx); scoped {
-		if create.Payload == nil {
-			create.Payload = &storepb.AttachmentPayload{}
-		}
-		create.Payload.Space = space
+		create.Space = space
 	}
 	return s.driver.CreateAttachment(ctx, create)
 }

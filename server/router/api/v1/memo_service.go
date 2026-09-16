@@ -97,7 +97,9 @@ func (s *APIV1Service) CreateMemo(ctx context.Context, request *v1pb.CreateMemoR
 
 	create := &store.Memo{
 		UID:        memoUID,
-		Payload:    &storepb.MemoPayload{Space: space, IsTodo: request.Memo.IsTodo, ExplicitTags: request.Memo.ExplicitTags, Tags: request.Memo.Tags},
+		Space:      space,
+		IsTodo:     request.Memo.IsTodo,
+		Payload:    &storepb.MemoPayload{ExplicitTags: request.Memo.ExplicitTags, Tags: request.Memo.Tags},
 		CreatorID:  user.ID,
 		Content:    request.Memo.Content,
 		Visibility: convertVisibilityToStore(request.Memo.Visibility),

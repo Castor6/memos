@@ -22,7 +22,7 @@ func TestPersonalSpaceQueries(t *testing.T) {
 		uid  string
 		todo bool
 	}{{personal, "personal-note", false}, {company, "company-note", false}, {company, "company-todo", true}} {
-		_, err = db.CreateMemo(test.ctx, &store.Memo{UID: test.uid, CreatorID: user.ID, Visibility: store.Private, Content: "共同搜索词", Payload: &storepb.MemoPayload{IsTodo: test.todo, ExplicitTags: true, Tags: []string{"项目"}}})
+		_, err = db.CreateMemo(test.ctx, &store.Memo{UID: test.uid, CreatorID: user.ID, Visibility: store.Private, Content: "共同搜索词", IsTodo: test.todo, Payload: &storepb.MemoPayload{ExplicitTags: true, Tags: []string{"项目"}}})
 		require.NoError(t, err)
 	}
 	notesOnly := false

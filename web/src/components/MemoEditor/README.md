@@ -32,4 +32,4 @@
 
 API 通过 `X-Memos-Space` 传递空间，Store 上下文强制约束笔记和附件查询；无该头时属于默认个人空间。后台任务用无范围上下文处理全部数据。空间和内容类型创建后不可通过修改笔记接口改变。
 
-历史数据缺少 space 时自然属于默认个人空间。新增信息使用现有 JSON payload/settings，未增加数据库表或列，因此无需结构迁移；三个驱动均需验证 JSON 查询条件。
+空间归属与待办类型分别存入 `memo.space`、`memo.is_todo` 和 `attachment.space`，作为唯一数据来源。0.30.2 迁移回填旧 JSON 并移除旧属性；缺少空间的历史数据归入默认个人空间。列表、附件与引用索引随三驱动迁移创建，详见 `docs/personal-content-storage.md`。

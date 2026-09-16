@@ -39,8 +39,6 @@ CREATE TABLE `memo` (
   `content` TEXT NOT NULL,
   `visibility` VARCHAR(256) NOT NULL DEFAULT 'PRIVATE',
   `pinned` BOOLEAN NOT NULL DEFAULT FALSE,
-  space VARCHAR(256) COLLATE utf8mb4_bin NOT NULL DEFAULT '',
-  is_todo BOOLEAN NOT NULL DEFAULT FALSE,
   `payload` JSON NOT NULL
 );
 
@@ -66,7 +64,6 @@ CREATE TABLE `attachment` (
   `memo_id` INT DEFAULT NULL,
   `storage_type` VARCHAR(256) NOT NULL DEFAULT '',
   `reference` TEXT NOT NULL DEFAULT (''),
-  space VARCHAR(256) COLLATE utf8mb4_bin NOT NULL DEFAULT '',
   `payload` TEXT NOT NULL
 );
 
@@ -126,12 +123,3 @@ CREATE TABLE `user_identity` (
 );
 
 CREATE INDEX `idx_user_identity_user_id` ON `user_identity`(`user_id`);
-
--- Personal content query indexes.
-CREATE INDEX idx_memo_space_created ON memo (creator_id, space, row_status, is_todo, created_ts DESC, id DESC);
-CREATE INDEX idx_memo_space_updated ON memo (creator_id, space, row_status, is_todo, updated_ts DESC, id DESC);
-CREATE INDEX idx_memo_space_pinned_created ON memo (creator_id, space, row_status, is_todo, pinned DESC, created_ts DESC, id DESC);
-CREATE INDEX idx_memo_space_pinned_updated ON memo (creator_id, space, row_status, is_todo, pinned DESC, updated_ts DESC, id DESC);
-CREATE INDEX idx_attachment_space_updated ON attachment (creator_id, space, updated_ts DESC);
-CREATE INDEX idx_attachment_memo_space ON attachment (memo_id, space);
-CREATE INDEX idx_memo_relation_target ON memo_relation (related_memo_id, type, memo_id);

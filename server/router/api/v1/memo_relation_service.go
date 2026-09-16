@@ -67,7 +67,7 @@ func (s *APIV1Service) validateMemoRelations(ctx context.Context, memo *store.Me
 		if err != nil {
 			return status.Errorf(codes.Internal, "failed to find related memo")
 		}
-		if target == nil || target.Payload.GetSpace() != memo.Payload.GetSpace() || target.Payload.GetIsTodo() || memo.Payload.GetIsTodo() {
+		if target == nil || target.Space != memo.Space || target.IsTodo || memo.IsTodo {
 			return status.Errorf(codes.InvalidArgument, "references must link notes in the same space")
 		}
 		if err := s.checkMemoReadAccess(ctx, target); err != nil {

@@ -45,6 +45,8 @@ type Memo struct {
 	UpdatedTs int64
 
 	// Domain specific fields
+	Space      string
+	IsTodo     bool
 	Content    string
 	Visibility Visibility
 	Pinned     bool
@@ -113,10 +115,7 @@ func (s *Store) CreateMemo(ctx context.Context, create *Memo) (*Memo, error) {
 		return nil, errors.New("invalid uid")
 	}
 	if space, scoped := SpaceFromContext(ctx); scoped {
-		if create.Payload == nil {
-			create.Payload = &storepb.MemoPayload{}
-		}
-		create.Payload.Space = space
+		create.Space = space
 	}
 	return s.driver.CreateMemo(ctx, create)
 }

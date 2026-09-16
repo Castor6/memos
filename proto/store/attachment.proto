@@ -45,8 +45,9 @@ message AttachmentPayload {
 
   MotionMedia motion_media = 10;
 
-  // Personal space owning this file.
-  string space = 11;
+  // Promoted to an indexed database column.
+  reserved 11;
+  reserved "space";
 
   message S3Object {
     StorageS3Config s3_config = 1;
