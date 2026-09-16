@@ -4,6 +4,7 @@
 
 | 编号 | 标题 | 状态 | 模块 / 关键词 | 详情 |
 | --- | --- | --- | --- | --- |
+| TASK-20260916-notes-requirements | 笔记编辑、个人空间与独立待办需求 | 进行中 | 编辑器、标签、文件、常用词、空间隔离、待办、引用卡片 | [详情](TASK-20260916-notes-requirements.md) |
 | TASK-20260916-automated-deployment | 免费镜像仓库与自动部署 | 已完成 | ACR、Docker、发布、SQLite、备份、恢复 | [详情](TASK-20260916-automated-deployment.md) |
 | TASK-20260915-repository-presentation | 启用 Issues 与清理上游赞助展示 | 已完成 | Fork、Issues、README、赞助、FUNDING、问题模板 | [详情](TASK-20260915-repository-presentation.md) |
 | TASK-20260915-release-workflow | PR、版本发布与 CI 基础设施 | 已完成 | Fork、BrowserRig、Changesets、Release Please、Version PR、版本号、CI、主分支保护 | [详情](TASK-20260915-release-workflow.md) |
