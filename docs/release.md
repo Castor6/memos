@@ -52,9 +52,13 @@ main 的 CI 成功后，`Version Packages` 工作流对仍为当前 main 的提�
 
 ### 机器人权限与 CI 触发
 
-使用每次运行由 GitHub 发放的 `GITHUB_TOKEN`，无需个人 PAT 或服务器凭据。仓库默认工作流权限保持只读，并允许 Actions 创建 PR；仅版本任务声明 contents/PR/actions 写权限。
+推荐在 GitHub 创建仅授权 `Castor6/memos` 的细粒度 Token，Contents 和 Pull requests 设为 Read and write，在仓库 Settings → Secrets and variables → Actions 中保存为 `CHANGESETS_TOKEN`。它用于维护版本分支和 PR，不需要服务器权限；令牌只保存在 GitHub Secrets，不写入代码或聊天。
 
-GitHub 对内置令牌产生的普通事件有限制，因此版本机器人创建或更新 PR 后显式 `workflow_dispatch` 运行该版本分支的 CI。CI 本身只有代码读取权限。若 GitHub 同时展示自动 PR 事件的待批准提示，应以版本分支上实际运行的 `CI / validate` 结果和主分支规则为准；首次真实机器人运行后核实这一行为。
+配置后，版本 PR 的创建和更新事件正常触发 CI，与 BrowserRig 一致。令牌应设置有效期，到期后在 GitHub Secrets 中更新；版本 PR 可能显示仓库所有者为创建者。
+
+未配置时仍可使用 GitHub 临时 `GITHUB_TOKEN` 自动维护版本 PR，但 GitHub 会要求有写权限的人批准其工作流。实际验证发现：额外 dispatch 的 CI 即使成功，也没有进入该 PR 的必需检查汇总，因此不能把它当作自动门禁的替代；已移除这条重复运行路径。
+
+仓库默认工作流权限保持只读，并允许 Actions 创建 PR；仅版本任务声明 contents/PR 写权限，普通 CI 只有代码读取权限。配置状态与实际验证见本次任务记录。
 
 ## 合并版本 PR 后
 
