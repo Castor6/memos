@@ -1,6 +1,6 @@
 # TASK-20260916-notes-requirements：笔记编辑、个人空间与独立待办需求
 
-- 状态：进行中（功能已实现，本地验证通过，待 PR/CI）
+- 状态：进行中（功能已实现，本地验证通过，PR #8 待 CI）
 - 部署状态：未部署
 - 模块与关键词：编辑器、标签、Emoji、快捷键、文件、常用词、空间隔离、待办、引用卡片、折叠
 - 关联任务：无；本期不包含备份实现
@@ -46,7 +46,7 @@
 
 - 在 `/Users/castor/Code/memos-notes-requirements`、`feat/notes-workspaces` 分支开发；不修改另一任务使用的 `/Users/castor/Code/memos` 工作目录、分支或服务。
 - 本地使用该工作目录下 `tmp/local-dev/` 的可丢弃数据库和附件；测试账号 `local-dev`，页面 `http://127.0.0.1:3001`。
-- PR 面向 `Castor6/memos:main`。本任务不合并版本 PR，不发布镜像，不部署服务器。
+- PR：[所见即所得笔记、个人空间与独立待办 #8](https://github.com/Castor6/memos/pull/8)，面向 `Castor6/memos:main`。本任务不合并版本 PR，不发布镜像，不部署服务器。
 
 ## 实现结果
 
