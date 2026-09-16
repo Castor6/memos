@@ -1,0 +1,14 @@
+[Unit]
+Description=Update Memos from the tested release channel
+After=network-online.target docker.service nginx.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /usr/local/lib/memos-update/memos-update.py
+TimeoutStartSec=20min
+UMask=0077
+StandardOutput=journal
+StandardError=journal
+

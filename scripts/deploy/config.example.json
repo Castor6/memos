@@ -1,0 +1,10 @@
+{
+  "app_dir": "/opt/memos",
+  "state_dir": "/var/lib/memos-update",
+  "backup_dir": "/opt/backups/memos-update",
+  "image_repository": "YOUR-REGISTRY/YOUR-NAMESPACE/memos",
+  "profile_url": "http://127.0.0.1:5230/api/v1/instance/profile",
+  "public_health_url": "https://YOUR-HOST/healthz",
+  "ca_file": "/etc/memos-update/ca.pem",
+  "backup_paths": ["/etc/nginx", "/etc/memos-update"]
+}

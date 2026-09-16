@@ -17,7 +17,7 @@
 
 | 检查 | 触发范围 | 内容 |
 | --- | --- | --- |
-| 基础检查 | 所有 PR | CI/版本规则测试、发布说明及版本归属、差异空白与本地开发脚本语法 |
+| 基础检查 | 所有 PR | CI/版本规则测试、发布说明及版本归属、部署/备份恢复测试、差异空白与本地开发脚本语法 |
 | 前端 | 前端、Proto、工作流修改及版本 PR | 类型、Biome、单元测试、生产构建 |
 | 后端 | Go、依赖、Proto、工作流修改及版本 PR | tidy、golangci-lint、store/server/internal/other 测试；store 含三种数据库 |
 | Proto | Proto、工作流修改及版本 PR | Buf lint、格式检查 |
@@ -35,6 +35,8 @@ corepack pnpm install --frozen-lockfile
 corepack pnpm test
 corepack pnpm check:release origin/main
 go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -shellcheck=""
+python3 -m unittest discover -s scripts/deploy -p 'test_*.py'
+python3 -m unittest discover -s scripts -p 'test_publish_image.py'
 ```
 
 应用检查继续使用 `scripts/dev.sh` 和 `AGENTS.md` 的命令。CI 中容器测试运行于 GitHub 托管 runner，与线上服务器无关。
@@ -62,9 +64,13 @@ main 的 CI 成功后，`Version Packages` 工作流对仍为当前 main 的提�
 
 ## 合并版本 PR 后
 
-`Release Candidate` 从该版本 PR 的确定合并提交构建 Linux amd64/arm64 二进制，写入个人版本、提交号、标签约定和校验和，上传到本次 Actions 的 artifacts。
+`Publish Release` 从可信版本 PR 的确定合并提交重新核对 Changesets 生成结果，构建 Linux amd64/arm64 二进制和 Linux amd64 容器。新安装、登录、持久化与上一版升级冒烟测试全部通过后，才推送 ACR 镜像并推进 `stable`。服务器定时检查该通道；普通 PR 合并不会触发发布。
 
-当前阶段只准备候选产物，不推容器镜像、不创建正式 Release/标签，也不更新服务器。镜像仓库、正式发布、部署通道和服务器拉取在后续任务接入；首个版本 PR 可保留，等发布接入后再决定是否合并。
+镜像标签为 `castor-v<版本>`、`sha-<完整提交>` 和 `stable`。服务器使用不可变摘要运行镜像。版本标签存在时，重试必须复用对应提交的镜像，不能重新构建覆盖；认证或网络错误不能当作标签不存在。重试旧版本不能把 `stable` 降级。首版升级测试从官方 `ghcr.io/usememos/memos:0.30.0` 开始，后续从上一版个人镜像开始。
+
+仓库变量 `ACR_REGISTRY`、`ACR_IMAGE` 指定发布目标；Secrets `ACR_USERNAME`、`ACR_PASSWORD` 保存发布凭据。GitHub 不持有服务器 SSH 密钥。工作流也支持在 main 手动输入已经合并的版本 PR 编号重试，会重新验证 PR 来源和完整版本差异。二进制、校验和、镜像摘要记录保留在 Actions artifacts 30 天；这与令牌有效期无关。当前不创建 GitHub Release 或 Git 标签。
+
+部署脚本与安装、恢复步骤见 [自动部署说明](deployment.md)。实际上线状态和验证证据见 [自动部署任务](tasks/TASK-20260916-automated-deployment.md)。
 
 继承的 Release Please、标签发布、Canary、Demo 和自动关闭旧 Issue/PR 工作流已移除。源码、GitHub 设置和实际验证状态见 [本次任务](tasks/TASK-20260915-release-workflow.md)。
 

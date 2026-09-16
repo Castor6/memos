@@ -1,0 +1,43 @@
+# Memos 自动部署
+
+发布由 GitHub Actions 构建、验证并上传镜像；部署由现有服务器主动拉取、备份并启动新镜像。普通 PR 只更新 main，合并 `Version Packages` PR 才发布。具体上线状态以 [任务记录](tasks/TASK-20260916-automated-deployment.md) 为准。
+
+## 运行条件
+
+- Linux amd64、Docker Compose、Python 3、GNU tar、SQLite 数据库，服务名为 `memos`。
+- 应用目录包含 `compose.yaml` 和 `data/memos_prod.db`，附件保留在 `data/` 内。
+- 使用深圳免费 ACR 个人版私有仓库。该产品按官方约定限开发测试、无 SLA，用户已选择此限制；镜像拉取失败不停止旧服务。
+- 发布凭据放在 GitHub Secrets；服务器应使用仅允许拉取目标仓库的 RAM 用户。实际主机、密钥和密码仅在私有运维目录保存。
+
+## 安装与首次运行
+
+1. 将 `scripts/deploy/memos-update.py` 安装为 `/usr/local/lib/memos-update/memos-update.py`，由 root 管理。
+2. 用 `config.example.json` 创建 `/etc/memos-update/config.json`，填入实际仓库和健康检查地址，目录权限 700、文件 600。配置 `ca_file` 为验证 HTTPS 的 CA 证书，不能跳过 TLS 验证。
+3. 创建 `/var/lib/memos-update`（755），将 `maintenance.nginx.conf` 安装到 Nginx snippets，并在 Memos 的 HTTPS `server` 中 include；先 `nginx -t` 再 reload。
+4. 使用只读拉取账号和 `docker login --password-stdin` 配置 root 的 Registry 登录，Docker 配置文件权限 600。不将密码放进参数、日志或仓库。
+5. 安装同目录的 systemd service/timer，执行 `systemctl daemon-reload`。先执行 `python3 /usr/local/lib/memos-update/memos-update.py --dry-run`，只拉取和验证，不停机。
+6. 首次手动执行 service，核对健康、登录、笔记、附件和备份后，再执行 `systemctl enable --now memos-update.timer`。此后约每 5 分钟检查一次。
+
+## 更新与故障处理
+
+更新器先拉取 `stable`，核对来源标签、个人版本、提交、平台和仓库摘要。相同摘要不操作，已部署后禁止降低版本或替换同版本摘要，之前失败的摘要不会自动反复尝试。
+
+准备更新时，Nginx 暂时返回带 `X-Memos-Maintenance: 1` 的 503。脚本确认该入口生效后停止应用，对 SQLite 做完整性检查，记录用户/笔记/附件数量及附件哈希，备份应用和配置并比较归档。备份空间不足或备份失败会恢复旧应用，不切换镜像。
+
+新镜像通过 Compose overlay 按摘要启动。只有版本、提交、初始化状态、前端入口和原数据检查通过，才记录部署结果并结束维护。失败则停止候选版本，校验归档哈希，恢复升级前数据库、附件和 Compose，再启动原镜像。失败候选数据保留在备份目录，便于排查。
+
+查看状态：
+
+```bash
+systemctl status memos-update.service memos-update.timer
+journalctl -u memos-update.service -n 100 --no-pager
+cat /var/lib/memos-update/deployed.json
+```
+
+若自动恢复也失败，`pending.json` 与维护标记会保留，后续更新拒绝继续，避免对未知数据状态重复操作。先停止 timer，查看 pending 指向的归档和 `manifest.json`，核对 SHA-256，再在临时目录解包检查。保留当前失败目录，将备份的整个应用目录恢复到原路径，以备份的 Compose/overlay 启动；验证旧版本和原数据后才能移走 pending 和维护标记。不能只降级镜像而继续使用已迁移的数据，也不能通过直接删除标记跳过恢复。查明并修复失败原因后，可显式运行 `--retry`。
+
+目前不自动删除历史备份和镜像，需定期检查磁盘；更新前空间检查不足时会拒绝更新。备份在同一服务器，不能覆盖主机或磁盘损坏；异地备份、告警、证书续签不在本次实现范围。
+
+## 验证范围
+
+单元测试覆盖拉取、维护入口、停止、备份和健康检查失败，以及恢复失败保留维护状态。Linux 测试还使用真实 GNU tar、SQLite 与二进制附件验证恢复和权限、拒绝损坏归档。容器安装/升级冒烟测试使用独立临时数据，不访问生产数据。生产功能验证与定时器是否启用应单独记录。

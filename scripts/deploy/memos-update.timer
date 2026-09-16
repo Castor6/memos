@@ -1,0 +1,11 @@
+[Unit]
+Description=Check for a new Memos release every five minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=5min
+RandomizedDelaySec=30s
+Unit=memos-update.service
+
+[Install]
+WantedBy=timers.target
