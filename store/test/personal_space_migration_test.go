@@ -42,7 +42,7 @@ func TestPersonalSpaceMigration(t *testing.T) {
 		_, err = backend.GetDB().ExecContext(ctx, query, fmt.Sprintf("legacy-%d", i), user.ID, "- [ ] 保留正文", "PRIVATE", payload)
 		require.NoError(t, err)
 	}
-	query := "INSERT INTO attachment (uid, creator_id, filename, payload, blob) VALUES (?, ?, ?, ?, ?)"
+	query := "INSERT INTO attachment (uid, creator_id, filename, payload, `blob`) VALUES (?, ?, ?, ?, ?)"
 	if driver == "postgres" {
 		query = "INSERT INTO attachment (uid, creator_id, filename, payload, blob) VALUES ($1,$2,$3,$4,$5)"
 	}
