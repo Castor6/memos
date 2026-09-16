@@ -41,3 +41,5 @@ cat /var/lib/memos-update/deployed.json
 ## 验证范围
 
 单元测试覆盖拉取、维护入口、停止、备份和健康检查失败，以及恢复失败保留维护状态。Linux 测试还使用真实 GNU tar、SQLite 与二进制附件验证恢复和权限、拒绝损坏归档。容器安装/升级冒烟测试使用独立临时数据，不访问生产数据。生产功能验证与定时器是否启用应单独记录。
+
+还可在具备 Docker、nginx、openssl 的 Linux 主机上，以 root 执行 `python3 scripts/deploy/integration-test.py`。先准备官方 `ghcr.io/usememos/memos:0.30.0` 镜像。该演练创建独立 Compose 项目、临时数据和仅监听 loopback 的 HTTPS Nginx，验证成功更新，再故意损坏测试附件并触发健康检查失败，核对恢复后的数据库、附件和登录。它不重载系统 Nginx，不访问生产应用；结束时清理自己的容器、临时镜像和目录。
