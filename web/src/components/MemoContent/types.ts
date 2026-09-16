@@ -3,6 +3,7 @@ import type React from "react";
 export interface MemoContentProps {
   content: string;
   explicitTags?: boolean;
+  displayedTags?: readonly string[];
   maxCharacters?: number;
   /** Resource name of the memo (e.g. `memos/abc123`). Enables footnote links to target the memo detail page. */
   memoName?: string;

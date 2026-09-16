@@ -12,6 +12,14 @@ describe("<MemoMarkdownRenderer /> memoization", () => {
     vi.mocked(hasMathSyntax).mockClear();
   });
 
+  it("hides old body tags already shown above, but keeps literal hashes for new notes", () => {
+    const props = { content: "#旧标签", displayedTags: ["旧标签"], resolvedMentionUsernames: new Set<string>() };
+    const { container, rerender } = render(<MemoMarkdownRenderer {...props} />);
+    expect(container.textContent).toBe("");
+    rerender(<MemoMarkdownRenderer {...props} explicitTags />);
+    expect(container.textContent).toBe("#旧标签");
+  });
+
   it("does not parse again when only the resolved mention Set identity changes", () => {
     const { rerender } = render(
       <MemoMarkdownRenderer content="Hello @alice" memoName="memos/1" resolvedMentionUsernames={new Set(["alice"])} />,

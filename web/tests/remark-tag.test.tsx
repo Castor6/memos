@@ -12,6 +12,28 @@ const renderMarkdown = (content: string): string =>
   );
 
 describe("remarkTag", () => {
+  it("hides legacy metadata tags without touching literal hashes, code or links", () => {
+    const html = renderToStaticMarkup(
+      <ReactMarkdown remarkPlugins={[remarkGfm, [remarkTag, { hiddenTags: ["本地测试/编辑器"] }]]}>
+        {"正文\n\n#本地测试/编辑器\n\n\\#本地测试/编辑器 `#本地测试/编辑器` [#本地测试/编辑器](https://example.com/#本地测试/编辑器)\n\n#其他标签"}
+      </ReactMarkdown>,
+    );
+    expect(html).not.toContain('data-tag="本地测试/编辑器"');
+    expect(html).not.toContain("<p></p>");
+    expect(html).toContain("<p>#本地测试/编辑器 <code>#本地测试/编辑器</code>");
+    expect(html).toContain(`href="${encodeURI("https://example.com/#本地测试/编辑器")}"`);
+    expect(html).toContain('data-tag="其他标签"');
+  });
+
+  it("removes tag-only formatted paragraphs and preserves surrounding text", () => {
+    const html = renderToStaticMarkup(
+      <ReactMarkdown remarkPlugins={[[remarkTag, { hiddenTags: ["旧标签"] }]]}>
+        {"**#旧标签**\n\n前面 #旧标签 后面"}
+      </ReactMarkdown>,
+    );
+    expect(html).toBe("<p>前面  后面</p>");
+  });
+
   it("does not turn URL fragments inside autolinks into tags", () => {
     const html = renderMarkdown("https://github.com/dmtrKovalenko/fff#pi-agent-extension\n\nProject #memo-tag");
 

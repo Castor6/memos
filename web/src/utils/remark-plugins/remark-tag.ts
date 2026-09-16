@@ -184,9 +184,32 @@ function transformTagTextNodes(parent: ParentNode, insideLink: boolean, source: 
 
 type VFileLike = { value?: string | Uint8Array };
 
-export const remarkTag = () => {
+// Old memo tags remain in storage, but metadata chips already show them above
+// the body. Remove only parsed, matching tags from this rendering tree.
+function hideMetadataTags(parent: ParentNode, tags: Set<string>): boolean {
+  let removed = false;
+  parent.children = parent.children.filter((child) => {
+    if (child.type === "tagNode" && tags.has((child as TagNode).value)) {
+      removed = true;
+      return false;
+    }
+    if (isParentNode(child) && hideMetadataTags(child, tags)) {
+      removed = true;
+      if (["paragraph", "strong", "emphasis", "delete"].includes(child.type) && child.children.every(isWhitespace)) return false;
+    }
+    return true;
+  });
+  return removed;
+}
+
+function isWhitespace(node: UnistNode): boolean {
+  return node.type === "break" || (node.type === "text" && !(node as Text).value.trim());
+}
+
+export const remarkTag = ({ hiddenTags = [] }: { hiddenTags?: readonly string[] } = {}) => {
   return (tree: Root, file: VFileLike) => {
     const source = typeof file?.value === "string" ? file.value : "";
     transformTagTextNodes(tree as ParentNode, false, source);
+    if (hiddenTags.length) hideMetadataTags(tree as ParentNode, new Set(hiddenTags));
   };
 };

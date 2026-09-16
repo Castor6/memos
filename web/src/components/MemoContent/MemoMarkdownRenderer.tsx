@@ -30,6 +30,7 @@ import { TrustedIframe } from "./TrustedIframe";
 export interface MemoMarkdownRendererProps {
   content: string;
   explicitTags?: boolean;
+  displayedTags?: readonly string[];
   maxCharacters?: number;
   resolvedMentionUsernames: Set<string>;
   /** Resource name of the memo (e.g. `memos/abc123`), used to target footnote links at the detail page. */
@@ -70,6 +71,7 @@ function getMentionUsername(node: Element, children?: ReactNode): string {
 
 export const MemoMarkdownRendererCore = ({
   explicitTags = false,
+  displayedTags,
   maxCharacters = 0,
   content,
   resolvedMentionUsernames,
@@ -173,7 +175,7 @@ export const MemoMarkdownRendererCore = ({
           remarkSplitMixedTaskLists,
           remarkBreaks,
           remarkMention,
-          ...(explicitTags ? [] : [remarkTag]),
+          ...((explicitTags ? [] : [[remarkTag, { hiddenTags: displayedTags }]]) as RemarkPlugins),
           remarkHighlight,
           remarkPreserveType,
           [remarkPreview, { limit: maxCharacters }],
@@ -212,6 +214,7 @@ export const MemoMarkdownRenderer = memo(
     previous.memoName === next.memoName &&
     previous.compact === next.compact &&
     previous.explicitTags === next.explicitTags &&
+    previous.displayedTags === next.displayedTags &&
     previous.maxCharacters === next.maxCharacters &&
     haveEqualResolvedMentions(previous.resolvedMentionUsernames, next.resolvedMentionUsernames),
 );
