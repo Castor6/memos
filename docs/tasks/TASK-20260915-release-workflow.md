@@ -1,6 +1,6 @@
 # TASK-20260915-release-workflow：统一 CI 与版本 PR 自动化
 
-- 状态：进行中（基础设施已启用，等待专用令牌完成版本 PR 的自动检查链路）
+- 状态：已完成（统一 CI、主分支保护与版本 PR 自动检查链路已验证）
 - 部署状态：未部署
 - 模块与关键词：Fork、BrowserRig、Changesets、Release Please、Version PR、版本号、CI、主分支保护
 - 关联任务：[环境初始化](TASK-20260915-local-environment.md)、[仓库展示](TASK-20260915-repository-presentation.md)
@@ -48,7 +48,7 @@
 
 - PR #1 已按用户要求合并，提交 `2bf6e786ed1e3d7a54f17eb7f5906ffcbba9e25d`。
 - 合并前在本仓库停用 Canary、Demo、Release Please、Release、Close Stale，避免初始化合并触发旧发布逻辑。
-- 仓库默认工作流权限仍为 read，已启用 Actions 创建 PR 的设置；当前无自定义 Secrets。
+- 仓库默认工作流权限仍为 read，已启用 Actions 创建 PR 的设置；现已配置专用 `CHANGESETS_TOKEN`。
 - 版本任务优先使用仓库专用 CHANGESETS_TOKEN（Contents / Pull requests 写权限），未配置时回退临时 GITHUB_TOKEN 并提示人工批准工作流。普通 CI 只有 contents read；不需要服务器凭据。
 - GitHub 要求批准内置令牌创建/更新的 PR 工作流。实测显式 dispatch 虽通过，但未满足合并门禁，已改为推荐专用令牌触发正常 PR CI，移除重复 dispatch。
 - 主分支规则模板保存在 `.github/rulesets/main.json`，已应用为 `Protect main`（规则集 ID `23465610`），API 回读确认 active、必须 PR、必须通过 validate、严格保持最新 main、禁止强推和删除。
@@ -69,8 +69,8 @@ Proto 保留 lint/格式检查；部分生成器未固定版本，自动验证�
 - [x] Changesets 实际执行：两份 patch/minor 说明汇总为一个 0.1.0，并保留两份说明；无 npm 发布。
 - [x] Actionlint 通过，本地版本检查及差异空白检查通过。
 - [x] GitHub 统一 CI 实际通过；主分支规则已应用并回读。
-- [ ] 实际机器人版本 PR 正确创建/更新，其 CI 自动运行通过，无重复 PR。
-- [ ] 补充 PR、工作流运行链接及最终启用状态。
+- [x] 实际机器人版本 PR 正确创建/更新，其 CI 自动运行通过，无重复 PR。
+- [x] 补充 PR、工作流运行链接及最终启用状态。
 
 本轮未改应用源码或 proto 生成文件。实际产物构建需合并版本 PR 才执行；本轮不为验证发布流程而合并首个版本 PR。
 
@@ -96,3 +96,14 @@ Proto 保留 lint/格式检查；部分生成器未固定版本，自动验证�
 - PR #4 随后扩展为修正版本 CI 授权并记录验证结果；工作流支持 CHANGESETS_TOKEN，移除不能满足门禁的重复 dispatch。
 - 已请用户仅在 GitHub Secrets 配置专用令牌，不读取或复用 BrowserRig 的秘密值，也不把本机 gh 的广泛权限令牌保存进 CI。
 - 待配置后验证同一个 Version Packages PR 被更新、正常 PR CI 自动通过，且主分支门禁认可结果。若选择不配置，需逐次批准 GitHub 的版本 PR 工作流。
+
+### 2026-09-16 续接验证
+
+- 已核对 PR #4 最新提交 `aaae9cba` 的 [CI](https://github.com/Castor6/memos/actions/runs/34994437354)：基础检查、前后端、Proto 和 validate 通过；容器升级检查按变更范围跳过。
+- PR #4 从草稿转为可审阅后已 squash 合并，main 提交为 `4abd4a75ff3cd6504afbf3003c0b4286011155cd`；[合并后的 CI](https://github.com/Castor6/memos/actions/runs/35105421470) 通过，Release Candidate 按条件跳过。
+- 用户在 Chrome 完成 GitHub 身份验证后，已创建 `memos-changesets` 细粒度令牌并保存为仓库 `CHANGESETS_TOKEN`。仅授权 `Castor6/memos` 的 Contents / Pull requests 读写与必需的 Metadata 只读，无账号权限；未将令牌写入代码、文件或聊天。
+- 初次创建沿用 GitHub 默认 30 天；用户明确选择不过期后，已重新生成同一令牌并同步更新 Secret，页面确认无到期日。[使用新令牌的版本工作流](https://github.com/Castor6/memos/actions/runs/35106054116) 成功。
+- [首次专用令牌版本工作流](https://github.com/Castor6/memos/actions/runs/35105822928) 更新原有 PR #3 并自动触发正常 PR CI；再次验证新令牌产生更新后，旧提交的 CI 被并发规则取消。
+- 最终 PR #3 head 为 `a3c03690c3434dc473e462b8ca0441123060137f`，[正常 PR 事件 CI](https://github.com/Castor6/memos/actions/runs/35106112573) 全部必需检查通过，容器升级按范围跳过。`validate` 进入 PR 的 statusCheckRollup 且为 SUCCESS，GitHub 回读 `mergeStateStatus=CLEAN`；没有人工批准该次 CI，也没有降低主分支保护。
+- 回读确认只有一个开放的 `changeset-release/main` PR；差异仅为 package.json、CHANGELOG.md 与已消费的基线 changeset。版本仍为 0.1.0。
+- Version Packages PR #3 保持未合并。本次没有发布或部署。
