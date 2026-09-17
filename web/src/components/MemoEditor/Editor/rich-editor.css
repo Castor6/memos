@@ -125,3 +125,11 @@
   border: 1px solid var(--border);
   padding: 0.35rem 0.6rem;
 }
+
+.rich-media img {
+  width: auto;
+  height: auto;
+  max-width: min(100%, 30rem);
+  max-height: 20rem;
+  object-fit: contain;
+}

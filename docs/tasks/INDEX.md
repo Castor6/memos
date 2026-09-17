@@ -4,6 +4,7 @@
 
 | 编号 | 标题 | 状态 | 模块 / 关键词 | 详情 |
 | --- | --- | --- | --- | --- |
+| TASK-20260917-tag-menu-image-preview | 标签操作与图片预览尺寸 | 已实现并本地验证，待 CI | 标签、右键、图标、图片 | [详情](TASK-20260917-tag-menu-image-preview.md) |
 | TASK-20260917-pre-commit-whitespace | 提交前空白检查 | 已实现并本地验证，待 CI | Git、空白、CI、开发环境 | [详情](TASK-20260917-pre-commit-whitespace.md) |
 | TASK-20260917-sidebar-tag-settings | 侧栏标签设置入口 | 已实现并本地验证，待 CI | 侧栏、标签、Emoji、菜单 | [详情](TASK-20260917-sidebar-tag-settings.md) |
 | TASK-20260917-editor-and-todo-experience | 编辑器与待办交互完善 | 已实现并本地验证，待 CI | 编辑器、待办、侧栏、标签、平铺、引用 | [详情](TASK-20260917-editor-and-todo-experience.md) |
