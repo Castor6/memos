@@ -4,7 +4,7 @@
 
 | 编号 | 标题 | 状态 | 模块 / 关键词 | 详情 |
 | --- | --- | --- | --- | --- |
-| TASK-20260917-deployment-retention | 升级备份与配套镜像清理 | 进行中 | 自动部署、备份、镜像、恢复 | [详情](TASK-20260917-deployment-retention.md) |
+| TASK-20260917-deployment-retention | 升级备份与配套镜像清理 | 已完成 | 自动部署、备份、镜像、恢复 | [详情](TASK-20260917-deployment-retention.md) |
 | TASK-20260917-release-note-whitespace | 修复多段发布说明阻塞 | 已实现，待 CI | Changesets、CHANGELOG、版本 PR、发布生成器 | [详情](TASK-20260917-release-note-whitespace.md) |
 | TASK-20260916-notes-requirements | 笔记编辑、个人空间与独立待办需求 | 已实现，待验收 | 编辑器、标签、文件、常用词、空间隔离、待办、引用卡片 | [详情](TASK-20260916-notes-requirements.md) |
 | TASK-20260916-automated-deployment | 免费镜像仓库与自动部署 | 已完成 | ACR、Docker、发布、SQLite、备份、恢复 | [详情](TASK-20260916-automated-deployment.md) |
