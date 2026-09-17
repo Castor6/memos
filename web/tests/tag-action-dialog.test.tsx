@@ -24,12 +24,18 @@ vi.mock("@/contexts/AuthContext", () => ({
     }),
   }),
 }));
+vi.mock("@/components/TagEmojiPicker", () => ({
+  default: ({ onSelect, disabled }: { onSelect: (emoji: string) => void; disabled: boolean }) => (
+    <button type="button" disabled={disabled} onClick={() => onSelect("📚")}>
+      选择图标 📚
+    </button>
+  ),
+}));
 beforeEach(() => vi.clearAllMocks());
 it("offers common icons and preserves inherited metadata and unrelated rules", async () => {
   const close = vi.fn();
   render(<TagActionDialog tag="work/a" action="icon" onClose={close} />);
-  expect(screen.getAllByRole("button", { name: /^选择图标/ }).length).toBeGreaterThan(60);
-  fireEvent.click(screen.getByRole("button", { name: "选择图标 📚" }));
+  fireEvent.click(await screen.findByRole("button", { name: "选择图标 📚" }));
   fireEvent.click(screen.getByRole("button", { name: "保存", exact: true }));
   await waitFor(() => expect(close).toHaveBeenCalled());
   const tags = mocks.update.mock.calls[0][0].setting.value.value.tags;
@@ -40,9 +46,17 @@ it("keeps the selection on save failure", async () => {
   mocks.update.mockRejectedValueOnce(new Error("offline"));
   const close = vi.fn();
   render(<TagActionDialog tag="work/a" action="icon" onClose={close} />);
-  fireEvent.click(screen.getByRole("button", { name: "选择图标 📚" }));
+  fireEvent.click(await screen.findByRole("button", { name: "选择图标 📚" }));
   fireEvent.click(screen.getByRole("button", { name: "保存", exact: true }));
   await waitFor(() => expect(mocks.error).toHaveBeenCalled());
   expect(close).not.toHaveBeenCalled();
   expect(screen.getByLabelText("自定义图标")).toHaveValue("📚");
+});
+
+it("restores the default icon without removing other metadata", async () => {
+  render(<TagActionDialog tag="work/a" action="icon" onClose={vi.fn()} />);
+  fireEvent.click(screen.getByRole("button", { name: "恢复默认" }));
+  fireEvent.click(screen.getByRole("button", { name: "保存", exact: true }));
+  await waitFor(() => expect(mocks.update).toHaveBeenCalled());
+  expect(mocks.update.mock.calls[0][0].setting.value.value.tags["work/a"]).toMatchObject({ emoji: "", blurContent: true });
 });

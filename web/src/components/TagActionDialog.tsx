@@ -1,6 +1,6 @@
 import { create } from "@bufbuild/protobuf";
 import { useQueryClient } from "@tanstack/react-query";
-import { useRef, useState } from "react";
+import { Suspense, useRef, useState } from "react";
 import { toast } from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -20,13 +20,9 @@ import {
   UserSettingSchema,
 } from "@/types/proto/api/v1/user_service_pb";
 
-const ICON_GROUPS = [
-  ["常用", "⭐ 🌟 ❤️ 📌 🔖 💡 ✅ 🔥 🎯 🚀 💬 📝"],
-  ["工作与学习", "💼 📁 📂 📋 📊 📈 📅 ⏰ 📚 📖 🎓 🧠 💻 🛠️ 🔍 🔗"],
-  ["生活", "🏠 👨‍👩‍👧‍👦 👤 🐱 🐶 🌱 🌸 ☀️ 🌙 ☕ 🍜 🍎 🛒 🎁 💰 🧾"],
-  ["兴趣与出行", "🎨 🎵 🎬 📷 🎮 ⚽ 🏃 🚲 ✈️ 🚗 🗺️ 🏖️ 🏔️ 🧳"],
-  ["状态", "😀 😊 🤔 😴 🎉 🏆 💪 🙏 ⚠️ 🚧 ⏳ ❓ 🔒 💤"],
-];
+import { lazyWithReload } from "@/utils/lazy";
+
+const TagEmojiPicker = lazyWithReload(() => import("@/components/TagEmojiPicker"));
 
 export default function TagActionDialog({ tag, action, onClose }: { tag: string; action: "rename" | "icon"; onClose: () => void }) {
   const { currentUser, userTagsSetting, refetchSettings } = useAuth();
@@ -138,28 +134,10 @@ export default function TagActionDialog({ tag, action, onClose }: { tag: string;
           {action === "rename" ? (
             <p className="text-sm text-muted-foreground">同时重命名当前空间笔记、待办和归档中的此标签及子标签，正文不变。</p>
           ) : (
-            <div className="max-h-[45vh] overflow-y-auto space-y-3">
-              {ICON_GROUPS.map(([title, icons]) => (
-                <div key={title}>
-                  <p className="mb-1 text-xs text-muted-foreground">{title}</p>
-                  <div className="grid grid-cols-8 gap-1">
-                    {icons.split(" ").map((icon) => (
-                      <Button
-                        key={icon}
-                        type="button"
-                        variant={value === icon ? "secondary" : "ghost"}
-                        className="h-9 p-0 text-xl"
-                        aria-label={`选择图标 ${icon}`}
-                        aria-pressed={value === icon}
-                        disabled={saving}
-                        onClick={() => setValue(icon)}
-                      >
-                        {icon}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-              ))}
+            <div className="min-h-0 overflow-y-auto">
+              <Suspense fallback={<p className="py-8 text-center text-sm text-muted-foreground">正在加载图标…</p>}>
+                <TagEmojiPicker onSelect={setValue} disabled={saving} />
+              </Suspense>
             </div>
           )}
           <div className="flex justify-end gap-2">
