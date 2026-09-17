@@ -16,6 +16,7 @@ export interface MemoExplorerFeatures {
 }
 
 interface Props {
+  isTodo?: boolean;
   className?: string;
   context?: MemoExplorerContext;
   features?: MemoExplorerFeatures;
@@ -58,7 +59,7 @@ const getDefaultFeatures = (context: MemoExplorerContext): MemoExplorerFeatures 
 };
 
 const MemoExplorer = (props: Props) => {
-  const { className, context = "home", features: featureOverrides = {}, statisticsData, tagCount } = props;
+  const { className, isTodo = false, context = "home", features: featureOverrides = {}, statisticsData, tagCount } = props;
   const currentUser = useCurrentUser();
 
   // Merge default features with overrides
@@ -74,10 +75,11 @@ const MemoExplorer = (props: Props) => {
         className,
       )}
     >
-      {features.search && <SearchBar />}
+      <div className="px-1 mb-2 text-sm font-medium">{isTodo ? "待办" : "笔记"}</div>
+      {features.search && <SearchBar isTodo={isTodo} />}
       <div className="mt-1 px-1 w-full">
-        {features.statistics && <StatisticsView statisticsData={statisticsData} />}
-        {features.shortcuts && currentUser && <ShortcutsSection />}
+        {features.statistics && <StatisticsView statisticsData={statisticsData} itemLabel={isTodo ? "待办" : undefined} />}
+        {features.shortcuts && currentUser && <ShortcutsSection isTodo={isTodo} />}
         {features.tags && <TagsSection readonly={context === "explore"} tagCount={tagCount} />}
       </div>
     </aside>

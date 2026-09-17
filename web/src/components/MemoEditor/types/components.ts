@@ -29,6 +29,7 @@ export interface EditorContentProps {
 }
 
 export interface EditorToolbarProps {
+  formattingTools?: React.ReactNode;
   onInsertReference?: (memo: { name: string; snippet: string }) => void;
   onSave: () => void;
   onCancel?: () => void;

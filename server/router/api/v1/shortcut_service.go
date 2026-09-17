@@ -84,6 +84,7 @@ func (s *APIV1Service) ListShortcuts(ctx context.Context, request *v1pb.ListShor
 			Name:   constructShortcutName(user.Username, shortcut.GetId()),
 			Title:  shortcut.GetTitle(),
 			Filter: shortcut.GetFilter(),
+			IsTodo: shortcut.GetIsTodo(),
 		})
 	}
 
@@ -125,6 +126,7 @@ func (s *APIV1Service) GetShortcut(ctx context.Context, request *v1pb.GetShortcu
 				Name:   constructShortcutName(user.Username, shortcut.GetId()),
 				Title:  shortcut.GetTitle(),
 				Filter: shortcut.GetFilter(),
+				IsTodo: shortcut.GetIsTodo(),
 			}, nil
 		}
 	}
@@ -154,6 +156,7 @@ func (s *APIV1Service) CreateShortcut(ctx context.Context, request *v1pb.CreateS
 		Id:     util.GenUUID(),
 		Title:  request.Shortcut.GetTitle(),
 		Filter: request.Shortcut.GetFilter(),
+		IsTodo: request.Shortcut.GetIsTodo(),
 	}
 	if newShortcut.Title == "" {
 		return nil, status.Errorf(codes.InvalidArgument, "title is required")
@@ -166,6 +169,7 @@ func (s *APIV1Service) CreateShortcut(ctx context.Context, request *v1pb.CreateS
 			Name:   constructShortcutName(user.Username, newShortcut.GetId()),
 			Title:  newShortcut.GetTitle(),
 			Filter: newShortcut.GetFilter(),
+			IsTodo: newShortcut.GetIsTodo(),
 		}, nil
 	}
 
@@ -205,6 +209,7 @@ func (s *APIV1Service) CreateShortcut(ctx context.Context, request *v1pb.CreateS
 		Name:   constructShortcutName(user.Username, newShortcut.GetId()),
 		Title:  newShortcut.GetTitle(),
 		Filter: newShortcut.GetFilter(),
+		IsTodo: newShortcut.GetIsTodo(),
 	}, nil
 }
 
@@ -250,6 +255,8 @@ func (s *APIV1Service) UpdateShortcut(ctx context.Context, request *v1pb.UpdateS
 						return nil, status.Errorf(codes.InvalidArgument, "title is required")
 					}
 					shortcut.Title = request.Shortcut.GetTitle()
+				} else if field == "is_todo" {
+					shortcut.IsTodo = request.Shortcut.GetIsTodo()
 				} else if field == "filter" {
 					if err := s.validateFilter(ctx, request.Shortcut.GetFilter()); err != nil {
 						return nil, status.Errorf(codes.InvalidArgument, "invalid filter: %v", err)
@@ -278,6 +285,7 @@ func (s *APIV1Service) UpdateShortcut(ctx context.Context, request *v1pb.UpdateS
 		Name:   constructShortcutName(user.Username, foundShortcut.GetId()),
 		Title:  foundShortcut.GetTitle(),
 		Filter: foundShortcut.GetFilter(),
+		IsTodo: foundShortcut.GetIsTodo(),
 	}, nil
 }
 

@@ -18,6 +18,7 @@ export interface FilteredMemoStats {
 
 export interface UseFilteredMemoStatsOptions {
   userName?: string;
+  isTodo?: boolean;
   context?: MemoExplorerContext;
   enabled?: boolean;
 }
@@ -36,23 +37,35 @@ const timestampsForBasis = (stats: UserStats, basis: MemoTimeBasis) => {
 };
 
 export const useFilteredMemoStats = (options: UseFilteredMemoStatsOptions = {}): FilteredMemoStats => {
-  const { userName, context, enabled = true } = options;
+  const { userName, context, isTodo, enabled = true } = options;
   const currentUser = useCurrentUser();
   const { timeBasis } = useView();
 
   // home/profile: use backend per-user stats (full tag set, not page-limited)
-  const { data: userStats, isLoading: isLoadingUserStats } = useUserStats(userName, { enabled });
+  const { data: userStats, isLoading: isLoadingUserStats } = useUserStats(userName, { enabled: enabled && isTodo === undefined });
   // explore/archived: fetch backend grouped stats and aggregate them locally.
   // ListAllUserStats AND's the request filter with the server's auth filter, so
   // private memos are not included unless explicitly visible to the current user.
   const exploreVisibilityFilter = currentUser != null ? 'visibility in ["PUBLIC", "PROTECTED"]' : 'visibility in ["PUBLIC"]';
-  const allUserStatsRequest =
+  const baseStatsRequest =
     context === "explore"
       ? { state: State.NORMAL, filter: exploreVisibilityFilter }
       : context === "archived"
         ? { state: State.ARCHIVED }
         : {};
-  const shouldFetchAllUserStats = context === "explore" || (context === "archived" && !!currentUser?.name);
+  const scopedFilter = [
+    baseStatsRequest.filter,
+    isTodo !== undefined ? `is_todo == ${isTodo}` : undefined,
+    isTodo !== undefined && userName ? `creator == ${JSON.stringify(userName)}` : undefined,
+  ]
+    .filter(Boolean)
+    .map((filter) => `(${filter})`)
+    .join(" && ");
+  const allUserStatsRequest = isTodo === undefined ? baseStatsRequest : { ...baseStatsRequest, filter: scopedFilter };
+  const shouldFetchAllUserStats =
+    isTodo !== undefined
+      ? context === "explore" || !!userName || (context === "archived" && !!currentUser?.name)
+      : context === "explore" || (context === "archived" && !!currentUser?.name);
   const { data: allUserStats = [], isLoading: isLoadingAllUserStats } = useAllUserStats(allUserStatsRequest, {
     enabled: enabled && shouldFetchAllUserStats,
   });
@@ -62,7 +75,7 @@ export const useFilteredMemoStats = (options: UseFilteredMemoStatsOptions = {}):
     let activityStats: Record<string, number> = {};
     let tagCount: Record<string, number> = {};
 
-    if (context === "explore" || context === "archived") {
+    if (isTodo !== undefined || context === "explore" || context === "archived") {
       const displayDates: string[] = [];
       for (const stats of allUserStats) {
         for (const [tag, count] of Object.entries(stats.tagCount ?? {})) {
@@ -93,7 +106,7 @@ export const useFilteredMemoStats = (options: UseFilteredMemoStatsOptions = {}):
     }
 
     return { statistics: { activityStats, timeBasis }, tags: tagCount, loading };
-  }, [context, userName, userStats, allUserStats, isLoadingUserStats, isLoadingAllUserStats, timeBasis]);
+  }, [context, isTodo, userName, userStats, allUserStats, isLoadingUserStats, isLoadingAllUserStats, timeBasis]);
 
   return data;
 };

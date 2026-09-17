@@ -195,3 +195,18 @@ func TestRenderAllRejectsUnsupportedPredicate(t *testing.T) {
 	_, err = engine.CompileToStatement(context.Background(), `tags.all(t, size(t) > 2)`, RenderOptions{Dialect: DialectSQLite})
 	require.Error(t, err)
 }
+
+func TestTodoScopeRendersForEveryDialect(t *testing.T) {
+	t.Parallel()
+	engine, err := NewEngine(NewSchema())
+	require.NoError(t, err)
+	for _, dialect := range []DialectName{DialectSQLite, DialectMySQL, DialectPostgres} {
+		for _, expression := range []string{"is_todo", "!is_todo", "is_todo == true", "is_todo == false"} {
+			t.Run(string(dialect)+"/"+expression, func(t *testing.T) {
+				stmt, err := engine.CompileToStatement(context.Background(), expression, RenderOptions{Dialect: dialect})
+				require.NoError(t, err)
+				require.Contains(t, stmt.SQL, "is_todo")
+			})
+		}
+	}
+}

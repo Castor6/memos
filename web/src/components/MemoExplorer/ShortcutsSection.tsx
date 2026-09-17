@@ -8,7 +8,7 @@ import { shortcutServiceClient } from "@/connect";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMemoFilterContext } from "@/contexts/MemoFilterContext";
 import { cn } from "@/lib/utils";
-import { ROUTES } from "@/router";
+import { ROUTES } from "@/router/routes";
 import { Shortcut } from "@/types/proto/api/v1/shortcut_service_pb";
 import { useTranslate } from "@/utils/i18n";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../ui/dropdown-menu";
@@ -22,7 +22,7 @@ const getShortcutId = (name: string): string => {
   return parts.length === 4 ? parts[3] : "";
 };
 
-function ShortcutsSection() {
+function ShortcutsSection({ isTodo = false }: { isTodo?: boolean }) {
   const t = useTranslate();
   const navigate = useNavigate();
   const { shortcuts, refetchSettings } = useAuth();
@@ -42,11 +42,11 @@ function ShortcutsSection() {
   };
 
   const handleCreateShortcut = () => {
-    navigate(ROUTES.SHORTCUTS, { state: { openCreate: true } });
+    navigate(`${ROUTES.SHORTCUTS}?type=${isTodo ? "todo" : "note"}`, { state: { openCreate: true } });
   };
 
   const handleEditShortcut = (shortcut: Shortcut) => {
-    navigate(ROUTES.SHORTCUTS, { state: { shortcut } });
+    navigate(`${ROUTES.SHORTCUTS}?type=${isTodo ? "todo" : "note"}`, { state: { shortcut } });
   };
 
   return (
@@ -63,43 +63,45 @@ function ShortcutsSection() {
         </TooltipProvider>
       </div>
       <div className="w-full flex flex-row justify-start items-center relative flex-wrap gap-x-2 gap-y-1">
-        {shortcuts.map((shortcut) => {
-          const shortcutId = getShortcutId(shortcut.name);
-          const maybeEmoji = shortcut.title.split(" ")[0];
-          const emoji = emojiRegex.test(maybeEmoji) ? maybeEmoji : undefined;
-          const title = emoji ? shortcut.title.replace(emoji, "") : shortcut.title;
-          const selected = selectedShortcut === shortcutId;
-          return (
-            <div
-              key={shortcutId}
-              className="shrink-0 w-full text-sm rounded-md leading-6 flex flex-row justify-between items-center select-none gap-2 text-muted-foreground"
-            >
-              <span
-                className={cn("truncate cursor-pointer text-muted-foreground", selected && "text-primary font-medium")}
-                onClick={() => (selected ? setShortcut(undefined) : setShortcut(shortcutId))}
+        {shortcuts
+          .filter((shortcut) => shortcut.isTodo === isTodo)
+          .map((shortcut) => {
+            const shortcutId = getShortcutId(shortcut.name);
+            const maybeEmoji = shortcut.title.split(" ")[0];
+            const emoji = emojiRegex.test(maybeEmoji) ? maybeEmoji : undefined;
+            const title = emoji ? shortcut.title.replace(emoji, "") : shortcut.title;
+            const selected = selectedShortcut === shortcutId;
+            return (
+              <div
+                key={shortcutId}
+                className="shrink-0 w-full text-sm rounded-md leading-6 flex flex-row justify-between items-center select-none gap-2 text-muted-foreground"
               >
-                {emoji && <span className="text-base mr-1">{emoji}</span>}
-                {title.trim()}
-              </span>
-              <DropdownMenu>
-                <DropdownMenuTrigger
-                  nativeButton={false}
-                  render={<MoreVerticalIcon className="w-4 h-auto shrink-0 text-muted-foreground cursor-pointer hover:text-foreground" />}
-                />
-                <DropdownMenuContent align="end" alignOffset={-12}>
-                  <DropdownMenuItem onClick={() => handleEditShortcut(shortcut)}>
-                    <Edit3Icon className="w-4 h-auto" />
-                    {t("common.edit")}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleDeleteShortcut(shortcut)}>
-                    <TrashIcon className="w-4 h-auto" />
-                    {t("common.delete")}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          );
-        })}
+                <span
+                  className={cn("truncate cursor-pointer text-muted-foreground", selected && "text-primary font-medium")}
+                  onClick={() => (selected ? setShortcut(undefined) : setShortcut(shortcutId))}
+                >
+                  {emoji && <span className="text-base mr-1">{emoji}</span>}
+                  {title.trim()}
+                </span>
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    nativeButton={false}
+                    render={<MoreVerticalIcon className="w-4 h-auto shrink-0 text-muted-foreground cursor-pointer hover:text-foreground" />}
+                  />
+                  <DropdownMenuContent align="end" alignOffset={-12}>
+                    <DropdownMenuItem onClick={() => handleEditShortcut(shortcut)}>
+                      <Edit3Icon className="w-4 h-auto" />
+                      {t("common.edit")}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleDeleteShortcut(shortcut)}>
+                      <TrashIcon className="w-4 h-auto" />
+                      {t("common.delete")}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            );
+          })}
       </div>
       <ConfirmDialog
         open={!!deleteTarget}

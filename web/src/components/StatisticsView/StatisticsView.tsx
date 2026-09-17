@@ -6,11 +6,12 @@ import type { StatisticsData } from "@/types/statistics";
 import { MonthNavigator } from "./MonthNavigator";
 
 interface Props {
+  itemLabel?: string;
   statisticsData: StatisticsData;
 }
 
 const StatisticsView = (props: Props) => {
-  const { statisticsData } = props;
+  const { statisticsData, itemLabel } = props;
   const { activityStats, timeBasis } = statisticsData;
   const navigateToDateFilter = useDateFilterNavigation();
   const [visibleMonthString, setVisibleMonthString] = useState(dayjs().format("YYYY-MM"));
@@ -22,6 +23,7 @@ const StatisticsView = (props: Props) => {
         onMonthChange={setVisibleMonthString}
         activityStats={activityStats}
         timeBasis={timeBasis}
+        itemLabel={itemLabel}
       />
 
       <div className="w-full animate-scale-in">
@@ -31,6 +33,7 @@ const StatisticsView = (props: Props) => {
           maxCount={calculateMaxCount(activityStats)}
           onClick={navigateToDateFilter}
           timeBasis={timeBasis}
+          itemLabel={itemLabel}
         />
       </div>
     </div>

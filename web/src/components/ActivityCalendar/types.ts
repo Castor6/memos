@@ -30,6 +30,7 @@ export interface MonthCalendarProps {
   selectedDate?: string;
   className?: string;
   disableTooltips?: boolean;
+  itemLabel?: string;
   timeBasis?: MemoTimeBasis;
 }
 
@@ -39,5 +40,6 @@ export interface YearCalendarProps {
   onYearChange: (year: number) => void;
   onDateClick: (date: string) => void;
   className?: string;
+  itemLabel?: string;
   timeBasis?: MemoTimeBasis;
 }

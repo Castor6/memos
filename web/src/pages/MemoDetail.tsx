@@ -1,7 +1,7 @@
 import { Code, ConnectError } from "@connectrpc/connect";
 import { ArrowUpLeftFromCircleIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Link, Navigate, useLocation, useParams } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import MemoCommentSection from "@/components/MemoCommentSection";
 import { MentionResolutionProvider } from "@/components/MemoContent/MentionResolutionContext";
 import { MemoDetailSidebar, MemoDetailSidebarDrawer } from "@/components/MemoDetailSidebar";
@@ -24,6 +24,19 @@ const MemoDetail = () => {
   const [shareImageDialogOpen, setShareImageDialogOpen] = useState(false);
   const params = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (!location.state?.referenceNavigation) return;
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented || event.isComposing) return;
+      if (document.querySelector('[role="dialog"], [role="alertdialog"], [role="menu"], [data-editor-shell]')) return;
+      if (event.target instanceof HTMLElement && event.target.closest('input, textarea, select, [contenteditable="true"]')) return;
+      event.preventDefault();
+      navigate(-1);
+    };
+    window.addEventListener("keydown", onEscape);
+    return () => window.removeEventListener("keydown", onEscape);
+  }, [location.key, location.state, navigate]);
   const { state: locationState, hash } = location;
 
   // Detect share mode from the route parameter.

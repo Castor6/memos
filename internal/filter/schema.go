@@ -158,6 +158,16 @@ func NewSchema() Schema {
 				CompareEq:  true,
 				CompareNeq: true,
 			},
+		}, "is_todo": {
+			Name:        "is_todo",
+			Kind:        FieldKindBoolColumn,
+			Type:        FieldTypeBool,
+			Column:      Column{Table: "memo", Name: "is_todo"},
+			Expressions: map[DialectName]string{},
+			AllowedComparisonOps: map[ComparisonOperator]bool{
+				CompareEq:  true,
+				CompareNeq: true,
+			},
 		},
 		"visibility": {
 			Name:        "visibility",
@@ -236,6 +246,7 @@ func NewSchema() Schema {
 		cel.Variable("created_ts", cel.TimestampType),
 		cel.Variable("updated_ts", cel.TimestampType),
 		cel.Variable("pinned", cel.BoolType),
+		cel.Variable("is_todo", cel.BoolType),
 		cel.Variable("tag", cel.StringType),
 		cel.Variable("tags", cel.ListType(cel.StringType)),
 		cel.Variable("visibility", cel.StringType),

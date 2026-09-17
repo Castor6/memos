@@ -15,6 +15,7 @@ import { isCompactWidth, useEditorActiveState, useElementWidth } from "../hooks"
 import type { EditorController } from "../types";
 
 interface FormattingToolbarProps {
+  expanded?: boolean;
   controllerRef: RefObject<EditorController | null>;
   /** Called by the exit button; when omitted (normal-mode toolbar) the button is hidden. */
   onExit?: () => void;
@@ -60,11 +61,11 @@ const preventFocusSteal: MouseEventHandler<HTMLButtonElement> = (event) => event
  * COMPACT_TOOLBAR_WIDTH the block controls fold into a "more" menu while marks
  * stay inline. In focus mode an exit button is pushed to the far edge.
  */
-export function FormattingToolbar({ controllerRef, onExit, className }: FormattingToolbarProps) {
+export function FormattingToolbar({ controllerRef, onExit, className, expanded = false }: FormattingToolbarProps) {
   const t = useTranslate();
   const rootRef = useRef<HTMLDivElement>(null);
   const width = useElementWidth(rootRef);
-  const compact = isCompactWidth(width);
+  const compact = !expanded && isCompactWidth(width);
   const active = useEditorActiveState(controllerRef);
 
   const run = (id: EditorCommandId) => controllerRef.current?.formatting?.run(id);

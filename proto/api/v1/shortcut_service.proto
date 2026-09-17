@@ -69,6 +69,9 @@ message Shortcut {
   // The CEL filter expression for the shortcut, using the same grammar as the
   // ListMemos `filter` argument. Reuse it by passing this value to ListMemos.
   string filter = 3 [(google.api.field_behavior) = OPTIONAL];
+
+  // Whether this shortcut belongs to the todo view. Existing shortcuts default to notes.
+  bool is_todo = 4 [(google.api.field_behavior) = OPTIONAL];
 }
 
 message ListShortcutsRequest {
