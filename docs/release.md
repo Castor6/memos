@@ -69,7 +69,7 @@ main 的 CI 成功后，`Version Packages` 工作流对仍为当前 main 的提�
 
 镜像标签为 `castor-v<版本>`、`sha-<完整提交>` 和 `stable`。服务器使用不可变摘要运行镜像。版本标签存在时，重试必须复用对应提交的镜像，不能重新构建覆盖；认证或网络错误不能当作标签不存在。重试旧版本不能把 `stable` 降级。首版升级测试从官方 `ghcr.io/usememos/memos:0.30.0` 开始，后续从上一版个人镜像开始。
 
-仓库变量 `ACR_REGISTRY`、`ACR_IMAGE` 指定发布目标；Secrets `ACR_USERNAME`、`ACR_PASSWORD` 保存发布凭据。GitHub 不持有服务器 SSH 密钥。工作流也支持在 main 手动输入已经合并的版本 PR 编号重试，会重新验证 PR 来源和完整版本差异。二进制、校验和、镜像摘要记录保留在 Actions artifacts 30 天；这与令牌有效期无关。当前不创建 GitHub Release 或 Git 标签。
+仓库变量 `ACR_REGISTRY`、`ACR_IMAGE` 指定发布目标；Secrets `ACR_USERNAME`、`ACR_PASSWORD` 保存发布凭据。GitHub 不持有服务器 SSH 密钥。工作流也支持在 main 手动输入已经合并的版本 PR 编号重试，会重新验证 PR 来源和完整版本差异。二进制、校验和、镜像摘要记录保留在 Actions artifacts 30 天；这与令牌有效期无关。镜像发布与 Actions 产物归档成功后，独立的 `github-release` job 创建 `castor-v<版本>` Git 标签和同名 GitHub Release。标签固定到版本 PR 的确定合并提交；更新说明取该版本 CHANGELOG，先草稿上传并校验所有附件，再公开。
 
 部署脚本与安装、恢复步骤见 [自动部署说明](deployment.md)。实际上线状态和验证证据见 [自动部署任务](tasks/TASK-20260916-automated-deployment.md)。
 
@@ -80,3 +80,13 @@ main 的 CI 成功后，`Version Packages` 工作流对仍为当前 main 的提�
 上游修复和功能同样通过 PR，引入后写明来源提交与自己的发布说明。审查工作流和发布元数据冲突，保留本项目的 CI、版本号与发布目标。
 
 上游最新的仓库配置与本 fork 起点可能不同。这里只读核查公开工作流和可访问的规则；上游 Secrets、组织策略和不可访问的保护设置不应推测。
+
+## GitHub Release
+
+普通 PR 不创建 Release。版本 PR 合并后依次完成镜像安装/升级验证、ACR 发布、Actions artifact 归档，再创建 GitHub Release；该阶段使用独立 job 的 `contents: write` 权限，构建任务与普通 CI 仍为只读。
+
+附件包含 Linux amd64/arm64 二进制、`CHANGELOG.md`、`LICENSE`、`release.json`、`image-digest.txt` 和 `SHA256SUMS`。二进制和元数据先核对构建产物的校验清单，再生成包含镜像摘要的完整公开清单；不会公开私有 Registry 地址。与 30 天 Actions artifacts 不同，Release 附件不会因这个保留期限被自动清除。
+
+上传不完整时保留草稿，可在 Actions 重跑失败的 Release job；标签、附件和摘要相符时复用，不重复创建。已有标签指向其它提交、同名附件内容不同或公开 Release 缺少附件时拒绝覆盖，需人工核查。重跑旧草稿不会把较新个人版本的 Latest 标记降级。
+
+Release 发布失败不会撤回已成功发布的镜像，服务器仍可能更新成功；Release 发布成功也不表示服务器已完成更新。继续分别查看发布工作流和服务器部署记录。新流程从包含此工作流的下一个版本 PR 开始，不自动补发历史版本。
