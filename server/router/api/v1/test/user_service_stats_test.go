@@ -223,3 +223,31 @@ func TestListAllUserStats_FilterExcludesPrivateMemos(t *testing.T) {
 	require.Equal(t, int32(1), filteredResp.Stats[0].TagCount["public"])
 	require.NotContains(t, filteredResp.Stats[0].TagCount, "private")
 }
+
+func TestListAllUserStats_SeparatesNotesAndTodos(t *testing.T) {
+	ctx := context.Background()
+	ts := NewTestService(t)
+	defer ts.Cleanup()
+	user, err := ts.CreateHostUser(ctx, "scope-user")
+	require.NoError(t, err)
+	userCtx := ts.CreateUserContext(ctx, user.ID)
+	for _, todo := range []bool{false, true} {
+		tag := fmt.Sprintf("scope-%t", todo)
+		_, err = ts.Store.CreateMemo(ctx, &store.Memo{
+			UID: tag, CreatorID: user.ID, Content: "- [ ] Task syntax in both types", Visibility: store.Private, IsTodo: todo,
+			Payload: &storepb.MemoPayload{Tags: []string{tag}},
+		})
+		require.NoError(t, err)
+	}
+	for _, todo := range []bool{false, true} {
+		response, err := ts.Service.ListAllUserStats(userCtx, &v1pb.ListAllUserStatsRequest{
+			Filter: fmt.Sprintf(`is_todo == %t && creator == "users/scope-user"`, todo),
+		})
+		require.NoError(t, err)
+		require.Len(t, response.Stats, 1)
+		require.Equal(t, int32(1), response.Stats[0].TotalMemoCount)
+		require.Equal(t, map[string]int32{fmt.Sprintf("scope-%t", todo): 1}, response.Stats[0].TagCount)
+		require.Len(t, response.Stats[0].MemoCreatedTimestamps, 1)
+		require.Len(t, response.Stats[0].MemoUpdatedTimestamps, 1)
+	}
+}

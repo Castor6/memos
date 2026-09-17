@@ -98,6 +98,7 @@ const RelationRow = ({ relation, direction, snippet }: { relation: MemoRelation;
     <Link
       className="flex min-w-0 items-center gap-1.5 rounded-md px-1.5 py-1 -mx-1.5 text-[13px] leading-5 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
       to={`/${relatedMemo.name}`}
+      state={{ referenceNavigation: true }}
       title={snippet}
       viewTransition
     >

@@ -9,7 +9,7 @@ import { useEditorContext, useEditorSelector } from "../state";
 
 const EMPTY_TAGS: string[] = [];
 
-export default function EditorTags({ editing }: { editing: boolean }) {
+export default function EditorTags({ editing, ready = true }: { editing: boolean; ready?: boolean }) {
   const { actions, dispatch } = useEditorContext();
   const tags = useEditorSelector((state) => state.metadata.tags ?? EMPTY_TAGS);
   const { userTagsSetting } = useAuth();
@@ -19,15 +19,22 @@ export default function EditorTags({ editing }: { editing: boolean }) {
   const [open, setOpen] = useState(false);
   const selectedFilter = filters.filter((filter) => filter.factor === "tagSearch").map((filter) => filter.value);
   const filterKey = selectedFilter.join("\u0000");
+  const autoTags = useRef(new Set<string>());
   const previousFilter = useRef<string | undefined>(undefined);
   useEffect(() => {
-    if (!editing && previousFilter.current !== filterKey) {
-      dispatch(actions.setMetadata({ tags: Array.from(new Set([...tags, ...selectedFilter])) }));
+    if (ready && !editing && previousFilter.current !== filterKey) {
+      const retained = tags.filter((tag) => !autoTags.current.has(tag) || selectedFilter.includes(tag));
+      autoTags.current = new Set([
+        ...[...autoTags.current].filter((tag) => selectedFilter.includes(tag)),
+        ...selectedFilter.filter((tag) => !retained.includes(tag)),
+      ]);
+      dispatch(actions.setMetadata({ tags: Array.from(new Set([...retained, ...selectedFilter])) }));
       previousFilter.current = filterKey;
     }
-  }, [editing, filterKey, tags, selectedFilter, dispatch, actions]);
+  }, [ready, editing, filterKey, tags, selectedFilter, dispatch, actions]);
   const add = (tag: string) => {
     const value = tag.trim();
+    autoTags.current.delete(value);
     if (value && !tags.includes(value)) dispatch(actions.setMetadata({ tags: [...tags, value] }));
     setSearch("");
     setOpen(false);

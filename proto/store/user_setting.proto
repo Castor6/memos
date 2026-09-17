@@ -127,6 +127,7 @@ message ShortcutsUserSetting {
     string id = 1;
     string title = 2;
     string filter = 3;
+    bool is_todo = 4;
   }
   repeated Shortcut shortcuts = 1;
 }

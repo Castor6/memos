@@ -44,6 +44,7 @@ export const MonthCalendar = memo((props: MonthCalendarProps) => {
     selectedDate,
     className,
     disableTooltips = false,
+    itemLabel,
     timeBasis = "create_time",
   } = props;
   const t = useTranslate();
@@ -73,7 +74,7 @@ export const MonthCalendar = memo((props: MonthCalendarProps) => {
             key={day.date}
             day={day}
             maxCount={maxCount}
-            tooltipText={getTooltipText(day.count, day.date, t, timeBasis)}
+            tooltipText={getTooltipText(day.count, day.date, t, timeBasis, itemLabel)}
             onClick={onClick}
             size={size}
             disableTooltip={disableTooltips}

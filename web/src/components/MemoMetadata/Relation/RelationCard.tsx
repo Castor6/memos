@@ -9,7 +9,13 @@ interface RelationCardProps {
 
 const RelationCard = ({ memo, parentPage, className }: RelationCardProps) => {
   return (
-    <MemoSnippetLink name={memo.name} snippet={memo.snippet} to={`/${memo.name}`} state={{ from: parentPage }} className={className} />
+    <MemoSnippetLink
+      name={memo.name}
+      snippet={memo.snippet}
+      to={`/${memo.name}`}
+      state={{ from: parentPage, referenceNavigation: true }}
+      className={className}
+    />
   );
 };
 

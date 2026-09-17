@@ -897,6 +897,7 @@ type ShortcutsUserSetting_Shortcut struct {
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Title         string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
 	Filter        string                 `protobuf:"bytes,3,opt,name=filter,proto3" json:"filter,omitempty"`
+	IsTodo        bool                   `protobuf:"varint,4,opt,name=is_todo,json=isTodo,proto3" json:"is_todo,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -950,6 +951,13 @@ func (x *ShortcutsUserSetting_Shortcut) GetFilter() string {
 		return x.Filter
 	}
 	return ""
+}
+
+func (x *ShortcutsUserSetting_Shortcut) GetIsTodo() bool {
+	if x != nil {
+		return x.IsTodo
+	}
+	return false
 }
 
 type WebhooksUserSetting_Webhook struct {
@@ -1101,13 +1109,14 @@ const file_store_user_setting_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12<\n" +
 	"\flast_used_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"lastUsedAt\"\xaa\x01\n" +
+	"lastUsedAt\"\xc3\x01\n" +
 	"\x14ShortcutsUserSetting\x12H\n" +
-	"\tshortcuts\x18\x01 \x03(\v2*.memos.store.ShortcutsUserSetting.ShortcutR\tshortcuts\x1aH\n" +
+	"\tshortcuts\x18\x01 \x03(\v2*.memos.store.ShortcutsUserSetting.ShortcutR\tshortcuts\x1aa\n" +
 	"\bShortcut\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x16\n" +
-	"\x06filter\x18\x03 \x01(\tR\x06filter\"\xc5\x01\n" +
+	"\x06filter\x18\x03 \x01(\tR\x06filter\x12\x17\n" +
+	"\ais_todo\x18\x04 \x01(\bR\x06isTodo\"\xc5\x01\n" +
 	"\x13WebhooksUserSetting\x12D\n" +
 	"\bwebhooks\x18\x01 \x03(\v2(.memos.store.WebhooksUserSetting.WebhookR\bwebhooks\x1ah\n" +
 	"\aWebhook\x12\x0e\n" +

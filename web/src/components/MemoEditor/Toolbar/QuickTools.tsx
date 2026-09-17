@@ -13,7 +13,7 @@ export default function QuickTools({ controllerRef }: { controllerRef: RefObject
   const [linkOpen, setLinkOpen] = useState(false);
   const [url, setURL] = useState("");
   return (
-    <div className="flex flex-wrap items-center gap-1 w-full" role="toolbar" aria-label="更多编辑操作">
+    <div className="flex shrink-0 items-center gap-0.5" role="toolbar" aria-label="更多编辑操作">
       {(
         [
           { action: "undo", label: "撤销", icon: UndoIcon },
@@ -66,9 +66,8 @@ export default function QuickTools({ controllerRef }: { controllerRef: RefObject
         </PopoverContent>
       </Popover>
       <Popover open={wordsOpen} onOpenChange={setWordsOpen}>
-        <PopoverTrigger className="inline-flex gap-1 items-center px-2 py-1 text-sm text-muted-foreground rounded hover:bg-muted">
+        <PopoverTrigger aria-label="常用词" title="常用词" className="p-1.5 text-muted-foreground rounded hover:bg-muted">
           <BookTextIcon className="size-4" />
-          常用词
         </PopoverTrigger>
         <PopoverContent
           align="start"

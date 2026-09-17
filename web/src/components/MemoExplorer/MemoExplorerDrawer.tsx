@@ -7,6 +7,7 @@ import type { StatisticsData } from "@/types/statistics";
 import MemoExplorer, { MemoExplorerContext, MemoExplorerFeatures } from "./MemoExplorer";
 
 interface Props {
+  isTodo?: boolean;
   context?: MemoExplorerContext;
   features?: MemoExplorerFeatures;
   statisticsData: StatisticsData;
@@ -15,7 +16,7 @@ interface Props {
 }
 
 const MemoExplorerDrawer = (props: Props) => {
-  const { context, features, statisticsData, tagCount, onOpenChange } = props;
+  const { context, isTodo, features, statisticsData, tagCount, onOpenChange } = props;
   const location = useLocation();
   const [open, setOpen] = useState(false);
 
@@ -39,7 +40,14 @@ const MemoExplorerDrawer = (props: Props) => {
         <SheetHeader>
           <SheetTitle />
         </SheetHeader>
-        <MemoExplorer className="px-4" context={context} features={features} statisticsData={statisticsData} tagCount={tagCount} />
+        <MemoExplorer
+          isTodo={isTodo}
+          className="px-4"
+          context={context}
+          features={features}
+          statisticsData={statisticsData}
+          tagCount={tagCount}
+        />
       </SheetContent>
     </Sheet>
   );

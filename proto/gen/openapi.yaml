@@ -3593,6 +3593,9 @@ components:
                     description: |-
                         The CEL filter expression for the shortcut, using the same grammar as the
                          ListMemos `filter` argument. Reuse it by passing this value to ListMemos.
+                isTodo:
+                    type: boolean
+                    description: Whether this shortcut belongs to the todo view. Existing shortcuts default to notes.
         SignInRequest:
             type: object
             properties:

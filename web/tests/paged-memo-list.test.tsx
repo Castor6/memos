@@ -186,3 +186,20 @@ describe("<PagedMemoList>", () => {
     });
   });
 });
+
+it("keeps the editor mounted while a new filter loads", () => {
+  readiness.auth = true;
+  readiness.instance = true;
+  view.maxColumns = 1;
+  feed.isLoading = false;
+  const client = new QueryClient();
+  const content = () => <QueryClientProvider client={client}><PagedMemoList renderer={() => <div />} renderLeading={() => <textarea aria-label="draft" defaultValue="unsaved draft" />} /></QueryClientProvider>;
+  const { rerender } = render(content());
+  const editor = screen.getByLabelText("draft");
+  feed.isLoading = true;
+  rerender(content());
+  expect(screen.getByLabelText("draft")).toBe(editor);
+  feed.isLoading = false;
+  rerender(content());
+  expect(screen.getByLabelText("draft")).toBe(editor);
+});

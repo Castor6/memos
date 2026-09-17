@@ -6,7 +6,7 @@ import type { ActiveFormatState, EditorCommandContext, EditorCommandId } from ".
  * for the editor's internal CodeMirror/DOM APIs.
  */
 export interface EditorController {
-  focus(): void;
+  focus(position?: "end"): void;
   insertText?(text: string): void;
   insertFile?(src: string, title: string, label: string): void;
   replaceFile?(src: string, replacement: string): void;
