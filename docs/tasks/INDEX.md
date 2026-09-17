@@ -4,6 +4,7 @@
 
 | 编号 | 标题 | 状态 | 模块 / 关键词 | 详情 |
 | --- | --- | --- | --- | --- |
+| TASK-20260917-local-ops-entry | 本地私有运维入口与历史资料整理 | 已完成 | AGENTS、本地入口、私有资料、历史归档 | [详情](TASK-20260917-local-ops-entry.md) |
 | TASK-20260917-github-release | 版本 PR 自动生成 GitHub Release | 已实现，CI 见 PR #13 | Release、发布、标签、附件 | [详情](TASK-20260917-github-release.md) |
 | TASK-20260917-deployment-retention | 升级备份与配套镜像清理 | 已完成 | 自动部署、备份、镜像、恢复 | [详情](TASK-20260917-deployment-retention.md) |
 | TASK-20260917-release-note-whitespace | 修复多段发布说明阻塞 | 已实现，待 CI | Changesets、CHANGELOG、版本 PR、发布生成器 | [详情](TASK-20260917-release-note-whitespace.md) |
