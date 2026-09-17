@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.2
+
+### Patch Changes
+
+- 20e5bf3: 修复富文本编辑器任务列表光标及文字显示在复选框下一行的问题。
+
 ## 0.2.1
 
 ### Patch Changes
