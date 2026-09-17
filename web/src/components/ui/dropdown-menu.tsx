@@ -16,13 +16,14 @@ const DropdownMenuTrigger = React.forwardRef<HTMLButtonElement, DropdownMenuPrim
 DropdownMenuTrigger.displayName = "DropdownMenuTrigger";
 
 type DropdownMenuContentProps = DropdownMenuPrimitive.Popup.Props &
-  Pick<DropdownMenuPrimitive.Positioner.Props, "align" | "alignOffset" | "side" | "sideOffset">;
+  Pick<DropdownMenuPrimitive.Positioner.Props, "align" | "alignOffset" | "side" | "sideOffset" | "anchor">;
 
 const DropdownMenuContent = React.forwardRef<HTMLDivElement, DropdownMenuContentProps>(
-  ({ className, align, alignOffset, side, sideOffset = 4, ...props }, ref) => {
+  ({ className, align, alignOffset, side, sideOffset = 4, anchor, ...props }, ref) => {
     return (
       <DropdownMenuPrimitive.Portal>
         <DropdownMenuPrimitive.Positioner
+          anchor={anchor}
           align={align}
           alignOffset={alignOffset}
           side={side}

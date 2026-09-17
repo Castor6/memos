@@ -197,7 +197,7 @@ const VisualGallery = ({ items, onPreview }: { items: VisualItem[]; onPreview?: 
   }
 
   return (
-    <div className={layout.containerClassName}>
+    <div className={cn(layout.containerClassName, "max-w-[30rem]")}>
       {layout.cells.map(({ item, className, overlayLabel }) => (
         <CollageVisualItem
           key={item.id}

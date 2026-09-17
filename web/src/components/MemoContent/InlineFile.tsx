@@ -22,7 +22,10 @@ export function InlineFile({ src, title, label }: { src: string; title: string; 
   const type = title.slice(FILE_TITLE.length);
   if (type.startsWith("video/")) return <video className="my-2 max-w-full max-h-96 rounded-lg" src={url} controls preload="metadata" />;
   if (type.startsWith("audio/")) return <audio className="my-2 max-w-full" src={url} controls preload="metadata" />;
-  if (type.startsWith("image/")) return <img className="my-2 max-w-full rounded-lg" src={url} alt={label} loading="lazy" />;
+  if (type.startsWith("image/"))
+    return (
+      <img className="my-2 h-auto w-auto max-w-[min(100%,30rem)] max-h-80 object-contain rounded-lg" src={url} alt={label} loading="lazy" />
+    );
   return (
     <a
       className="my-2 block rounded-lg border bg-muted/40 px-4 py-3 hover:bg-muted"
