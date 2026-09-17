@@ -6,5 +6,10 @@
   "profile_url": "http://127.0.0.1:5230/api/v1/instance/profile",
   "public_health_url": "https://YOUR-HOST/healthz",
   "ca_file": "/etc/memos-update/ca.pem",
-  "backup_paths": ["/etc/nginx", "/etc/memos-update"]
+  "backup_paths": [
+    "/etc/nginx",
+    "/etc/memos-update"
+  ],
+  "backup_keep_count": 3,
+  "backup_keep_days": 30
 }

@@ -5,6 +5,7 @@ import tempfile
 import unittest
 import sqlite3
 import subprocess
+from unittest.mock import patch
 
 spec = importlib.util.spec_from_file_location("memos_update", Path(__file__).with_name("memos-update.py"))
 module = importlib.util.module_from_spec(spec)
@@ -125,6 +126,26 @@ class UpdateTests(unittest.TestCase):
         self.updater.update()
         self.assertEqual(self.updater.events, ["pull"])
 
+    def test_cleanup_only_after_success_and_never_rolls_back(self):
+        def cleanup():
+            self.assertFalse(self.updater.marker.exists())
+            self.assertFalse(self.updater.pending.exists())
+            self.assertEqual(self.updater.read_state("deployed.json")["image"], self.updater.release["image"])
+            raise OSError("cleanup disk error")
+        with patch.object(self.updater, "cleanup", side_effect=cleanup) as clean:
+            self.updater.update()
+            clean.assert_called_once()
+            self.assertNotIn("restore", self.updater.events)
+            self.updater.update()
+            clean.assert_called_once()
+
+    def test_failure_never_runs_cleanup(self):
+        self.updater.failure = "health"
+        with patch.object(self.updater, "cleanup") as clean:
+            with self.assertRaises(RuntimeError):
+                self.updater.update()
+            clean.assert_not_called()
+
     def test_dry_run_does_not_write_or_stop(self):
         self.updater.update(dry_run=True)
         self.assertFalse(self.updater.pending.exists())
@@ -167,6 +188,8 @@ class BackupTests(unittest.TestCase):
                 db.execute(f'CREATE TABLE "{table}" (id INTEGER PRIMARY KEY, content TEXT)')
                 db.execute(f'INSERT INTO "{table}" VALUES (1, ?)', ("sentinel",))
         self.updater.snapshot = self.updater.data_snapshot()
+        self.updater.previous_image_id = lambda: "sha256:" + "a" * 64
+        self.updater.verify_image_id = lambda image: None
         self.updater.make_backup()
 
     def test_real_archive_restores_database_files_and_permissions(self):
@@ -176,6 +199,7 @@ class BackupTests(unittest.TestCase):
             db.execute("DELETE FROM memo")
         self.updater.restore()
         self.assertEqual(self.updater.data_snapshot(), self.updater.snapshot)
+        self.assertEqual(json.loads(self.updater.overlay.read_text())["services"]["memos"]["image"], "sha256:" + "a" * 64)
         self.assertEqual((app / "data" / "attachment.bin").stat().st_mode & 0o777, 0o640)
         self.assertEqual((self.updater.backup.parent / "failed-application/data/attachment.bin").read_bytes(), b"changed")
 
