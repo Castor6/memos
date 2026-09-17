@@ -2,6 +2,7 @@
 
 - 状态：已实现并本地验证，待 CI
 - 部署状态：未部署
+- 关联 PR：[PR #21](https://github.com/Castor6/memos/pull/21)，目标 `Castor6/memos:main`
 - 模块与关键词：标签、右键菜单、重命名、图标、图片、平铺
 - 最后更新：2026-09-17
 
