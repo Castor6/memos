@@ -3,6 +3,7 @@
 - 状态：已实现并本地验证，待 CI
 - 部署状态：未部署
 - 模块与关键词：侧栏、标签、Emoji、颜色、内容模糊
+- 关联 PR：[PR #18](https://github.com/Castor6/memos/pull/18)，目标 `Castor6/memos:main`
 - 最后更新：2026-09-17
 
 ## 背景与目标
