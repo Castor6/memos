@@ -221,6 +221,7 @@ def reset():
 
 
 def setup():
+    run(["bash", str(ROOT / "scripts/install-git-hooks.sh")])
     run(["node", "--version"])
     run(["go", "version"])
     pnpm("install", "--frozen-lockfile")

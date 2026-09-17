@@ -4,6 +4,7 @@
 
 | 编号 | 标题 | 状态 | 模块 / 关键词 | 详情 |
 | --- | --- | --- | --- | --- |
+| TASK-20260917-pre-commit-whitespace | 提交前空白检查 | 已实现并本地验证，待 CI | Git、空白、CI、开发环境 | [详情](TASK-20260917-pre-commit-whitespace.md) |
 | TASK-20260917-sidebar-tag-settings | 侧栏标签设置入口 | 已实现并本地验证，待 CI | 侧栏、标签、Emoji、菜单 | [详情](TASK-20260917-sidebar-tag-settings.md) |
 | TASK-20260917-editor-and-todo-experience | 编辑器与待办交互完善 | 已实现并本地验证，待 CI | 编辑器、待办、侧栏、标签、平铺、引用 | [详情](TASK-20260917-editor-and-todo-experience.md) |
 | TASK-20260917-task-list-cursor | 编辑器任务列表光标位置修复 | 已完成（待 CI） | 富文本、任务列表、光标、CSS | [详情](TASK-20260917-task-list-cursor.md) |

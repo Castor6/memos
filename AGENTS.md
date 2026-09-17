@@ -15,6 +15,7 @@ Memos is a self-hosted note-taking app.
 ## Working Rules
 
 - Read relevant code before editing; prefer local patterns over new abstractions.
+- 开始新会话的提交工作前运行 `./scripts/install-git-hooks.sh`；已有自定义钩子时保留并检查其是否接入 `git diff --cached --check`。所有代码、文档及任务记录更新完成并暂存后，必须执行 `git diff --cached --check`；推送前执行 `git diff --check origin/main...HEAD` 检查完整 PR 差异。修正后重新暂存，不使用 `--no-verify` 绕过检查。
 - Keep diffs scoped. Do not do repo-wide cleanup, dependency churn, or generated-file rewrites unless the task requires it.
 - Do not hand-edit generated proto outputs. Change `.proto` files, then run `buf generate`.
 - Add migrations for all database drivers when schema changes, and update each driver's `LATEST.sql`.
