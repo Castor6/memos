@@ -83,7 +83,7 @@ jobs:
             const notes = pr.body?.split('# Releases\n')[1] ?? pr.body?.split('## 本次版本\n')[1] ?? '详见 CHANGELOG.md。';
             const body = [
               '此 PR 汇总 main 中尚未发布的改动；后续 changeset 会继续更新同一个 PR。',
-              '合并后会构建并验证该版本，成功后发布 ACR 镜像并推进 stable；服务器按既有定时更新流程备份并部署。',
+              '合并后会构建并验证该版本，成功后发布 ACR 镜像并推进 stable，再创建附带更新说明和产物的 GitHub Release；服务器按既有定时更新流程备份并部署。',
               process.env.HAS_RELEASE_TOKEN === 'true'
                 ? 'CI 会自动运行，validate 通过后可审阅合并。'
                 : '尚未配置 CHANGESETS_TOKEN：需要先在 GitHub 批准此 PR 的工作流，validate 通过后可审阅合并。',

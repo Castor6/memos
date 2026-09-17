@@ -44,6 +44,8 @@ jobs:
             core.setOutput('commit', pr.merge_commit_sha);
   candidate:
     needs: source
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
@@ -70,7 +72,7 @@ jobs:
           pnpm install --frozen-lockfile
           RELEASE_BASE="$(git rev-parse HEAD^)" VERSION_PR=true pnpm check:release
           python3 -m unittest discover -s scripts/deploy -p 'test_*.py'
-          python3 -m unittest discover -s scripts -p 'test_publish_image.py'
+          python3 -m unittest discover -s scripts -p 'test_publish*.py'
       - name: Read the personal version
         id: version
         run: |
@@ -118,3 +120,24 @@ jobs:
           path: build/candidate/
           retention-days: 30
           if-no-files-found: error
+
+  github-release:
+    needs: [source, candidate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.source.outputs.commit }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v6
+        with:
+          name: memos-${{ needs.candidate.outputs.version }}-${{ needs.source.outputs.commit }}
+          path: build/candidate/
+      - name: Publish verified GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_COMMIT: ${{ needs.source.outputs.commit }}
+        run: python3 scripts/publish-github-release.py

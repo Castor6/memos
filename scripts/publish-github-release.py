@@ -1,0 +1,162 @@
+#!/usr/bin/env python3
+"""Publish verified candidate artifacts as an idempotent GitHub Release."""
+
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import tempfile
+
+
+def digest(path):
+    h = hashlib.sha256()
+    with path.open('rb') as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b''):
+            h.update(block)
+    return 'sha256:' + h.hexdigest()
+
+
+def version_tuple(version):
+    if not re.fullmatch(r'(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)', version) or version == '0.0.0':
+        raise ValueError('Invalid personal version')
+    return tuple(map(int, version.split('.')))
+
+
+def prepare(source, destination, commit):
+    release = json.loads((source / 'release.json').read_text())
+    version = release['version']
+    version_tuple(version)
+    tag = 'castor-v' + version
+    if not re.fullmatch(r'[0-9a-f]{40}', commit) or release.get('commit') != commit or release.get('tag') != tag:
+        raise RuntimeError('Candidate release identity mismatch')
+    image = json.loads((source / 'image.json').read_text())
+    if image.get('commit') != commit or image.get('version') != version:
+        raise RuntimeError('Published image identity mismatch')
+    match = re.fullmatch(r'[^\s@]+@(sha256:[0-9a-f]{64})', image.get('image', ''))
+    if not match:
+        raise RuntimeError('Published image digest is missing')
+    image_digest = match[1]
+    names = ('memos-linux-amd64', 'memos-linux-arm64', 'CHANGELOG.md', 'LICENSE', 'release.json')
+    checksums = {}
+    for line in (source / 'SHA256SUMS').read_text().splitlines():
+        checksum, name = line.split(maxsplit=1)
+        checksums[name] = 'sha256:' + checksum
+    for name in names:
+        path = source / name
+        if path.is_symlink() or not path.is_file() or digest(path) != checksums.get(name):
+            raise RuntimeError('Candidate checksum mismatch: ' + name)
+        shutil.copyfile(path, destination / name)
+    changelog = (source / 'CHANGELOG.md').read_text()
+    sections = re.split(r'^## ', changelog, flags=re.M)
+    notes = [s.split('\n', 1)[1].strip() for s in sections[1:] if s.split('\n', 1)[0].strip() == version]
+    if len(notes) != 1 or not notes[0]:
+        raise RuntimeError('Expected exactly one nonempty changelog section for this version')
+    # Public assets expose the immutable digest, not the private registry location.
+    (destination / 'image-digest.txt').write_text(image_digest + '\n')
+    files = sorted(destination.iterdir())
+    (destination / 'SHA256SUMS').write_text(''.join(digest(p)[7:] + '  ' + p.name + '\n' for p in files))
+    body = notes[0] + f'\n\n提交：`{commit}`\n\n镜像摘要：`{image_digest}`\n\n镜像构建和安装/升级测试已通过；服务器更新状态需单独确认。\n'
+    return version, tag, body
+
+
+class GitHub:
+    def __init__(self, repo):
+        if repo != 'Castor6/memos':
+            raise RuntimeError('Unexpected release repository')
+        self.repo = repo
+
+    def api(self, path, method='GET', data=None, optional=False):
+        command = ['gh', 'api', 'repos/' + self.repo + '/' + path, '--method', method]
+        if data is not None:
+            command += ['--input', '-']
+        result = subprocess.run(command, input=json.dumps(data) if data is not None else None,
+                                capture_output=True, text=True, check=False)
+        if result.returncode:
+            if optional and '(HTTP 404)' in result.stderr:
+                return None
+            raise RuntimeError('GitHub API request failed: ' + result.stderr.strip())
+        return json.loads(result.stdout)
+
+    def listing(self, path):
+        items = []
+        for page in range(1, 1001):
+            batch = self.api(f'{path}?per_page=100&page={page}')
+            items.extend(batch)
+            if len(batch) < 100:
+                return items
+        raise RuntimeError('GitHub pagination limit exceeded')
+
+    def upload(self, tag, path):
+        subprocess.run(['gh', 'release', 'upload', tag, str(path), '--repo', self.repo], check=True)
+
+    def asset_digest(self, asset):
+        if re.fullmatch(r'sha256:[0-9a-f]{64}', asset.get('digest') or ''):
+            return asset['digest']
+        # Older assets may not expose a digest. Compare their actual bytes.
+        result = subprocess.run(['gh', 'api', f'repos/{self.repo}/releases/assets/{asset["id"]}',
+                                 '-H', 'Accept: application/octet-stream'], check=True, capture_output=True)
+        return 'sha256:' + hashlib.sha256(result.stdout).hexdigest()
+
+
+def publish(client, directory, commit, version, tag, body):
+    # Never move an existing tag. Resolve annotated tags to the final commit.
+    ref = client.api('git/ref/tags/' + tag, optional=True)
+    if ref is None:
+        ref = client.api('git/refs', 'POST', {'ref': 'refs/tags/' + tag, 'sha': commit})
+    obj = ref['object']
+    for _ in range(10):
+        if obj['type'] != 'tag':
+            break
+        obj = client.api('git/tags/' + obj['sha'])['object']
+    if obj['type'] != 'commit' or obj['sha'] != commit:
+        raise RuntimeError('Existing release tag points to a different commit')
+    releases = client.listing('releases')
+    matching = [r for r in releases if r['tag_name'] == tag]
+    if len(matching) > 1:
+        raise RuntimeError('Duplicate release tag')
+    release = matching[0] if matching else client.api('releases', 'POST', {
+        'tag_name': tag, 'target_commitish': commit, 'name': tag, 'body': body,
+        'draft': True, 'prerelease': False, 'make_latest': 'false'})
+    if release.get('prerelease'):
+        raise RuntimeError('Existing release unexpectedly marked prerelease')
+    assets = {a['name']: a for a in client.listing(f'releases/{release["id"]}/assets')}
+    for path in sorted(directory.iterdir()):
+        asset = assets.get(path.name)
+        if asset:
+            if asset.get('state') != 'uploaded' or client.asset_digest(asset) != digest(path):
+                raise RuntimeError('Existing release asset differs: ' + path.name)
+        elif not release['draft']:
+            raise RuntimeError('Published release is missing asset: ' + path.name)
+        else:
+            client.upload(tag, path)
+    # Read back every uploaded asset before exposing the release.
+    assets = {a['name']: a for a in client.listing(f'releases/{release["id"]}/assets')}
+    for path in directory.iterdir():
+        asset = assets.get(path.name)
+        if not asset or asset.get('state') != 'uploaded' or client.asset_digest(asset) != digest(path):
+            raise RuntimeError('Uploaded release asset verification failed: ' + path.name)
+    if release['draft']:
+        newer = any(not r['draft'] and not r['prerelease'] and re.fullmatch(r'castor-v\d+\.\d+\.\d+', r['tag_name'])
+                    and version_tuple(r['tag_name'][8:]) > version_tuple(version) for r in releases)
+        release = client.api(f'releases/{release["id"]}', 'PATCH', {
+            'draft': False, 'name': tag, 'body': body, 'make_latest': 'false' if newer else 'true'})
+    return release['html_url']
+
+
+def main():
+    client = GitHub(os.environ['GITHUB_REPOSITORY'])
+    commit = os.environ['RELEASE_COMMIT']
+    with tempfile.TemporaryDirectory(prefix='memos-github-release-') as temp:
+        destination = Path(temp)
+        version, tag, body = prepare(Path('build/candidate'), destination, commit)
+        url = publish(client, destination, commit, version, tag, body)
+    print('GitHub Release verified: ' + url)
+    with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+        summary.write(f'GitHub Release: {url}\n')
+
+
+if __name__ == '__main__':
+    main()
