@@ -20,6 +20,7 @@ function fixture(t) {
   write("package.json", JSON.stringify({ name: "memos-personal", version: "0.0.0", private: true }, null, 2) + "\n");
   write(".gitignore", "node_modules\n");
   write(".changeset/config.json", readFileSync(join(project, ".changeset/config.json"), "utf8"));
+  write(".changeset/changelog.mjs", readFileSync(join(project, ".changeset/changelog.mjs"), "utf8"));
   write("CHANGELOG.md", "# Changelog\n");
   symlinkSync(join(project, "node_modules"), join(root, "node_modules"), "dir");
   const base = commit();
@@ -84,4 +85,21 @@ test("two changesets aggregate into one minor version; forged version diffs fail
   }
   f.write("web/src/App.tsx", "unexpected change\n"); f.commit();
   assert.throws(() => checkRelease({ root: f.root, base, versionPR: true }), /file set differs/);
+});
+
+test("multiline release notes generate clean whitespace and pass exact regeneration", (t) => {
+  const f = fixture(t);
+  f.write(".changeset/multiline.md", note("minor", "新增笔记功能。\n\n迁移核心字段，保留旧数据。\n\n- 第一项\n  - 嵌套项\n\n```text\n  保留代码缩进\n```"));
+  const base = f.commit();
+  execFileSync(join(project, "node_modules/.bin/changeset"), ["version"], { cwd: f.root, stdio: "pipe" });
+  const changelog = readFileSync(join(f.root, "CHANGELOG.md"), "utf8");
+  assert.doesNotMatch(changelog, /^[ \t]+$/m);
+  assert.match(changelog, /新增笔记功能。\n\n  迁移核心字段，保留旧数据。/);
+  assert.match(changelog, /    - 嵌套项/);
+  assert.match(changelog, /    保留代码缩进/);
+  f.git("diff", "--check", base);
+  f.commit();
+  checkRelease({ root: f.root, base, versionPR: true });
+  f.write("CHANGELOG.md", changelog.replace("保留旧数据", "篡改生成结果")); f.commit();
+  assert.throws(() => checkRelease({ root: f.root, base, versionPR: true }), /unexpected content/);
 });
