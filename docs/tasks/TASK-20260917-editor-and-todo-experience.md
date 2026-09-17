@@ -38,7 +38,7 @@
 
 验证日期：2026-09-17，本任务工作分支；未部署。
 
-- `./scripts/dev.sh check frontend`：TypeScript/Biome、66 文件 / 271 用例、生产构建、差异空白检查通过。最后仅调整路由常量导入，额外 lint 通过；最终检查继续记录于 PR。
+- `./scripts/dev.sh check frontend`：TypeScript/Biome、66 文件 / 271 用例、生产构建、差异空白检查通过。最终路由常量导入调整后再次完整通过。
 - `go test -race ./server/... ./internal/...` 通过。新增用例覆盖三驱动 CEL SQL 编译、全量统计区分笔记/待办、捷径归属创建/读取/更新/列表持久化；前端新增标签来源撤回、末尾输入及筛选加载保持编辑器实例的用例。
 - `go run github.com/bufbuild/buf/cmd/buf@v1.57.2 generate`、`lint`、`format --diff --exit-code`（在 proto 目录）通过。仅 JSON 字段扩展，无数据库迁移。
 - `corepack pnpm check:release origin/main` 通过。
@@ -51,4 +51,4 @@
 ## 后续事项
 
 - iPhone/Safari、真实软键盘和触摸手势需真机验收；窄屏测试不等同 iOS 测试。
-- 本任务不合并、不部署；CI 与 PR 链接在创建后补记。
+- 本任务不合并、不部署；PR：[Castor6/memos#17](https://github.com/Castor6/memos/pull/17)，实现提交 2126ed3c，CI 状态见 PR。
