@@ -12,6 +12,20 @@
 
 当前 Node 不是 24 且本机已有 fnm 时，`setup` 会安装/选择 Node 24；选择只作用于该命令，不修改全局默认版本。其他电脑也可自行准备 Node 24 与 Corepack 后运行。Corepack 按项目要求调用 pnpm，依赖使用 `--frozen-lockfile` 安装。
 
+## 提交前空白检查
+
+`setup` 会安装仓库维护的 pre-commit 钩子；已准备好的环境可单独运行：
+
+```bash
+./scripts/install-git-hooks.sh
+```
+
+安装到本机 Git hooks 目录，当前仓库及其 worktree 共享；新克隆需要重新安装。重复安装会更新本仓库维护的钩子，遇到自定义 `core.hooksPath` 或已有自定义 pre-commit 时停止且不覆盖，请在自己的钩子中接入 `git diff --cached --check`。
+
+钩子只检查暂存区，不修改文件、不自动暂存。报错后修正对应内容，重新 `git add` 再提交；部分暂存时，工作区已修正不代表暂存区已修正。`.editorconfig` 为支持它的编辑器提供末尾换行与行尾空白设置，Markdown 保留双空格换行；它不能保证删除文件末尾的额外空行，最终由 Git 检查兜底。
+
+代码、文档、任务记录全部更新后执行 `git diff --cached --check`，推送前执行 `git diff --check origin/main...HEAD`，覆盖此前提交引入的空白问题。CI 门禁保持不变。
+
 ## 启动与停止
 
 ```bash

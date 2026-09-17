@@ -1,0 +1,7 @@
+#!/bin/sh
+# memos-managed-whitespace-hook
+# Check the index only; never rewrite files or stage unrelated changes.
+if ! git diff --cached --check; then
+  echo '提交已阻止：请修正上述暂存文件的空白问题，重新 git add 后再提交。' >&2
+  exit 1
+fi
