@@ -47,6 +47,7 @@ main 的 CI 成功后，`Version Packages` 工作流对仍为当前 main 的提�
 
 - 有待发布 changeset 时，机器人创建或更新同一个 `changeset-release/main` PR，标题为 `Version Packages`。
 - PR 汇总中文更新说明、计算版本并删除已消费的 changeset。
+- `.changeset/changelog.mjs` 沿用 Changesets 默认格式，仅清除生成结果中纯空白行的缩进，防止多段说明触发 `git diff --check`。生成与精确再生成校验使用同一配置，不手改版本 PR 的日志。
 - 初始 `0.0.0` 是未发布占位值；首份基线 changeset 生成 `0.1.0`，上游源码基线仍是官方 `v0.30.0`。
 - 个人标签约定为 `castor-v<版本号>`，例如 `castor-v0.1.0`，与上游标签区分。数据库迁移序列保持独立。
 - CI 从 main 重新运行 Changesets，比较完整文件集合和内容，保证版本 PR 只包含应生成的版本改动。
