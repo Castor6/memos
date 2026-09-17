@@ -11,7 +11,7 @@ import useCurrentUser from "@/hooks/useCurrentUser";
 import { useFilteredMemoStats } from "@/hooks/useFilteredMemoStats";
 import useMediaQuery from "@/hooks/useMediaQuery";
 import { cn } from "@/lib/utils";
-import { Routes } from "@/router";
+import { ROUTES as Routes } from "@/router/routes";
 
 const ARCHIVED_ROUTE = "/archived";
 const PROFILE_ROUTE = "/u/:username";
@@ -25,6 +25,8 @@ const MainLayout = () => {
   const { isInitialized: instanceInitialized } = useInstance();
   const location = useLocation();
   const currentUser = useCurrentUser();
+  const isTodo =
+    location.pathname === "/todos" || (location.pathname === "/shortcuts" && new URLSearchParams(location.search).get("type") === "todo");
   const [profileUserName, setProfileUserName] = useState<string | undefined>();
   const [mobileExplorerOpen, setMobileExplorerOpen] = useState(false);
   const showMemoExplorer = location.pathname !== Routes.ABOUT;
@@ -75,8 +77,13 @@ const MainLayout = () => {
   // auxiliary statistics behind full settings initialization, and do not fetch
   // mobile drawer data until the user actually opens it.
   const statsEnabled = showMemoExplorer && authInitialized && instanceInitialized && (md || mobileExplorerOpen);
-  const { statistics, tags } = useFilteredMemoStats({ userName: statsUserName, context, enabled: statsEnabled });
-  const memoExplorerProps = { context, statisticsData: statistics, tagCount: tags };
+  const { statistics, tags } = useFilteredMemoStats({
+    userName: statsUserName,
+    context,
+    isTodo,
+    enabled: statsEnabled,
+  });
+  const memoExplorerProps = { context, isTodo, statisticsData: statistics, tagCount: tags };
 
   return (
     <section className="@container w-full min-h-full flex flex-col justify-start items-center md:flex-row md:items-start">

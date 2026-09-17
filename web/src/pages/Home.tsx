@@ -18,6 +18,7 @@ const Home = ({ isTodo = false }: { isTodo?: boolean }) => {
   const defaultCreateTime = useMemo(() => deriveDefaultCreateTimeFromFilters(filters), [filters]);
 
   const memoFilter = useMemoFilters({
+    isTodo,
     creatorName: user?.name,
     includeShortcuts: true,
     includePinned: true,

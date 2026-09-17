@@ -121,3 +121,15 @@ describe("useFilteredMemoStats", () => {
     expect(useAllUserStats).toHaveBeenCalledWith(expect.anything(), { enabled: false });
   });
 });
+
+it("requests separate full statistics for notes and todos", () => {
+  mockUseView.mockReturnValue({ timeBasis: "create_time" });
+  vi.mocked(useUserStats).mockReturnValue({ isLoading: false } as ReturnType<typeof useUserStats>);
+  vi.mocked(useAllUserStats).mockReturnValue({ data: [{ tagCount: { todo: 2 }, memoCreatedTimestamps: [ts(2026, 5, 1)] }], isLoading: false } as ReturnType<typeof useAllUserStats>);
+  const { result, rerender } = renderHook(({ isTodo }) => useFilteredMemoStats({ userName: "users/test", context: "home", isTodo }), { initialProps: { isTodo: true } });
+  expect(useAllUserStats).toHaveBeenLastCalledWith({ filter: '(is_todo == true) && (creator == "users/test")' }, { enabled: true });
+  expect(result.current.tags).toEqual({ todo: 2 });
+  expect(result.current.statistics.activityStats).toEqual({ "2026-05-01": 1 });
+  rerender({ isTodo: false });
+  expect(useAllUserStats).toHaveBeenLastCalledWith({ filter: '(is_todo == false) && (creator == "users/test")' }, { enabled: true });
+});

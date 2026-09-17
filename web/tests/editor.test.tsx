@@ -158,3 +158,13 @@ it("uses Enter to save only on desktop and ignores IME confirmation", async () =
   preferences.enterToSave = false;
   vi.unstubAllGlobals();
 });
+
+it("focuses at the end of an existing task without adding a trailing paragraph", async () => {
+  const { act } = await import("@testing-library/react");
+  const ref = createRef<EditorController>();
+  const { container } = render(<Editor ref={ref} className="x" initialContent="- [ ] 编辑待办" placeholder="" onContentChange={vi.fn()} onFiles={vi.fn()} onSubmit={vi.fn()} />);
+  act(() => ref.current!.focus("end"));
+  act(() => ref.current!.insertText!("末尾"));
+  expect(ref.current!.getMarkdown().trim()).toBe("- [ ] 编辑待办末尾");
+  expect(container.querySelector(".rich-editor > p")).toBeNull();
+});

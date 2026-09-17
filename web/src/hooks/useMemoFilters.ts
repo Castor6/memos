@@ -26,13 +26,14 @@ const escapeFilterValue = (value: string): string => JSON.stringify(value);
 
 export interface UseMemoFiltersOptions {
   creatorName?: string;
+  isTodo?: boolean;
   includeShortcuts?: boolean;
   includePinned?: boolean;
   visibilities?: Visibility[];
 }
 
 export const useMemoFilters = (options: UseMemoFiltersOptions = {}): string | undefined => {
-  const { creatorName, includeShortcuts = false, includePinned = false, visibilities } = options;
+  const { creatorName, isTodo, includeShortcuts = false, includePinned = false, visibilities } = options;
 
   const { shortcuts } = useAuth();
   const { filters, shortcut: currentShortcut } = useMemoFilterContext();
@@ -40,8 +41,10 @@ export const useMemoFilters = (options: UseMemoFiltersOptions = {}): string | un
   // Get selected shortcut if needed
   const selectedShortcut = useMemo(() => {
     if (!includeShortcuts) return undefined;
-    return shortcuts.find((shortcut) => getShortcutId(shortcut.name) === currentShortcut);
-  }, [includeShortcuts, currentShortcut, shortcuts]);
+    return shortcuts.find(
+      (shortcut) => getShortcutId(shortcut.name) === currentShortcut && (isTodo === undefined || shortcut.isTodo === isTodo),
+    );
+  }, [includeShortcuts, isTodo, currentShortcut, shortcuts]);
 
   // Build filter
   return useMemo(() => {

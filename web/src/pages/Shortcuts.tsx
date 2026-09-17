@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -240,9 +240,12 @@ const ShortcutGuide = ({ onUseExample }: ShortcutGuideProps) => {
 const Shortcuts = () => {
   const t = useTranslate();
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const isTodo = searchParams.get("type") === "todo";
   const navigate = useNavigate();
   const user = useCurrentUser();
-  const { shortcuts, refetchSettings } = useAuth();
+  const { shortcuts: allShortcuts, refetchSettings } = useAuth();
+  const shortcuts = allShortcuts.filter((shortcut) => shortcut.isTodo === isTodo);
   const [isCreateFormOpen, setIsCreateFormOpen] = useState(false);
   const [draft, setDraft] = useState<Shortcut>(createEmptyShortcut());
   const [deleteTarget, setDeleteTarget] = useState<Shortcut | undefined>();
@@ -270,8 +273,8 @@ const Shortcuts = () => {
       setIsCreateFormOpen(true);
     }
 
-    navigate(location.pathname, { replace: true, state: null });
-  }, [location.key, location.pathname, location.state, navigate]);
+    navigate(location.pathname + location.search, { replace: true, state: null });
+  }, [location.key, location.pathname, location.search, location.state, navigate]);
 
   const setDraftState = (state: Partial<Shortcut>) => {
     setDraft((current) => ({ ...current, ...state }));
@@ -323,7 +326,7 @@ const Shortcuts = () => {
       validateState.setLoading();
       await shortcutServiceClient.createShortcut({
         parent: user.name,
-        shortcut: { name: "", title: draft.title, filter: draft.filter },
+        shortcut: { name: "", title: draft.title, filter: draft.filter, isTodo },
         validateOnly: true,
       });
       validateState.setFinish();
@@ -352,7 +355,7 @@ const Shortcuts = () => {
       createState.setLoading();
       await shortcutServiceClient.createShortcut({
         parent: user.name,
-        shortcut: { name: "", title: draft.title, filter: draft.filter },
+        shortcut: { name: "", title: draft.title, filter: draft.filter, isTodo },
       });
       await refetchSettings();
       createState.setFinish();
@@ -376,7 +379,7 @@ const Shortcuts = () => {
     try {
       updateState.setLoading();
       await shortcutServiceClient.updateShortcut({
-        shortcut: draft,
+        shortcut: { ...draft, isTodo },
         updateMask: create(FieldMaskSchema, { paths: ["title", "filter"] }),
       });
       await refetchSettings();
@@ -424,7 +427,7 @@ const Shortcuts = () => {
             <FilterIcon className="h-4 w-4" />
             <span className="text-sm font-medium">{t("common.shortcuts")}</span>
           </div>
-          <h1 className="text-2xl font-semibold tracking-normal text-foreground">Shortcut filters</h1>
+          <h1 className="text-2xl font-semibold tracking-normal text-foreground">{isTodo ? "待办捷径" : "笔记捷径"}</h1>
           <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
             Create reusable memo filters with fields, operators, time helpers, and tag matching. Use examples as starting points, then
             validate before saving.
@@ -436,6 +439,20 @@ const Shortcuts = () => {
         </Button>
       </div>
 
+      <div className="flex gap-2" aria-label="捷径类型">
+        {[false, true].map((todo) => (
+          <Button
+            key={String(todo)}
+            variant={isTodo === todo ? "default" : "outline"}
+            onClick={() => {
+              handleCloseForm();
+              setSearchParams({ type: todo ? "todo" : "note" });
+            }}
+          >
+            {todo ? "待办" : "笔记"}
+          </Button>
+        ))}
+      </div>
       <div className={cn("grid grid-cols-1 gap-6", isCreateFormOpen && "xl:grid-cols-[minmax(0,1fr)_20rem]")}>
         <div className="flex min-w-0 flex-col gap-6">
           <div
@@ -512,7 +529,7 @@ const Shortcuts = () => {
 
           <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between">
-              <h2 className="text-base font-semibold text-foreground">All shortcuts</h2>
+              <h2 className="text-base font-semibold text-foreground">{isTodo ? "待办捷径" : "笔记捷径"}</h2>
               <Badge variant="outline">{shortcuts.length}</Badge>
             </div>
 

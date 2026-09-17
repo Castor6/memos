@@ -14,6 +14,7 @@ import { type EditorCommandId, EMPTY_ACTIVE_FORMATS } from "../formatting/comman
 import type { EditorController } from "../types/editorController";
 import { InlineMedia } from "./media";
 import { PreservedContent, prepareMarkdown } from "./preserved-content";
+import SelectionToolbar from "./SelectionToolbar";
 import "./rich-editor.css";
 
 interface EditorProps {
@@ -34,7 +35,7 @@ const Editor = forwardRef<EditorController, EditorProps>((props, ref) => {
   const lastEmitted = useRef(props.initialContent);
   const editor = useEditor({
     extensions: [
-      StarterKit.configure({ link: { openOnClick: false }, heading: { levels: [1, 2, 3, 4, 5, 6] } }),
+      StarterKit.configure({ trailingNode: false, link: { openOnClick: false }, heading: { levels: [1, 2, 3, 4, 5, 6] } }),
       TableKit,
       TaskList,
       TaskItem.configure({ nested: true }),
@@ -121,8 +122,8 @@ const Editor = forwardRef<EditorController, EditorProps>((props, ref) => {
   useImperativeHandle(
     ref,
     () => ({
-      focus: () => {
-        editor?.commands.focus();
+      focus: (position) => {
+        editor?.commands.focus(position);
       },
       hasFocus: () => editor?.isFocused ?? false,
       isEmpty: () => editor?.isEmpty ?? true,
@@ -258,7 +259,12 @@ const Editor = forwardRef<EditorController, EditorProps>((props, ref) => {
     [editor],
   );
 
-  return <EditorContent editor={editor} className={cn("w-full min-h-24", props.className, props.isFocusMode && "flex-1")} />;
+  return (
+    <>
+      <EditorContent editor={editor} className={cn("w-full min-h-24", props.className, props.isFocusMode && "flex-1")} />
+      {editor && <SelectionToolbar editor={editor} />}
+    </>
+  );
 });
 Editor.displayName = "RichMemoEditor";
 export default Editor;

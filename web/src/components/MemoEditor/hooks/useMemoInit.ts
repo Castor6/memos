@@ -52,7 +52,7 @@ export const useMemoInit = ({
     }
 
     if (autoFocus) {
-      setTimeout(() => editorRef.current?.focus(), 100);
+      setTimeout(() => editorRef.current?.focus("end"), 100);
     }
 
     setIsInitialized(true);

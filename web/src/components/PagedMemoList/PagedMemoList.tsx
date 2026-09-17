@@ -11,7 +11,6 @@ import { useDelayedFlag } from "@/hooks/useDelayedFlag";
 import { useInfiniteMemos } from "@/hooks/useMemoQueries";
 import { hoistMemoToFront } from "@/hooks/useMemoSorting";
 import { DEFAULT_LIST_MEMOS_PAGE_SIZE, LOADING_INDICATOR_DELAY_MS } from "@/lib/constants";
-import { cn } from "@/lib/utils";
 import { State } from "@/types/proto/api/v1/common_pb";
 import type { Memo } from "@/types/proto/api/v1/memo_service_pb";
 import { useTranslate } from "@/utils/i18n";
@@ -23,10 +22,6 @@ import { estimateMemoCardHeight } from "./memoCardHeight";
 // Memo identity for React keys and grid planning. The pages use it for their renderer keys too,
 // so flow-list and grid identity can never drift apart.
 export const getMemoKey = (memo: Memo) => `${memo.name}-${memo.updateTime}`;
-
-// Columns never stretch past this, so 2 columns on a wide monitor stay readable and the
-// grid centers in the leftover space instead of filling it.
-const MAX_COLUMN_WIDTH = 420;
 
 const Loader = () => (
   <div className="w-full flex flex-row justify-center items-center py-8">
@@ -219,7 +214,7 @@ const PagedMemoList = (props: Props) => {
   );
 
   const emptyPlaceholder =
-    !isFetchingNextPage && !hasNextPage && sortedMemoList.length === 0 ? (
+    !isDisplayPending && !isFetchingNextPage && !hasNextPage && sortedMemoList.length === 0 ? (
       <Placeholder variant="empty" message={t("message.no-data")} className="w-full" />
     ) : null;
 
@@ -240,7 +235,7 @@ const PagedMemoList = (props: Props) => {
   // Pagination controls are identical across both layouts.
   const footer = (
     <>
-      {isFetchingNextPage && <Loader />}
+      {(showLoader || isFetchingNextPage) && <Loader />}
       {!isFetchingNextPage && (hasNextPage || sortedMemoList.length > 0) && (
         <div className="w-full opacity-70 flex flex-row justify-center items-center my-4">
           <BackToTop />
@@ -252,9 +247,9 @@ const PagedMemoList = (props: Props) => {
   const children = (
     <MentionResolutionProvider contents={contents} userNames={userNames}>
       <div ref={layoutMeasureRef} className="w-full">
-        <div className={cn("flex flex-col justify-start w-full mx-auto", useGrid ? "max-w-none" : "max-w-2xl")}>
+        <div className="flex flex-col justify-start w-full mx-auto">
           {/* During initial load, show the spinner only after the delay; render nothing before then to avoid a flash. */}
-          {isDisplayPending ? (
+          {!authInitialized || !instanceInitialized ? (
             showLoader ? (
               <Loader />
             ) : null
@@ -268,7 +263,6 @@ const PagedMemoList = (props: Props) => {
                 leading={gridLeading}
                 priorityKey={priorityKey}
                 maxColumns={maxColumns}
-                maxColumnWidth={MAX_COLUMN_WIDTH}
               />
               {footer}
             </>

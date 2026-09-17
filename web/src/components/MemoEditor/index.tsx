@@ -244,6 +244,7 @@ const MemoEditorImpl: React.FC<MemoEditorProps> = ({
       )}
 
       <div
+        data-editor-shell
         ref={editorContainerRef}
         className={cn(
           "group relative w-full flex flex-col justify-between items-start bg-card px-4 pt-3 pb-1 rounded-lg border border-border gap-2",
@@ -252,9 +253,7 @@ const MemoEditorImpl: React.FC<MemoEditorProps> = ({
           !isFocusMode && className,
         )}
       >
-        <EditorTags editing={Boolean(memo)} />
-        <QuickTools controllerRef={editorRef} />
-        <FormattingToolbar controllerRef={editorRef} onExit={isFocusMode ? handleToggleFocusMode : undefined} />
+        <EditorTags editing={Boolean(memo)} ready={isInitialized} />
 
         {(memoName || (!memo && hasTimestamp)) && (
           <div className="w-full -mb-1">
@@ -281,6 +280,12 @@ const MemoEditorImpl: React.FC<MemoEditorProps> = ({
         <div className="w-full flex flex-col gap-2">
           <EditorMetadata memoName={memoName} />
           <EditorToolbar
+            formattingTools={
+              <>
+                <FormattingToolbar expanded controllerRef={editorRef} className="w-auto shrink-0" />
+                <QuickTools controllerRef={editorRef} />
+              </>
+            }
             onInsertReference={(target) =>
               editorRef.current?.insertFile?.(`/${target.name}`, "memos:reference", target.snippet || "笔记引用")
             }

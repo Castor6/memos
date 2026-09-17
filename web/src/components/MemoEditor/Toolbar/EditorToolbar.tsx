@@ -8,7 +8,14 @@ import type { EditorToolbarProps } from "../types";
 import InsertMenu from "./InsertMenu";
 import VisibilitySelector from "./VisibilitySelector";
 
-export const EditorToolbar: FC<EditorToolbarProps> = ({ onInsertReference, onSave, onCancel, memoName, onAudioRecorderClick }) => {
+export const EditorToolbar: FC<EditorToolbarProps> = ({
+  formattingTools,
+  onInsertReference,
+  onSave,
+  onCancel,
+  memoName,
+  onAudioRecorderClick,
+}) => {
   const t = useTranslate();
   const { actions, dispatch } = useEditorContext();
   // Subscribe to narrow/derived slices so typing (which only changes content)
@@ -33,8 +40,8 @@ export const EditorToolbar: FC<EditorToolbarProps> = ({ onInsertReference, onSav
   };
 
   return (
-    <div className="w-full flex flex-row justify-between items-center mb-2">
-      <div className="flex flex-row justify-start items-center gap-1">
+    <div className="w-full min-w-0 flex flex-row justify-between items-center gap-2 mb-2">
+      <div className="min-w-0 flex flex-row items-center gap-1 overflow-x-auto py-1 [&>*]:shrink-0">
         <InsertMenu
           onInsertReference={onInsertReference}
           isUploading={isUploading}
@@ -44,17 +51,18 @@ export const EditorToolbar: FC<EditorToolbarProps> = ({ onInsertReference, onSav
           memoName={memoName}
           onAudioRecorderClick={onAudioRecorderClick}
         />
+        {formattingTools}
         <VisibilitySelector value={visibility} onChange={handleVisibilityChange} />
       </div>
 
-      <div className="flex flex-row justify-end items-center gap-2">
+      <div className="shrink-0 flex flex-row justify-end items-center gap-1">
         {onCancel && (
-          <Button variant="ghost" onClick={onCancel} disabled={isSaving}>
+          <Button variant="ghost" size="sm" onClick={onCancel} disabled={isSaving}>
             {t("common.cancel")}
           </Button>
         )}
 
-        <Button onClick={onSave} disabled={!valid || isSaving}>
+        <Button size="sm" onClick={onSave} disabled={!valid || isSaving}>
           {isSaving ? t("editor.saving") : t("editor.save")}
         </Button>
       </div>

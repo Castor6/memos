@@ -6,7 +6,12 @@ export function InlineFile({ src, title, label }: { src: string; title: string; 
   if (!url) return <span>{label}</span>;
   if (title === REFERENCE_TITLE) {
     return /^\/memos\/[a-zA-Z0-9-]+$/.test(url) ? (
-      <Link to={url} className="my-2 block rounded-lg border bg-muted/40 p-3 hover:bg-muted" onClick={(event) => event.stopPropagation()}>
+      <Link
+        state={{ referenceNavigation: true }}
+        to={url}
+        className="my-2 block rounded-lg border bg-muted/40 p-3 hover:bg-muted"
+        onClick={(event) => event.stopPropagation()}
+      >
         <span className="block text-xs text-muted-foreground mb-1">↗ 笔记引用</span>
         <span className="line-clamp-3">{label}</span>
       </Link>
