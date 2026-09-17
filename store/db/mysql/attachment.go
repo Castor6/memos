@@ -15,8 +15,8 @@ import (
 )
 
 func (d *DB) CreateAttachment(ctx context.Context, create *store.Attachment) (*store.Attachment, error) {
-	fields := []string{"`uid`", "`filename`", "`blob`", "`type`", "`size`", "`creator_id`", "`memo_id`", "`storage_type`", "`reference`", "`payload`"}
-	placeholder := []string{"?", "?", "?", "?", "?", "?", "?", "?", "?", "?"}
+	fields := []string{"`uid`", "`filename`", "`blob`", "`type`", "`size`", "`creator_id`", "`memo_id`", "`storage_type`", "`reference`", "`payload`", "`space`"}
+	placeholder := []string{"?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?"}
 	storageType := ""
 	if create.StorageType != storepb.AttachmentStorageType_ATTACHMENT_STORAGE_TYPE_UNSPECIFIED {
 		storageType = create.StorageType.String()
@@ -29,7 +29,7 @@ func (d *DB) CreateAttachment(ctx context.Context, create *store.Attachment) (*s
 		}
 		payloadString = string(bytes)
 	}
-	args := []any{create.UID, create.Filename, create.Blob, create.Type, create.Size, create.CreatorID, create.MemoID, storageType, create.Reference, payloadString}
+	args := []any{create.UID, create.Filename, create.Blob, create.Type, create.Size, create.CreatorID, create.MemoID, storageType, create.Reference, payloadString, create.Space}
 
 	stmt := "INSERT INTO `attachment` (" + strings.Join(fields, ", ") + ") VALUES (" + strings.Join(placeholder, ", ") + ")"
 	result, err := d.db.ExecContext(ctx, stmt, args...)
@@ -48,6 +48,10 @@ func (d *DB) CreateAttachment(ctx context.Context, create *store.Attachment) (*s
 
 func (d *DB) ListAttachments(ctx context.Context, find *store.FindAttachment) ([]*store.Attachment, error) {
 	where, args := []string{"1 = 1"}, []any{}
+
+	if v := find.Space; v != nil {
+		where, args = append(where, "`attachment`.`space` = ?"), append(args, *v)
+	}
 
 	if v := find.ID; v != nil {
 		where, args = append(where, "`attachment`.`id` = ?"), append(args, *v)
@@ -107,6 +111,7 @@ func (d *DB) ListAttachments(ctx context.Context, find *store.FindAttachment) ([
 		"`attachment`.`storage_type` AS `storage_type`",
 		"`attachment`.`reference` AS `reference`",
 		"`attachment`.`payload` AS `payload`",
+		"`attachment`.`space` AS `space`",
 		"CASE WHEN `memo`.`uid` IS NOT NULL THEN `memo`.`uid` ELSE NULL END AS `memo_uid`",
 	}
 	if find.GetBlob {
@@ -149,6 +154,7 @@ func (d *DB) ListAttachments(ctx context.Context, find *store.FindAttachment) ([
 			&storageType,
 			&attachment.Reference,
 			&payloadBytes,
+			&attachment.Space,
 			&attachment.MemoUID,
 		}
 		if find.GetBlob {

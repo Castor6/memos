@@ -2,18 +2,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-hot-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useInstance } from "@/contexts/InstanceContext";
-import { useLocalStorage } from "@/hooks";
 import useCurrentUser from "@/hooks/useCurrentUser";
 import { cn } from "@/lib/utils";
 import { InstanceSetting_Key } from "@/types/proto/api/v1/instance_service_pb";
 import { useTranslate } from "@/utils/i18n";
 import { convertVisibilityFromString } from "@/utils/memo";
 import { AudioRecorderPanel, EditorContent, EditorMetadata, FocusModeOverlay, TimestampPopover } from "./components";
-import { FOCUS_MODE_STYLES, FORMATTING_TOOLBAR_STORAGE_KEY } from "./constants";
+import EditorTags from "./components/EditorTags";
+import { FOCUS_MODE_STYLES } from "./constants";
 import { useAudioRecorder, useAutoSave, useFocusMode, useMemoInit, useMemoSave } from "./hooks";
 import { errorService, transcriptionService } from "./services";
 import { EditorProvider, useEditorContext, useEditorSelector } from "./state";
 import { EditorToolbar, FormattingToolbar } from "./Toolbar";
+import QuickTools from "./Toolbar/QuickTools";
 import type { MemoEditorProps } from "./types";
 import type { LocalFile } from "./types/attachment";
 import type { EditorController } from "./types/editorController";
@@ -26,6 +27,7 @@ const MemoEditor = (props: MemoEditorProps) => (
 
 const MemoEditorImpl: React.FC<MemoEditorProps> = ({
   className,
+  isTodo = false,
   cacheKey,
   memo,
   parentMemoName,
@@ -48,9 +50,6 @@ const MemoEditorImpl: React.FC<MemoEditorProps> = ({
   const { aiSetting, fetchSetting } = useInstance();
   const [isAudioRecorderOpen, setIsAudioRecorderOpen] = useState(false);
   const [isTranscribingAudio, setIsTranscribingAudio] = useState(false);
-  // Persisted preference: also show the formatting toolbar in normal mode. Focus
-  // mode always shows it regardless; this only governs the non-focus layout.
-  const [isFormattingToolbarVisible, setFormattingToolbarVisible] = useLocalStorage(FORMATTING_TOOLBAR_STORAGE_KEY, false);
 
   const memoName = memo?.name;
   const canTranscribe = useMemo(() => {
@@ -184,10 +183,6 @@ const MemoEditorImpl: React.FC<MemoEditorProps> = ({
     dispatch(actions.toggleFocusMode());
   };
 
-  const handleToggleFormattingToolbar = useCallback(() => {
-    setFormattingToolbarVisible((visible) => !visible);
-  }, [setFormattingToolbarVisible]);
-
   const handleStartAudioRecording = async () => {
     setIsAudioRecorderOpen(true);
     await audioRecorder.startRecording();
@@ -219,7 +214,12 @@ const MemoEditorImpl: React.FC<MemoEditorProps> = ({
     }
   };
 
+  useEffect(() => {
+    if (!memo) dispatch(actions.setMetadata({ isTodo }));
+  }, [isTodo, memo, actions, dispatch]);
+
   const handleSave = useMemoSave({
+    isTodo,
     memoName,
     parentMemoName,
     defaultVisibility,
@@ -252,12 +252,9 @@ const MemoEditorImpl: React.FC<MemoEditorProps> = ({
           !isFocusMode && className,
         )}
       >
-        {/* Formatting toolbar. Always shown in focus mode (with an exit button);
-            in normal mode it appears only when the user toggled it on via the
-            insert menu. */}
-        {(isFocusMode || isFormattingToolbarVisible) && (
-          <FormattingToolbar controllerRef={editorRef} onExit={isFocusMode ? handleToggleFocusMode : undefined} />
-        )}
+        <EditorTags editing={Boolean(memo)} />
+        <QuickTools controllerRef={editorRef} />
+        <FormattingToolbar controllerRef={editorRef} onExit={isFocusMode ? handleToggleFocusMode : undefined} />
 
         {(memoName || (!memo && hasTimestamp)) && (
           <div className="w-full -mb-1">
@@ -284,12 +281,13 @@ const MemoEditorImpl: React.FC<MemoEditorProps> = ({
         <div className="w-full flex flex-col gap-2">
           <EditorMetadata memoName={memoName} />
           <EditorToolbar
+            onInsertReference={(target) =>
+              editorRef.current?.insertFile?.(`/${target.name}`, "memos:reference", target.snippet || "笔记引用")
+            }
             onSave={handleSave}
             onCancel={onCancel}
             memoName={memoName}
             onAudioRecorderClick={handleAudioRecorderClick}
-            isFormattingToolbarVisible={isFormattingToolbarVisible}
-            onToggleFormattingToolbar={handleToggleFormattingToolbar}
           />
         </div>
       </div>

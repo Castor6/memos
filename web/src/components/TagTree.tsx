@@ -1,6 +1,8 @@
 import { ChevronRightIcon, HashIcon } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 import { type MemoFilter, useMemoFilterContext } from "@/contexts/MemoFilterContext";
+import { findTagMetadata } from "@/lib/tag";
 
 interface Tag {
   key: string;
@@ -86,6 +88,8 @@ interface TagItemContainerProps {
 
 const TagItemContainer = (props: TagItemContainerProps) => {
   const { tag, expandSubTags } = props;
+  const { userTagsSetting } = useAuth();
+  const emoji = userTagsSetting ? findTagMetadata(tag.text, userTagsSetting)?.emoji : undefined;
   const { getFiltersByFactor, addFilter, removeFilter } = useMemoFilterContext();
   const tagFilters = getFiltersByFactor("tagSearch");
   const isActive = tagFilters.some((f: MemoFilter) => f.value === tag.text);
@@ -123,7 +127,7 @@ const TagItemContainer = (props: TagItemContainerProps) => {
           }`}
           onClick={handleTagClick}
         >
-          <HashIcon className="w-4 h-auto shrink-0 mr-1" />
+          {emoji ? <span className="mr-1">{emoji}</span> : <HashIcon className="w-4 h-auto shrink-0 mr-1" />}
           <span className={`truncate hover:opacity-80 ${isActive ? "font-medium" : ""}`}>
             {tag.key} {tag.amount > 1 && <span className="opacity-60">({tag.amount})</span>}
           </span>

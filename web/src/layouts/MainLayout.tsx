@@ -3,6 +3,7 @@ import { matchPath, Outlet, useLocation } from "react-router-dom";
 import type { MemoExplorerContext } from "@/components/MemoExplorer";
 import { MemoExplorer, MemoExplorerDrawer } from "@/components/MemoExplorer";
 import MobileHeader from "@/components/MobileHeader";
+import SpaceSwitcher from "@/components/SpaceSwitcher";
 import { userServiceClient } from "@/connect";
 import { useAuth } from "@/contexts/AuthContext";
 import { useInstance } from "@/contexts/InstanceContext";
@@ -91,6 +92,7 @@ const MainLayout = () => {
       )}
       <div className={MAIN_CONTENT_CLASS_NAME}>
         <div className={cn("w-full mx-auto px-4 sm:px-6 pt-2 md:pt-6 pb-8")}>
+          <SpaceSwitcher />
           <Outlet />
         </div>
       </div>

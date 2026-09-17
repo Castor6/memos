@@ -50,7 +50,37 @@ func (s *APIV1Service) SetMemoRelations(ctx context.Context, request *v1pb.SetMe
 	return &emptypb.Empty{}, nil
 }
 
+func (s *APIV1Service) validateMemoRelations(ctx context.Context, memo *store.Memo, relations []*v1pb.MemoRelation) error {
+	// Validate all targets before changing existing relations.
+	for _, relation := range relations {
+		if relation == nil || relation.RelatedMemo == nil {
+			return status.Errorf(codes.InvalidArgument, "related memo is required")
+		}
+		if relation.Type == v1pb.MemoRelation_COMMENT {
+			continue
+		}
+		uid, err := ExtractMemoUIDFromName(relation.RelatedMemo.Name)
+		if err != nil {
+			return status.Errorf(codes.InvalidArgument, "invalid related memo")
+		}
+		target, err := s.Store.GetMemo(ctx, &store.FindMemo{UID: &uid})
+		if err != nil {
+			return status.Errorf(codes.Internal, "failed to find related memo")
+		}
+		if target == nil || target.Space != memo.Space || target.IsTodo || memo.IsTodo {
+			return status.Errorf(codes.InvalidArgument, "references must link notes in the same space")
+		}
+		if err := s.checkMemoReadAccess(ctx, target); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (s *APIV1Service) setMemoRelationsInternal(ctx context.Context, memo *store.Memo, relations []*v1pb.MemoRelation) error {
+	if err := s.validateMemoRelations(ctx, memo, relations); err != nil {
+		return err
+	}
 	referenceType := store.MemoRelationReference
 	// Delete all reference relations first.
 	if err := s.Store.DeleteMemoRelation(ctx, &store.DeleteMemoRelation{
@@ -100,6 +130,9 @@ func (s *APIV1Service) ListMemoRelations(ctx context.Context, request *v1pb.List
 		return nil, status.Errorf(codes.Internal, "failed to get memo")
 	}
 
+	if memo == nil {
+		return nil, status.Errorf(codes.NotFound, "memo not found")
+	}
 	currentUser, err := s.fetchCurrentUser(ctx)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get user")

@@ -57,7 +57,7 @@ export const SANITIZE_SCHEMA = {
       "loading",
     ],
   },
-  tagNames: [...(defaultSchema.tagNames || []), "iframe"],
+  tagNames: [...(defaultSchema.tagNames || []), "iframe", "mark"],
   protocols: {
     ...defaultSchema.protocols,
     src: ["https"],

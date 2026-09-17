@@ -82,7 +82,8 @@ func (s *APIV1Service) RegisterGateway(ctx context.Context, echoServer *echo.Ech
 
 	gatewayAuthMiddleware := func(next runtime.HandlerFunc) runtime.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request, pathParams map[string]string) {
-			ctx := r.Context()
+			ctx := store.WithSpace(r.Context(), r.Header.Get("X-Memos-Space"))
+			r = r.WithContext(ctx)
 
 			authHeader := r.Header.Get("Authorization")
 			result := authorizer.Authenticate(ctx, authHeader)

@@ -1,6 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import { toast } from "react-hot-toast";
+import { useMemoFilterContext } from "@/contexts/MemoFilterContext";
 import { useNewMemo } from "@/contexts/NewMemoContext";
 import { memoKeys } from "@/hooks/useMemoQueries";
 import { userKeys } from "@/hooks/useUserQueries";
@@ -11,6 +12,7 @@ import { errorService, memoService, validationService } from "../services";
 import { useEditorContext } from "../state";
 
 interface UseMemoSaveOptions {
+  isTodo?: boolean;
   memoName?: string;
   parentMemoName?: string;
   defaultVisibility?: Visibility;
@@ -26,6 +28,7 @@ interface UseMemoSaveOptions {
  * triggered by the toolbar or the editor keyboard shortcut.
  */
 export function useMemoSave({
+  isTodo = false,
   memoName,
   parentMemoName,
   defaultVisibility,
@@ -34,6 +37,7 @@ export function useMemoSave({
   onConfirm,
   onCancel,
 }: UseMemoSaveOptions): () => Promise<void> {
+  const { filters } = useMemoFilterContext();
   const t = useTranslate();
   const queryClient = useQueryClient();
   const { markNewMemo } = useNewMemo();
@@ -74,6 +78,9 @@ export function useMemoSave({
       await Promise.all(invalidationPromises);
 
       dispatch(actions.reset());
+      dispatch(
+        actions.setMetadata({ isTodo, tags: filters.filter((filter) => filter.factor === "tagSearch").map((filter) => filter.value) }),
+      );
       if (!memoName && defaultVisibility) {
         dispatch(actions.setMetadata({ visibility: defaultVisibility }));
       }
@@ -97,6 +104,8 @@ export function useMemoSave({
     }
   }, [
     actions,
+    isTodo,
+    filters,
     defaultCreateTime,
     defaultVisibility,
     discardDraft,

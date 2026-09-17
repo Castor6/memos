@@ -17,8 +17,19 @@ export const validationService = {
       return { valid: false, reason: "Content, attachment, or file required" };
     }
 
+    if (
+      state.metadata.isTodo &&
+      !state.content
+        .replace(/&nbsp;/g, "")
+        .replace(/^\s*[-*+]\s*\[[ xX]\]\s*/gm, "")
+        .trim() &&
+      !state.metadata.attachments.length
+    ) {
+      return { valid: false, reason: "请填写待办事项" };
+    }
+
     // Cannot save while uploading
-    if (state.ui.isLoading.uploading) {
+    if (state.ui.isLoading.uploading || state.localFiles.length > 0 || /!\[[^\]]*\]\(<?blob:/.test(state.content)) {
       return { valid: false, reason: "Wait for upload to complete" };
     }
 

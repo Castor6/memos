@@ -1,7 +1,9 @@
 import { HashIcon, MoreVerticalIcon, TagsIcon } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { useAuth } from "@/contexts/AuthContext";
 import { type MemoFilter, useMemoFilterContext } from "@/contexts/MemoFilterContext";
 import { useLocalStorage } from "@/hooks";
+import { findTagMetadata } from "@/lib/tag";
 import { cn } from "@/lib/utils";
 import { useTranslate } from "@/utils/i18n";
 import TagTree from "../TagTree";
@@ -14,6 +16,7 @@ interface Props {
 
 const TagsSection = (props: Props) => {
   const t = useTranslate();
+  const { userTagsSetting } = useAuth();
   const { getFiltersByFactor, addFilter, removeFilter } = useMemoFilterContext();
   const [treeMode, setTreeMode] = useLocalStorage<boolean>("tag-view-as-tree", false);
   const [treeAutoExpand, setTreeAutoExpand] = useLocalStorage<boolean>("tag-tree-auto-expand", false);
@@ -64,6 +67,7 @@ const TagsSection = (props: Props) => {
         ) : (
           <div className="w-full flex flex-row justify-start items-center relative flex-wrap gap-x-2 gap-y-1.5">
             {tags.map(([tag, amount]) => {
+              const emoji = userTagsSetting ? findTagMetadata(tag, userTagsSetting)?.emoji : undefined;
               const isActive = getFiltersByFactor("tagSearch").some((filter: MemoFilter) => filter.value === tag);
               return (
                 <div
@@ -75,7 +79,7 @@ const TagsSection = (props: Props) => {
                   )}
                   onClick={() => handleTagClick(tag)}
                 >
-                  <HashIcon className="w-4 h-auto shrink-0" />
+                  {emoji ? <span>{emoji}</span> : <HashIcon className="w-4 h-auto shrink-0" />}
                   <div className="inline-flex flex-nowrap ml-0.5 gap-0.5 max-w-[calc(100%-16px)]">
                     <span className={cn("truncate", isActive ? "font-medium" : "")}>{tag}</span>
                     {amount > 1 && <span className="opacity-60 shrink-0">({amount})</span>}

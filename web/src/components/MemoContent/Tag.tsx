@@ -73,6 +73,11 @@ export const Tag: React.FC<TagProps> = ({ "data-tag": dataTag, children, classNa
       {...props}
       onClick={handleTagClick}
     >
+      {metadata?.emoji && (
+        <span aria-hidden className="mr-1">
+          {metadata.emoji}
+        </span>
+      )}
       {children}
     </span>
   );

@@ -74,4 +74,4 @@ jobs:
               ;;
           esac
         env:
-          DRIVER: ${{ matrix.test-group == 'store' && '' || 'sqlite' }}
+          DRIVER: ${{ matrix.test-group != 'store' && 'sqlite' || '' }}

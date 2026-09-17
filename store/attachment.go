@@ -25,6 +25,7 @@ type Attachment struct {
 	UpdatedTs int64
 
 	// Domain specific fields
+	Space       string
 	Filename    string
 	Blob        []byte
 	Type        string
@@ -41,6 +42,7 @@ type Attachment struct {
 }
 
 type FindAttachment struct {
+	Space          *string
 	GetBlob        bool
 	ID             *int32
 	UID            *string
@@ -90,6 +92,9 @@ func (s *Store) CreateAttachment(ctx context.Context, create *Attachment) (*Atta
 	if !base.UIDMatcher.MatchString(create.UID) {
 		return nil, errors.New("invalid uid")
 	}
+	if space, scoped := SpaceFromContext(ctx); scoped {
+		create.Space = space
+	}
 	return s.driver.CreateAttachment(ctx, create)
 }
 
@@ -106,7 +111,11 @@ func (s *Store) ListAttachments(ctx context.Context, find *FindAttachment) ([]*A
 		find.Limit = &defaultLimit
 	}
 
-	return s.driver.ListAttachments(ctx, find)
+	scopedFind := *find
+	if space, scoped := SpaceFromContext(ctx); scoped {
+		scopedFind.Space = &space
+	}
+	return s.driver.ListAttachments(ctx, &scopedFind)
 }
 
 func (s *Store) GetAttachment(ctx context.Context, find *FindAttachment) (*Attachment, error) {

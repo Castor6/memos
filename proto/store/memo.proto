@@ -11,6 +11,12 @@ message MemoPayload {
 
   repeated string tags = 3;
 
+  // Promoted to indexed database columns; never reuse these payload fields.
+  reserved 4, 5;
+  reserved "space", "is_todo";
+  // Explicit tags must not be overwritten by Markdown extraction.
+  bool explicit_tags = 6;
+
   // The calculated properties from the memo content.
   message Property {
     bool has_link = 1;

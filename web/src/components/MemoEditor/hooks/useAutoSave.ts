@@ -10,6 +10,7 @@ import { useEditorStore } from "../state";
 export const useAutoSave = (username: string, cacheKey: string | undefined, enabled = true) => {
   const store = useEditorStore();
   const latestContentRef = useRef(store.getState().content);
+  const latestMetadataRef = useRef(store.getState().metadata);
   const discardedContentRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
@@ -17,18 +18,20 @@ export const useAutoSave = (username: string, cacheKey: string | undefined, enab
 
     const key = cacheService.key(username, cacheKey);
     const persist = (content: string) => {
+      if (store.getState().localFiles.length) return;
       latestContentRef.current = content;
+      latestMetadataRef.current = store.getState().metadata;
       if (discardedContentRef.current !== undefined && discardedContentRef.current !== content) {
         discardedContentRef.current = undefined;
       }
-      cacheService.save(key, content);
+      cacheService.save(key, content, latestMetadataRef.current);
     };
 
     // Persist the current content on mount/enable, then on every change.
     persist(store.getState().content);
     return store.subscribe(() => {
       const content = store.getState().content;
-      if (content !== latestContentRef.current) {
+      if (content !== latestContentRef.current || store.getState().metadata !== latestMetadataRef.current) {
         persist(content);
       }
     });
@@ -43,7 +46,7 @@ export const useAutoSave = (username: string, cacheKey: string | undefined, enab
         return;
       }
 
-      cacheService.saveNow(key, latestContentRef.current);
+      cacheService.saveNow(key, latestContentRef.current, latestMetadataRef.current);
     };
     const handleVisibilityChange = () => {
       if (document.visibilityState === "hidden") {

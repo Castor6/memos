@@ -45,7 +45,7 @@ describe("useAutoSave (store-subscribed)", () => {
     act(() => {
       api.dispatch(api.actions.updateContent("hello world"));
     });
-    expect(saveSpy).toHaveBeenCalledWith(key, "hello world");
+    expect(saveSpy).toHaveBeenCalledWith(key, "hello world", expect.objectContaining({ attachments: [], relations: [] }));
   });
 
   it("does not persist when disabled", () => {

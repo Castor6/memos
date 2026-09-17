@@ -1,6 +1,7 @@
 import { timestampDate } from "@bufbuild/protobuf/wkt";
 import { Code, ConnectError, createClient, type Interceptor } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
+import { getActiveSpace } from "@/lib/personal-space";
 import { getAccessToken, hasStoredToken, isTokenExpired, REQUEST_TOKEN_EXPIRY_BUFFER_MS, setAccessToken } from "./auth-state";
 import { AIService } from "./types/proto/api/v1/ai_service_pb";
 import { AttachmentService } from "./types/proto/api/v1/attachment_service_pb";
@@ -185,7 +186,13 @@ const transport = createConnectTransport({
   baseUrl: window.location.origin,
   useBinaryFormat: true,
   fetch: fetchWithCredentials,
-  interceptors: [authInterceptor],
+  interceptors: [
+    (next) => (req) => {
+      req.header.set("X-Memos-Space", getActiveSpace());
+      return next(req);
+    },
+    authInterceptor,
+  ],
 });
 
 // Core service clients

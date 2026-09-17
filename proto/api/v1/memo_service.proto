@@ -237,8 +237,8 @@ message Memo {
   // PUBLIC (anyone). Defaults to PRIVATE on creation when unspecified.
   Visibility visibility = 9 [(google.api.field_behavior) = REQUIRED];
 
-  // Output only. The tags extracted from the content.
-  repeated string tags = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Optional. Explicit tags, independent of the body.
+  repeated string tags = 10 [(google.api.field_behavior) = OPTIONAL];
 
   // Whether the memo is pinned.
   bool pinned = 11 [(google.api.field_behavior) = OPTIONAL];
@@ -267,6 +267,13 @@ message Memo {
 
   // Optional. The location of the memo.
   optional Location location = 18 [(google.api.field_behavior) = OPTIONAL];
+
+  // Personal space; empty means the original personal space.
+  string space = 19 [(google.api.field_behavior) = OPTIONAL];
+  // True for an independent todo card.
+  bool is_todo = 20 [(google.api.field_behavior) = OPTIONAL];
+  // True when tags are managed separately from Markdown.
+  bool explicit_tags = 21 [(google.api.field_behavior) = OPTIONAL];
 
   // Computed properties of a memo.
   message Property {
@@ -301,6 +308,9 @@ message CreateMemoRequest {
 }
 
 message ListMemosRequest {
+  // Select independent todo cards instead of notes.
+  bool is_todo = 7 [(google.api.field_behavior) = OPTIONAL];
+
   // Optional. The maximum number of memos to return.
   // The service may return fewer than this value.
   // If unspecified, at most 50 memos will be returned.

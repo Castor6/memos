@@ -10,8 +10,10 @@ import { isMentionElement, isTagElement, isTaskListItemElement } from "@/types/m
 import { lazyWithReload } from "@/utils/lazy";
 import { rehypeHeadingId } from "@/utils/rehype-plugins/rehype-heading-id";
 import { remarkDisableSetext } from "@/utils/remark-plugins/remark-disable-setext";
+import { remarkHighlight } from "@/utils/remark-plugins/remark-highlight";
 import { remarkMention } from "@/utils/remark-plugins/remark-mention";
 import { remarkPreserveType } from "@/utils/remark-plugins/remark-preserve-type";
+import { remarkPreview } from "@/utils/remark-plugins/remark-preview";
 import { remarkSplitMixedTaskLists } from "@/utils/remark-plugins/remark-split-mixed-task-lists";
 import { remarkTag } from "@/utils/remark-plugins/remark-tag";
 import { CodeBlock } from "./CodeBlock";
@@ -27,6 +29,9 @@ import { TrustedIframe } from "./TrustedIframe";
 
 export interface MemoMarkdownRendererProps {
   content: string;
+  explicitTags?: boolean;
+  displayedTags?: readonly string[];
+  maxCharacters?: number;
   resolvedMentionUsernames: Set<string>;
   /** Resource name of the memo (e.g. `memos/abc123`), used to target footnote links at the detail page. */
   memoName?: string;
@@ -65,6 +70,9 @@ function getMentionUsername(node: Element, children?: ReactNode): string {
 }
 
 export const MemoMarkdownRendererCore = ({
+  explicitTags = false,
+  displayedTags,
+  maxCharacters = 0,
   content,
   resolvedMentionUsernames,
   memoName,
@@ -167,8 +175,10 @@ export const MemoMarkdownRendererCore = ({
           remarkSplitMixedTaskLists,
           remarkBreaks,
           remarkMention,
-          remarkTag,
+          ...((explicitTags ? [] : [[remarkTag, { hiddenTags: displayedTags }]]) as RemarkPlugins),
+          remarkHighlight,
           remarkPreserveType,
+          [remarkPreview, { limit: maxCharacters }],
         ]}
         rehypePlugins={[rehypeRaw, [rehypeSanitize, SANITIZE_SCHEMA], rehypeHeadingId, ...mathRehypePlugins]}
         components={markdownComponents}
@@ -203,5 +213,8 @@ export const MemoMarkdownRenderer = memo(
     previous.content === next.content &&
     previous.memoName === next.memoName &&
     previous.compact === next.compact &&
+    previous.explicitTags === next.explicitTags &&
+    previous.displayedTags === next.displayedTags &&
+    previous.maxCharacters === next.maxCharacters &&
     haveEqualResolvedMentions(previous.resolvedMentionUsernames, next.resolvedMentionUsernames),
 );

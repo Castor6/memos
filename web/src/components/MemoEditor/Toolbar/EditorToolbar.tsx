@@ -8,14 +8,7 @@ import type { EditorToolbarProps } from "../types";
 import InsertMenu from "./InsertMenu";
 import VisibilitySelector from "./VisibilitySelector";
 
-export const EditorToolbar: FC<EditorToolbarProps> = ({
-  onSave,
-  onCancel,
-  memoName,
-  onAudioRecorderClick,
-  isFormattingToolbarVisible,
-  onToggleFormattingToolbar,
-}) => {
+export const EditorToolbar: FC<EditorToolbarProps> = ({ onInsertReference, onSave, onCancel, memoName, onAudioRecorderClick }) => {
   const t = useTranslate();
   const { actions, dispatch } = useEditorContext();
   // Subscribe to narrow/derived slices so typing (which only changes content)
@@ -43,14 +36,13 @@ export const EditorToolbar: FC<EditorToolbarProps> = ({
     <div className="w-full flex flex-row justify-between items-center mb-2">
       <div className="flex flex-row justify-start items-center gap-1">
         <InsertMenu
+          onInsertReference={onInsertReference}
           isUploading={isUploading}
           location={location}
           onLocationChange={handleLocationChange}
           onToggleFocusMode={handleToggleFocusMode}
           memoName={memoName}
           onAudioRecorderClick={onAudioRecorderClick}
-          isFormattingToolbarVisible={isFormattingToolbarVisible}
-          onToggleFormattingToolbar={onToggleFormattingToolbar}
         />
         <VisibilitySelector value={visibility} onChange={handleVisibilityChange} />
       </div>

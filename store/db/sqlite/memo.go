@@ -14,8 +14,8 @@ import (
 )
 
 func (d *DB) CreateMemo(ctx context.Context, create *store.Memo) (*store.Memo, error) {
-	fields := []string{"`uid`", "`creator_id`", "`content`", "`visibility`", "`payload`"}
-	placeholder := []string{"?", "?", "?", "?", "?"}
+	fields := []string{"`uid`", "`creator_id`", "`content`", "`visibility`", "`payload`", "`space`", "`is_todo`"}
+	placeholder := []string{"?", "?", "?", "?", "?", "?", "?"}
 	payload := "{}"
 	if create.Payload != nil {
 		payloadBytes, err := protojson.Marshal(create.Payload)
@@ -24,7 +24,7 @@ func (d *DB) CreateMemo(ctx context.Context, create *store.Memo) (*store.Memo, e
 		}
 		payload = string(payloadBytes)
 	}
-	args := []any{create.UID, create.CreatorID, create.Content, create.Visibility, payload}
+	args := []any{create.UID, create.CreatorID, create.Content, create.Visibility, payload, create.Space, create.IsTodo}
 
 	// Add custom timestamps if provided
 	if create.CreatedTs != 0 {
@@ -51,15 +51,22 @@ func (d *DB) CreateMemo(ctx context.Context, create *store.Memo) (*store.Memo, e
 	return create, nil
 }
 
-func (d *DB) ListMemos(ctx context.Context, find *store.FindMemo) ([]*store.Memo, error) {
+func buildMemoQuery(ctx context.Context, find *store.FindMemo) (string, []any, error) {
 	where, args := []string{"1 = 1"}, []any{}
+
+	if v := find.Space; v != nil {
+		where, args = append(where, "`memo`.`space` = ?"), append(args, *v)
+	}
+	if v := find.IsTodo; v != nil {
+		where, args = append(where, "`memo`.`is_todo` = ?"), append(args, *v)
+	}
 
 	engine, err := filter.DefaultEngine()
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 	if err := filter.AppendConditions(ctx, engine, find.Filters, filter.DialectSQLite, &where, &args); err != nil {
-		return nil, err
+		return "", nil, err
 	}
 	if v := find.ID; v != nil {
 		where, args = append(where, "`memo`.`id` = ?"), append(args, *v)
@@ -130,6 +137,8 @@ func (d *DB) ListMemos(ctx context.Context, find *store.FindMemo) ([]*store.Memo
 		"`memo`.`visibility` AS `visibility`",
 		"`memo`.`pinned` AS `pinned`",
 		"`memo`.`payload` AS `payload`",
+		"`memo`.`space` AS `space`",
+		"`memo`.`is_todo` AS `is_todo`",
 		"CASE WHEN `parent_memo`.`uid` IS NOT NULL THEN `parent_memo`.`uid` ELSE NULL END AS `parent_uid`",
 	}
 	if !find.ExcludeContent {
@@ -149,6 +158,14 @@ func (d *DB) ListMemos(ctx context.Context, find *store.FindMemo) ([]*store.Memo
 		}
 	}
 
+	return query, args, nil
+}
+
+func (d *DB) ListMemos(ctx context.Context, find *store.FindMemo) ([]*store.Memo, error) {
+	query, args, err := buildMemoQuery(ctx, find)
+	if err != nil {
+		return nil, err
+	}
 	rows, err := d.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
@@ -169,6 +186,8 @@ func (d *DB) ListMemos(ctx context.Context, find *store.FindMemo) ([]*store.Memo
 			&memo.Visibility,
 			&memo.Pinned,
 			&payloadBytes,
+			&memo.Space,
+			&memo.IsTodo,
 			&memo.ParentUID,
 		}
 		if !find.ExcludeContent {

@@ -35,6 +35,9 @@ const MemoContent = (props: MemoContentProps) => {
       >
         <MemoMarkdownRenderer
           content={content}
+          explicitTags={props.explicitTags}
+          displayedTags={props.displayedTags}
+          maxCharacters={props.maxCharacters}
           resolvedMentionUsernames={resolvedMentionUsernames}
           memoName={props.memoName}
           compact={Boolean(props.compact)}

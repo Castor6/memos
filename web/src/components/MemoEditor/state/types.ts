@@ -8,6 +8,8 @@ export type LoadingKey = "saving" | "uploading" | "loading";
 export interface EditorState {
   content: string;
   metadata: {
+    tags?: string[];
+    isTodo?: boolean;
     visibility: Visibility;
     attachments: Attachment[];
     relations: MemoRelation[];

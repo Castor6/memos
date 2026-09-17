@@ -456,6 +456,15 @@ message UserSetting {
     // This references a CSS file in the web/public/themes/ directory.
     // If not set, the default theme will be used.
     string theme = 4 [(google.api.field_behavior) = OPTIONAL];
+
+    // User-created personal spaces, keyed by immutable IDs.
+    map<string, string> spaces = 5 [(google.api.field_behavior) = OPTIONAL];
+    // Desktop Enter saves when enabled; mobile Enter always inserts a line.
+    bool enter_to_save = 6 [(google.api.field_behavior) = OPTIONAL];
+    // User-configured words, inserted only through the toolbar.
+    repeated string common_words = 7 [(google.api.field_behavior) = OPTIONAL];
+    // Visible character limit in feed cards; zero disables text folding.
+    int32 preview_characters = 8 [(google.api.field_behavior) = OPTIONAL];
   }
 
   // Tag metadata for user-specific display rules.
@@ -465,6 +474,8 @@ message UserSetting {
     google.type.Color background_color = 1 [(google.api.field_behavior) = OPTIONAL];
     // Whether memos with this tag should have their content blurred.
     bool blur_content = 2 [(google.api.field_behavior) = OPTIONAL];
+    // Optional display emoji.
+    string emoji = 3;
   }
 
   // User-specific tag metadata.

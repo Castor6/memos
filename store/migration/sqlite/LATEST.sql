@@ -40,6 +40,8 @@ CREATE TABLE memo (
   content TEXT NOT NULL DEFAULT '',
   visibility TEXT NOT NULL CHECK (visibility IN ('PUBLIC', 'PROTECTED', 'PRIVATE')) DEFAULT 'PRIVATE',
   pinned INTEGER NOT NULL CHECK (pinned IN (0, 1)) DEFAULT 0,
+  space TEXT NOT NULL DEFAULT '',
+  is_todo INTEGER NOT NULL DEFAULT 0 CHECK (is_todo IN (0, 1)),
   payload TEXT NOT NULL DEFAULT '{}'
 );
 
@@ -65,6 +67,7 @@ CREATE TABLE attachment (
   memo_id INTEGER,
   storage_type TEXT NOT NULL DEFAULT '',
   reference TEXT NOT NULL DEFAULT '',
+  space TEXT NOT NULL DEFAULT '',
   payload TEXT NOT NULL DEFAULT '{}'
 );
 
@@ -124,3 +127,12 @@ CREATE TABLE user_identity (
 );
 
 CREATE INDEX idx_user_identity_user_id ON user_identity(user_id);
+
+-- Personal content query indexes.
+CREATE INDEX idx_memo_space_created ON memo (creator_id, space, row_status, is_todo, created_ts DESC, id DESC);
+CREATE INDEX idx_memo_space_updated ON memo (creator_id, space, row_status, is_todo, updated_ts DESC, id DESC);
+CREATE INDEX idx_memo_space_pinned_created ON memo (creator_id, space, row_status, is_todo, pinned DESC, created_ts DESC, id DESC);
+CREATE INDEX idx_memo_space_pinned_updated ON memo (creator_id, space, row_status, is_todo, pinned DESC, updated_ts DESC, id DESC);
+CREATE INDEX idx_attachment_space_updated ON attachment (creator_id, space, updated_ts DESC);
+CREATE INDEX idx_attachment_memo_space ON attachment (memo_id, space);
+CREATE INDEX idx_memo_relation_target ON memo_relation (related_memo_id, type, memo_id);

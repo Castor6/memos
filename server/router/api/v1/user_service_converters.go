@@ -124,6 +124,7 @@ func convertUserTagsSettingFromStore(setting *storepb.TagsUserSetting) *v1pb.Use
 		tags[tag] = &v1pb.UserSetting_TagMetadata{
 			BackgroundColor: metadata.GetBackgroundColor(),
 			BlurContent:     metadata.GetBlurContent(),
+			Emoji:           metadata.GetEmoji(),
 		}
 	}
 	return &v1pb.UserSetting_TagsSetting{Tags: tags}
@@ -142,6 +143,7 @@ func convertUserTagsSettingToStore(setting *v1pb.UserSetting_TagsSetting) *store
 		tags[tag] = &storepb.UserTagMetadata{
 			BackgroundColor: metadata.GetBackgroundColor(),
 			BlurContent:     metadata.GetBlurContent(),
+			Emoji:           metadata.GetEmoji(),
 		}
 	}
 	return &storepb.TagsUserSetting{Tags: tags}
@@ -190,6 +192,7 @@ func convertUserSettingFromStore(storeSetting *storepb.UserSetting, user *store.
 					Locale:         general.Locale,
 					MemoVisibility: general.MemoVisibility,
 					Theme:          general.Theme,
+					Spaces:         general.Spaces, EnterToSave: general.EnterToSave, CommonWords: general.CommonWords, PreviewCharacters: general.PreviewCharacters,
 				},
 			}
 		} else {
@@ -243,6 +246,7 @@ func convertUserSettingToStore(apiSetting *v1pb.UserSetting, userID int32, key s
 					Locale:         general.Locale,
 					MemoVisibility: general.MemoVisibility,
 					Theme:          general.Theme,
+					Spaces:         general.Spaces, EnterToSave: general.EnterToSave, CommonWords: general.CommonWords, PreviewCharacters: general.PreviewCharacters,
 				},
 			}
 		} else {

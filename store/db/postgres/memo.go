@@ -14,7 +14,7 @@ import (
 )
 
 func (d *DB) CreateMemo(ctx context.Context, create *store.Memo) (*store.Memo, error) {
-	fields := []string{"uid", "creator_id", "content", "visibility", "payload"}
+	fields := []string{"uid", "creator_id", "content", "visibility", "payload", "space", "is_todo"}
 	payload := "{}"
 	if create.Payload != nil {
 		payloadBytes, err := protojson.Marshal(create.Payload)
@@ -23,7 +23,7 @@ func (d *DB) CreateMemo(ctx context.Context, create *store.Memo) (*store.Memo, e
 		}
 		payload = string(payloadBytes)
 	}
-	args := []any{create.UID, create.CreatorID, create.Content, create.Visibility, payload}
+	args := []any{create.UID, create.CreatorID, create.Content, create.Visibility, payload, create.Space, create.IsTodo}
 
 	// Add custom timestamps if provided
 	if create.CreatedTs != 0 {
@@ -50,6 +50,15 @@ func (d *DB) CreateMemo(ctx context.Context, create *store.Memo) (*store.Memo, e
 
 func (d *DB) ListMemos(ctx context.Context, find *store.FindMemo) ([]*store.Memo, error) {
 	where, args := []string{"1 = 1"}, []any{}
+
+	if v := find.Space; v != nil {
+		where = append(where, "memo.space = "+placeholder(len(args)+1))
+		args = append(args, *v)
+	}
+	if v := find.IsTodo; v != nil {
+		where = append(where, "memo.is_todo = "+placeholder(len(args)+1))
+		args = append(args, *v)
+	}
 
 	engine, err := filter.DefaultEngine()
 	if err != nil {
@@ -123,6 +132,8 @@ func (d *DB) ListMemos(ctx context.Context, find *store.FindMemo) ([]*store.Memo
 		`memo.visibility AS visibility`,
 		`memo.pinned AS pinned`,
 		`memo.payload AS payload`,
+		`memo.space AS space`,
+		`memo.is_todo AS is_todo`,
 		`CASE WHEN parent_memo.uid IS NOT NULL THEN parent_memo.uid ELSE NULL END AS parent_uid`,
 	}
 	if !find.ExcludeContent {
@@ -163,6 +174,8 @@ func (d *DB) ListMemos(ctx context.Context, find *store.FindMemo) ([]*store.Memo
 			&memo.Visibility,
 			&memo.Pinned,
 			&payloadBytes,
+			&memo.Space,
+			&memo.IsTodo,
 			&memo.ParentUID,
 		}
 		if !find.ExcludeContent {

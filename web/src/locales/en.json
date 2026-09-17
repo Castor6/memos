@@ -875,7 +875,7 @@
   "tag": {
     "all-tags": "All Tags",
     "create-tag": "Create Tag",
-    "create-tags-guide": "You can create tags by inputting `#tag`.",
+    "create-tags-guide": "Create or select tags above the editor.",
     "delete-confirm": "Are you sure you want to delete this tag? All related memos will be archived.",
     "delete-success": "Tag deleted successfully",
     "delete-tag": "Delete Tag",

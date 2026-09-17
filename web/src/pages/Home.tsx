@@ -11,7 +11,7 @@ import { State } from "@/types/proto/api/v1/common_pb";
 import { Memo } from "@/types/proto/api/v1/memo_service_pb";
 import { useTranslate } from "@/utils/i18n";
 
-const Home = () => {
+const Home = ({ isTodo = false }: { isTodo?: boolean }) => {
   const user = useCurrentUser();
   const t = useTranslate();
   const { filters } = useMemoFilterContext();
@@ -32,6 +32,7 @@ const Home = () => {
     <div className="w-full min-h-full bg-background text-foreground">
       <NewMemoProvider>
         <PagedMemoList
+          isTodo={isTodo}
           renderer={(memo: Memo, { compact }) => (
             <MemoView key={getMemoKey(memo)} memo={memo} showVisibility showPinned compact={compact} />
           )}
@@ -40,9 +41,11 @@ const Home = () => {
           filter={memoFilter}
           renderLeading={({ useGrid }) => (
             <MemoEditor
+              key={isTodo ? "todo-editor" : "memo-editor"}
+              isTodo={isTodo}
               className={useGrid ? undefined : "mb-2"}
-              cacheKey="home-memo-editor"
-              placeholder={t("editor.any-thoughts")}
+              cacheKey={isTodo ? "todo-editor" : "home-memo-editor"}
+              placeholder={isTodo ? "写下待办事项…" : t("editor.any-thoughts")}
               defaultCreateTime={defaultCreateTime}
             />
           )}

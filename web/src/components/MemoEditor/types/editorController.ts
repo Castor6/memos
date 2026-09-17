@@ -7,6 +7,10 @@ import type { ActiveFormatState, EditorCommandContext, EditorCommandId } from ".
  */
 export interface EditorController {
   focus(): void;
+  insertText?(text: string): void;
+  insertFile?(src: string, title: string, label: string): void;
+  replaceFile?(src: string, replacement: string): void;
+  edit?(action: "undo" | "redo" | "clear" | "highlight" | "blockquote" | "code"): void;
   hasFocus(): boolean;
   /** Whitespace-only content counts as empty. */
   isEmpty(): boolean;

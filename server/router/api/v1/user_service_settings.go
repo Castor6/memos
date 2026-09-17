@@ -3,6 +3,8 @@ package v1
 import (
 	"context"
 	"fmt"
+	"maps"
+	"strings"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -47,7 +49,7 @@ func (s *APIV1Service) GetUserSetting(ctx context.Context, request *v1pb.GetUser
 		return nil, status.Errorf(codes.Internal, "failed to get user setting: %v", err)
 	}
 
-	return convertUserSettingFromStore(userSetting, user, storeKey), nil
+	return scopeTagSetting(ctx, convertUserSettingFromStore(userSetting, user, storeKey)), nil
 }
 
 func (s *APIV1Service) UpdateUserSetting(ctx context.Context, request *v1pb.UpdateUserSettingRequest) (*v1pb.UserSetting, error) {
@@ -99,6 +101,7 @@ func (s *APIV1Service) UpdateUserSetting(ctx context.Context, request *v1pb.Upda
 			MemoVisibility: generalSetting.GetMemoVisibility(),
 			Locale:         generalSetting.GetLocale(),
 			Theme:          generalSetting.GetTheme(),
+			Spaces:         generalSetting.GetSpaces(), EnterToSave: generalSetting.GetEnterToSave(), CommonWords: generalSetting.GetCommonWords(), PreviewCharacters: generalSetting.GetPreviewCharacters(),
 		}
 
 		incomingGeneral := request.Setting.GetGeneralSetting()
@@ -107,6 +110,28 @@ func (s *APIV1Service) UpdateUserSetting(ctx context.Context, request *v1pb.Upda
 		}
 		for _, field := range request.UpdateMask.Paths {
 			switch field {
+			case "spaces":
+				if err := validateSpaces(incomingGeneral.Spaces, updatedGeneral.Spaces); err != nil {
+					return nil, err
+				}
+				updatedGeneral.Spaces = incomingGeneral.Spaces
+			case "enter_to_save":
+				updatedGeneral.EnterToSave = incomingGeneral.EnterToSave
+			case "common_words":
+				if len(incomingGeneral.CommonWords) > 1000 {
+					return nil, status.Errorf(codes.InvalidArgument, "too many common words")
+				}
+				for _, word := range incomingGeneral.CommonWords {
+					if len(word) > 400 || strings.TrimSpace(word) == "" {
+						return nil, status.Errorf(codes.InvalidArgument, "invalid common word")
+					}
+				}
+				updatedGeneral.CommonWords = incomingGeneral.CommonWords
+			case "preview_characters":
+				if incomingGeneral.PreviewCharacters < 0 || incomingGeneral.PreviewCharacters > 100000 {
+					return nil, status.Errorf(codes.InvalidArgument, "invalid preview length")
+				}
+				updatedGeneral.PreviewCharacters = incomingGeneral.PreviewCharacters
 			case "memo_visibility":
 				updatedGeneral.MemoVisibility = incomingGeneral.MemoVisibility
 			case "theme":
@@ -161,6 +186,28 @@ func (s *APIV1Service) UpdateUserSetting(ctx context.Context, request *v1pb.Upda
 		return nil, status.Errorf(codes.InvalidArgument, "failed to convert setting: %v", err)
 	}
 
+	// Preserve metadata belonging to other spaces while replacing this space's tags.
+	if storeKey == storepb.UserSetting_TAGS {
+		existing, err := s.Store.GetUserSetting(ctx, &store.FindUserSetting{UserID: &userID, Key: storeKey})
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to load tags")
+		}
+		merged := map[string]*storepb.UserTagMetadata{}
+		if existing != nil {
+			maps.Copy(merged, existing.GetTags().GetTags())
+		}
+		space, _ := store.SpaceFromContext(ctx)
+		for key := range merged {
+			if tagBelongsToSpace(key, space) {
+				delete(merged, key)
+			}
+		}
+		for key, value := range storeSetting.GetTags().Tags {
+			merged[spaceTagKey(space, key)] = value
+		}
+		storeSetting.GetTags().Tags = merged
+	}
+
 	// Upsert the setting
 	if _, err := s.Store.UpsertUserSetting(ctx, storeSetting); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to upsert user setting: %v", err)
@@ -200,7 +247,7 @@ func (s *APIV1Service) ListUserSettings(ctx context.Context, request *v1pb.ListU
 	for _, storeSetting := range userSettings {
 		apiSetting := convertUserSettingFromStore(storeSetting, user, storeSetting.Key)
 		if apiSetting != nil {
-			settings = append(settings, apiSetting)
+			settings = append(settings, scopeTagSetting(ctx, apiSetting))
 		}
 	}
 

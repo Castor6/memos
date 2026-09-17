@@ -107,6 +107,9 @@ func (s *APIV1Service) normalizeMemoAttachmentRequest(
 ) ([]*store.Attachment, error) {
 	requestedAttachments := make([]*store.Attachment, 0, len(requestAttachments))
 	for _, requestAttachment := range requestAttachments {
+		if requestAttachment == nil {
+			return nil, status.Errorf(codes.InvalidArgument, "attachment is required")
+		}
 		attachmentUID, err := ExtractAttachmentUIDFromName(requestAttachment.Name)
 		if err != nil {
 			return nil, status.Errorf(codes.InvalidArgument, "invalid attachment name: %v", err)

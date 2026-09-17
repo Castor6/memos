@@ -1,3 +1,5 @@
+const preferences = vi.hoisted(() => ({ enterToSave: false }));
+vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => ({ userGeneralSetting: preferences }) }));
 import { render } from "@testing-library/react";
 import { createRef } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -9,7 +11,7 @@ vi.mock("@/hooks/useUserQueries", () => ({
 }));
 
 describe("Editor", () => {
-  it("loads markdown and serializes it back verbatim", () => {
+  it("loads Markdown as rich content and preserves its structure", () => {
     const ref = createRef<EditorController>();
     render(
       <Editor
@@ -22,7 +24,9 @@ describe("Editor", () => {
         onSubmit={vi.fn()}
       />,
     );
-    expect(ref.current?.getMarkdown()).toBe("# Title\n\n- a\n  1. b");
+    expect(ref.current?.getMarkdown()).toContain("# Title");
+    expect(document.querySelector(".rich-editor h1")).toHaveTextContent("Title");
+    expect(document.querySelector(".rich-editor ol li")).toHaveTextContent("b");
   });
 
   it("emits changes through onContentChange", () => {
@@ -53,12 +57,104 @@ describe("Editor", () => {
     };
     const { container, rerender } = render(<Editor {...props} placeholder="Any thoughts?" />);
 
-    expect(container.querySelector(".cm-content")).toHaveAttribute("aria-placeholder", "Any thoughts?");
-    expect(container.querySelector(".cm-placeholder")).toHaveTextContent("Any thoughts?");
+    expect(container.querySelector(".rich-editor p")).toHaveAttribute("data-placeholder", "Any thoughts?");
 
     rerender(<Editor {...props} placeholder="有什么想法？" />);
 
-    expect(container.querySelector(".cm-content")).toHaveAttribute("aria-placeholder", "有什么想法？");
-    expect(container.querySelector(".cm-placeholder")).toHaveTextContent("有什么想法？");
+    expect(container.querySelector(".rich-editor p")).toHaveAttribute("data-placeholder", "有什么想法？");
   });
+});
+
+describe("rich editor round trips", () => {
+  const mount = (content: string) => {
+    const ref = createRef<EditorController>();
+    const view = render(<Editor ref={ref} className="x" initialContent={content} placeholder="memo" onContentChange={vi.fn()} onFiles={vi.fn()} onSubmit={vi.fn()} />);
+    return { ref, ...view };
+  };
+
+  it("keeps legacy HTML, math, footnotes and tables when saving", () => {
+    const cases = [
+      '<details><summary>概要</summary>原始内容</details>',
+      '公式 $x^2 + y^2$ 保留',
+      '引用[^1]\n\n[^1]: 注释内容',
+      '| 列一 | 列二 |\n| --- | --- |\n| 内容一 | 内容二 |',
+      '#### 四级标题',
+    ];
+    for (const content of cases) {
+      const { ref, unmount } = mount(content);
+      const saved = ref.current!.getMarkdown();
+      if (content.startsWith('|')) {
+        expect(saved).toContain('内容一');
+        expect(saved).toContain('内容二');
+        expect(document.querySelector('.rich-editor table')).not.toBeNull();
+      } else expect(saved.trim()).toBe(content);
+      expect(saved).not.toContain('memos-preserved-content');
+      unmount();
+    }
+  });
+
+  it("renders files and references at their content position", () => {
+    const { ref, container } = mount('前面\n\n![文档](</file/attachments/demo/test.pdf> "memos:file:application/pdf")\n\n![另一条笔记](</memos/target> "memos:reference")\n\n后面');
+    const body = container.querySelector('.rich-editor')!;
+    expect(body.textContent).toContain('前面📎 文档↗ 另一条笔记后面');
+    expect(ref.current!.getMarkdown()).toContain('memos:file:application/pdf');
+    expect(ref.current!.getMarkdown()).toContain('memos:reference');
+    ref.current!.replaceFile!('/file/attachments/demo/test.pdf','');
+    expect(ref.current!.getMarkdown()).not.toContain('test.pdf');
+  });
+
+  it("continues typing after an inserted file without replacing the file", () => {
+    const { ref } = mount("before");
+    ref.current!.insertFile!("/file/attachments/one/test.txt", "memos:file:text/plain", "test.txt");
+    ref.current!.insertText!("after");
+    expect(ref.current!.getMarkdown()).toContain("test.txt");
+    expect(ref.current!.getMarkdown()).toContain("after");
+  });
+
+  it("preserves tasks and ordered lists and renders highlight without markers", () => {
+    const { ref, container } = mount('1. 第一\n2. 第二\n\n- [ ] 吃饭\n- [x] 打扫\n\n==重点==');
+    expect(container.querySelectorAll('.rich-editor ol li')).toHaveLength(2);
+    expect(container.querySelectorAll('.rich-editor input[type="checkbox"]')).toHaveLength(2);
+    expect(container.querySelector('.rich-editor mark')).toHaveTextContent('重点');
+    expect(ref.current!.getMarkdown()).toContain('[x] 打扫');
+  });
+});
+
+describe("keyboard and clipboard", () => {
+  it("continues ordered lists with Shift+Enter and accepts pasted files", async () => {
+    const { fireEvent, act } = await import('@testing-library/react');
+    const ref = createRef<EditorController>();
+    const onFiles = vi.fn();
+    const { container } = render(<Editor ref={ref} className="x" initialContent="1. 示例" placeholder="" onContentChange={vi.fn()} onFiles={onFiles} onSubmit={vi.fn()} />);
+    act(() => ref.current!.insertText!("一"));
+    fireEvent.keyDown(container.querySelector('.rich-editor')!, { key: 'Enter', code: 'Enter', shiftKey: true });
+    act(() => ref.current!.insertText!("二"));
+    expect(container.querySelectorAll('.rich-editor ol li')).toHaveLength(2);
+    const file = new File(['example'], 'example.txt', { type: 'text/plain' });
+    fireEvent.paste(container.querySelector('.rich-editor')!, { clipboardData: { files: [file], getData: () => "", types: [] } });
+    expect(onFiles).toHaveBeenCalledWith([file]);
+  });
+});
+
+
+it("uses Enter to save only on desktop and ignores IME confirmation", async () => {
+  const { fireEvent } = await import("@testing-library/react");
+  preferences.enterToSave = true;
+  const media = vi.fn();
+  vi.stubGlobal("matchMedia", media);
+  media.mockReturnValue({ matches: false } as MediaQueryList);
+  const onSubmit = vi.fn();
+  const { container } = render(<Editor className="x" initialContent="内容" placeholder="" onContentChange={vi.fn()} onFiles={vi.fn()} onSubmit={onSubmit} />);
+  const body = container.querySelector(".rich-editor")!;
+  fireEvent.keyDown(body, { key: "Enter", code: "Enter" });
+  expect(onSubmit).toHaveBeenCalledTimes(1);
+  media.mockReturnValue({ matches: true } as MediaQueryList);
+  fireEvent.keyDown(body, { key: "Enter", code: "Enter" });
+  expect(onSubmit).toHaveBeenCalledTimes(1);
+  media.mockReturnValue({ matches: false } as MediaQueryList);
+  fireEvent.compositionStart(body);
+  fireEvent.keyDown(body, { key: "Enter", code: "Enter", isComposing: true });
+  expect(onSubmit).toHaveBeenCalledTimes(1);
+  preferences.enterToSave = false;
+  vi.unstubAllGlobals();
 });
