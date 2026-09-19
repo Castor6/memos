@@ -42,7 +42,7 @@ func (c Config) Validate() error {
 		return errors.New("请填写 Memos 用户、企业 ID、客服账号、Secret 和本人白名单")
 	}
 	for _, id := range append([]string{c.CorpID, c.KFID}, c.AllowedUsers...) {
-		if len(id) > 191 || strings.ContainsAny(id, "\x00\r\n\t ") {
+		if id == "" || len(id) > 191 || strings.ContainsAny(id, "\x00\r\n\t ") {
 			return errors.New("账号标识格式不正确")
 		}
 	}
