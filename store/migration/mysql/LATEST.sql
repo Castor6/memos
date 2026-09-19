@@ -147,14 +147,14 @@ CREATE TABLE wechat_kf_config (
 INSERT INTO wechat_kf_config(id, value) VALUES (1, '');
 CREATE TABLE wechat_kf_sync (
   id INTEGER PRIMARY KEY,
-  cursor TEXT NOT NULL,
+  sync_cursor TEXT NOT NULL,
   token TEXT NOT NULL,
   token_time BIGINT NOT NULL DEFAULT 0,
   generation BIGINT NOT NULL DEFAULT 0,
   next_at BIGINT NOT NULL DEFAULT 0,
   last_error TEXT NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
-INSERT INTO wechat_kf_sync(id, cursor, token, last_error) VALUES (1, '', '', '');
+INSERT INTO wechat_kf_sync(id, sync_cursor, token, last_error) VALUES (1, '', '', '');
 CREATE TABLE wechat_kf_jobs (
   id VARCHAR(191) PRIMARY KEY,
   payload LONGTEXT,

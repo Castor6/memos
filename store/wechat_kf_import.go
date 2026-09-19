@@ -113,7 +113,7 @@ func (s *Store) ImportWeChatState(ctx context.Context, snapshot WeChatImport, se
 			counts.Events++
 		}
 		// Never rewind an already imported or active cursor on a repeated import.
-		if _, err := tx.ExecContext(ctx, s.wechatSQL("UPDATE wechat_kf_sync SET cursor=?,token='',token_time=0,generation=generation+1,next_at=0 WHERE id=1 AND cursor='' AND generation=0"), snapshot.Cursor); err != nil {
+		if _, err := tx.ExecContext(ctx, s.wechatSQL("UPDATE wechat_kf_sync SET sync_cursor=?,token='',token_time=0,generation=generation+1,next_at=0 WHERE id=1 AND sync_cursor='' AND generation=0"), snapshot.Cursor); err != nil {
 			return err
 		}
 		_, err := tx.ExecContext(ctx, s.wechatSQL("UPDATE wechat_kf_config SET value=?,revision=revision+1 WHERE id=1"), sealed)

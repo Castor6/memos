@@ -187,7 +187,7 @@ func (s *Store) SignalWeChat(ctx context.Context, revision int64, token string, 
 // ReadWeChatSync reads the current cursor for the active consumer.
 func (s *Store) ReadWeChatSync(ctx context.Context) (WeChatSync, error) {
 	var sync WeChatSync
-	err := s.driver.GetDB().QueryRowContext(ctx, "SELECT cursor,token,token_time,generation,next_at,last_error FROM wechat_kf_sync WHERE id=1").Scan(&sync.Cursor, &sync.Token, &sync.TokenTime, &sync.Generation, &sync.NextAt, &sync.LastError)
+	err := s.driver.GetDB().QueryRowContext(ctx, "SELECT sync_cursor,token,token_time,generation,next_at,last_error FROM wechat_kf_sync WHERE id=1").Scan(&sync.Cursor, &sync.Token, &sync.TokenTime, &sync.Generation, &sync.NextAt, &sync.LastError)
 	return sync, err
 }
 
@@ -281,7 +281,7 @@ func (s *Store) AcceptWeChatPage(ctx context.Context, owner string, revision int
 				return err
 			}
 		}
-		_, err := tx.ExecContext(ctx, s.wechatSQL("UPDATE wechat_kf_sync SET cursor=? WHERE id=1"), cursor)
+		_, err := tx.ExecContext(ctx, s.wechatSQL("UPDATE wechat_kf_sync SET sync_cursor=? WHERE id=1"), cursor)
 		return err
 	})
 }

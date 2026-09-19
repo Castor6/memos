@@ -409,12 +409,15 @@ message WechatKfSetting {
 
 // Request for the current WeChat configuration.
 message GetWechatKfSettingRequest {}
+
 // Request to replace a configuration at a known revision.
 message UpdateWechatKfSettingRequest {
   WechatKfSetting setting = 1 [(google.api.field_behavior) = REQUIRED];
 }
+
 // Request for processing statistics.
 message GetWechatKfStatusRequest {}
+
 // Request to validate stored credentials without sending messages.
 message TestWechatKfSettingRequest {}
 
@@ -428,6 +431,7 @@ message WechatKfStatus {
   string sync_error = 6;
   int64 next_sync_time = 7;
 }
+
 // A recent processing result, without the original message or sender identifier.
 message WechatKfResult {
   string type = 1;
