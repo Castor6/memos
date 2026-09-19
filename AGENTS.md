@@ -27,12 +27,13 @@ Memos is a self-hosted note-taking app.
 - Communicate in Chinese. Keep task records in Chinese and update them as work progresses.
 - Use focused branches and PRs targeting `Castor6/memos:main` for changes, including documentation and upstream imports. `validate` is the required CI check. See `docs/release.md` for CI, Changesets and publishing; actual deployment status is in `docs/tasks/TASK-20260916-automated-deployment.md`. Ordinary merges must not trigger production deployment.
 - Add a new `.changeset/*.md` for shipped behavior changes using root `corepack pnpm changeset`. Use patch/minor/major and a Chinese user-facing summary. Only the generated version PR updates the root package version and `CHANGELOG.md`; upstream history lives in `docs/upstream/CHANGELOG.md`. Version PR merges publish smoke-tested ACR images; server pull updates use `scripts/deploy/` with backup and recovery. Keep deployment credentials and host details out of this repository.
-- Retrieve history on demand: search `docs/tasks/INDEX.md` by task ID, keywords or affected module; open only relevant task records and necessary linked documents. Do not load all historical tasks at startup.
+- 按需检索历史：直接按文件名、任务编号、标题、模块或关键词搜索 `docs/tasks/`，只打开相关任务和必要链接；`docs/tasks/INDEX.md` 仅提供固定检索说明，新任务不登记总索引，不在启动时读取全部历史。
 - 涉及线上排查、部署或服务器维护时，先读取仓库根目录的 `LOCAL_OPS.md`（若存在），按其中的路径查阅私有维护说明，不做全局目录搜索。该文件仅保存在本机，使用 `.git/info/exclude` 排除，不提交私有路径或凭据；本机缺少该文件时向用户确认维护入口。
 - `docs/README.md` is a navigation entry, not a mandatory reading list. Read `docs/development.md` when running or verifying locally; read deployment documentation only for deployment/upstream work.
 - 实质工作使用 `docs/tasks/TEMPLATE.md` 创建或续接任务，先记目标和验收标准，收尾记录带日期的实现、实际验证与未覆盖范围；相关小修可共用记录。
-- Task 是工作事实记录，不维护依赖外部变化的 CI、合并、部署状态；索引只负责检索。已发生的操作可附日期/提交/证据链接，后续进展查 PR、Actions、Release 或私有运维记录；不为追赶外部状态反复提交文档。
-- Promote durable decisions into this guide or the relevant module documentation. Keep task details, logs and screenshots out of this file; search archived task indexes only when relevant.
+- 单个任务文件由一个会话负责维护，记录维护会话或工作分支；同一任务交接后续写原文件，其他会话独立开展的工作另建任务并互链，不共同更新大任务进度表。多会话代码修改使用独立 worktree。
+- Task 只记录目标、关键决定、实现、实际验证与未覆盖范围，不重复 Git 提交流水或 PR 状态，不逐次记录推送、等待 CI、索引冲突等操作。必要证据可附日期与链接；后续进展查 PR、Actions、Release 或私有运维记录。不提交自动生成的任务总目录。
+- Promote durable decisions into this guide or the relevant module documentation. Keep task details, logs and screenshots out of this file; search archived task records only when relevant.
 - Default UI verification to the Codex in-app browser with local disposable data: desktop 1440×900; the user's iPhone 15 Pro Max uses a 430px-wide layout, checked at heights 739 and 932 (see `docs/development.md`). Verify no persistent left sidebar on mobile. Restore viewport overrides afterward. Use the regular Chrome profile only for a problem specific to it.
 - Narrow viewport checks do not establish iPhone/Safari, software keyboard, touch or PWA behavior; record any required real-device checks explicitly.
 
