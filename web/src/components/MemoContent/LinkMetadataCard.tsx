@@ -1,5 +1,4 @@
 import type React from "react";
-import { useEffect, useState } from "react";
 import { useLinkMetadata } from "@/hooks/useMemoQueries";
 import { cn } from "@/lib/utils";
 
@@ -18,17 +17,11 @@ function getHostname(url: string): string {
 }
 
 const LinkMetadataCard = ({ url, fallback, enabled = true }: LinkMetadataCardProps) => {
-  const [imageFailed, setImageFailed] = useState(false);
   const { data: metadata, isSuccess } = useLinkMetadata(url, { enabled });
 
   const title = metadata?.title.trim() ?? "";
   const description = metadata?.description.trim() ?? "";
-  const image = metadata?.image.trim() ?? "";
   const hostname = getHostname(metadata?.url || url);
-
-  useEffect(() => {
-    setImageFailed(false);
-  }, [url, image]);
 
   if (!isSuccess || title === "") {
     return fallback;
@@ -49,20 +42,6 @@ const LinkMetadataCard = ({ url, fallback, enabled = true }: LinkMetadataCardPro
         {title && <span className="line-clamp-2 text-sm font-medium leading-5 text-foreground">{title}</span>}
         {description && <span className="line-clamp-1 text-xs leading-4 text-muted-foreground sm:line-clamp-2">{description}</span>}
       </span>
-      {image && !imageFailed && (
-        <span className="flex w-24 shrink-0 items-center border-l border-border/70 bg-muted/40 sm:w-40">
-          <span className="aspect-[1.91/1] w-full overflow-hidden">
-            <img
-              src={image}
-              alt=""
-              className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.01]"
-              loading="lazy"
-              decoding="async"
-              onError={() => setImageFailed(true)}
-            />
-          </span>
-        </span>
-      )}
     </a>
   );
 };

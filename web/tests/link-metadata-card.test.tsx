@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import LinkMetadataCard from "@/components/MemoContent/LinkMetadataCard";
 
@@ -38,13 +38,5 @@ describe("link metadata card fallback", () => {
     renderCard();
     expect(screen.getByText("Article title")).toBeInTheDocument();
     expect(screen.getByRole("link")).toHaveAttribute("href", query.data.url);
-  });
-
-  it("keeps the useful title when the cover fails to load", () => {
-    query.data.image = "https://example.com/cover.jpg";
-    const { container } = renderCard();
-    fireEvent.error(container.querySelector("img") as HTMLImageElement);
-    expect(container.querySelector("img")).toBeNull();
-    expect(screen.getByText("Article title")).toBeInTheDocument();
   });
 });
