@@ -187,3 +187,165 @@ func TestSecureDialContextDialsResolvedIP(t *testing.T) {
 	require.NotNil(t, conn)
 	require.Equal(t, "93.184.216.34:80", dialedAddress)
 }
+
+func TestGetHTMLMetaRequestHeaders(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		url    string
+		wechat bool
+	}{
+		{"article", "https://mp.weixin.qq.com/s/example", true},
+		{"uppercase host", "https://MP.WEIXIN.QQ.COM/s?mid=123", true},
+		{"other site", "https://juejin.cn/post/example", false},
+		{"video channel", "https://channels.weixin.qq.com/finder-preview/pages/feed", false},
+		{"lookalike host", "https://mp.weixin.qq.com.example.com/s/example", false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			original := httpClient
+			t.Cleanup(func() { httpClient = original })
+			httpClient = &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+				if test.wechat {
+					require.Equal(t, "Mozilla/5.0 Chrome/120.0.0.0", req.Header.Get("User-Agent"))
+					require.Equal(t, "zh-CN,zh;q=0.9", req.Header.Get("Accept-Language"))
+					require.Equal(t, "https://mp.weixin.qq.com/", req.Header.Get("Referer"))
+				} else {
+					require.Empty(t, req.Header.Get("User-Agent"))
+					require.Empty(t, req.Header.Get("Accept-Language"))
+					require.Empty(t, req.Header.Get("Referer"))
+				}
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Header:     http.Header{"Content-Type": []string{"text/html"}},
+					Body:       io.NopCloser(strings.NewReader("<title>Article title</title>")),
+					Request:    req,
+				}, nil
+			})}
+			meta, err := GetHTMLMeta(test.url)
+			require.NoError(t, err)
+			require.Equal(t, "Article title", meta.Title)
+		})
+	}
+}
+
+func TestGetHTMLMetaRedirectHeaders(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		urls []string
+	}{
+		{"other sites", []string{"https://example.com/start", "https://other.example.com/end"}},
+		{"leave wechat", []string{"https://mp.weixin.qq.com/s/one", "https://example.com/next", "https://other.example.com/end"}},
+		{"enter and leave wechat", []string{"https://example.com/start", "https://mp.weixin.qq.com/s/two", "https://example.com/end"}},
+		{"within wechat", []string{"https://mp.weixin.qq.com/s/one", "https://mp.weixin.qq.com/s/two"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			original := httpClient
+			t.Cleanup(func() { httpClient = original })
+			client := newHTTPClient()
+			requests := 0
+			client.Transport = roundTripFunc(func(req *http.Request) (*http.Response, error) {
+				require.Equal(t, test.urls[requests], req.URL.String())
+				if req.URL.Hostname() == "mp.weixin.qq.com" {
+					require.Equal(t, "Mozilla/5.0 Chrome/120.0.0.0", req.Header.Get("User-Agent"))
+					require.Equal(t, "zh-CN,zh;q=0.9", req.Header.Get("Accept-Language"))
+					require.Equal(t, "https://mp.weixin.qq.com/", req.Header.Get("Referer"))
+				} else {
+					require.Empty(t, req.Header.Get("User-Agent"))
+					require.Empty(t, req.Header.Get("Accept-Language"))
+					if test.name == "other sites" && requests > 0 {
+						require.Equal(t, test.urls[requests-1], req.Header.Get("Referer"))
+					} else {
+						require.Empty(t, req.Header.Get("Referer"))
+					}
+				}
+				requests++
+				response := &http.Response{
+					StatusCode: http.StatusOK,
+					Header:     http.Header{"Content-Type": []string{"text/html"}},
+					Body:       io.NopCloser(strings.NewReader("<title>Final title</title>")),
+					Request:    req,
+				}
+				if requests < len(test.urls) {
+					response.StatusCode = http.StatusFound
+					response.Header.Set("Location", test.urls[requests])
+				}
+				return response, nil
+			})
+			httpClient = client
+			meta, err := GetHTMLMeta(test.urls[0])
+			require.NoError(t, err)
+			require.Equal(t, "Final title", meta.Title)
+			require.Equal(t, len(test.urls), requests)
+		})
+	}
+}
+
+func TestExtractHTMLMetaTitlePriority(t *testing.T) {
+	for _, test := range []struct {
+		name  string
+		html  string
+		title string
+	}{
+		{"empty title", "<title></title>", ""},
+		{"whitespace title", "<title> \n </title>", ""},
+		{"plain title", "<title> Plain &amp; useful </title>", "Plain & useful"},
+		{"og before empty title", `<meta property="og:title" content="公众号文章"><title></title>`, "公众号文章"},
+		{"og before plain title", `<meta property="og:title" content="Article"><title>Site shell</title>`, "Article"},
+		{"og after plain title", `<title>Site shell</title><meta property="og:title" content=" Article ">`, "Article"},
+		{"empty og preserves fallback", `<title>Fallback</title><meta property="og:title" content=" ">`, "Fallback"},
+		{"empty duplicate og", `<meta property="og:title" content="Article"><meta property="og:title" content="">`, "Article"},
+		{"ignore body title", `<title>Page</title><body><title>Body</title>`, "Page"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			meta := extractHTMLMeta(strings.NewReader(test.html))
+			require.Equal(t, test.title, meta.Title)
+		})
+	}
+}
+
+func TestGetHTMLMetaRejectsHTTPErrorPages(t *testing.T) {
+	original := httpClient
+	t.Cleanup(func() { httpClient = original })
+	for _, status := range []int{http.StatusForbidden, http.StatusNotFound, http.StatusServiceUnavailable} {
+		httpClient = &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: status,
+				Header:     http.Header{"Content-Type": []string{"text/html"}},
+				Body:       io.NopCloser(strings.NewReader("<title>Access Denied</title>")),
+				Request:    req,
+			}, nil
+		})}
+		meta, err := GetHTMLMeta("https://example.com/article")
+		require.ErrorContains(t, err, "unexpected HTTP status")
+		require.Nil(t, meta)
+	}
+}
+
+func TestGetHTMLMetaWeChatShellTitles(t *testing.T) {
+	for _, test := range []struct {
+		url   string
+		title string
+		want  string
+	}{
+		{"https://mp.weixin.qq.com/s/example", "title", ""},
+		{"https://mp.weixin.qq.com/mp/wappoc_appmsgcaptcha", "微信公众平台", ""},
+		{"https://channels.weixin.qq.com/finder-preview/pages/feed", "视频号", ""},
+		{"https://channels.weixin.qq.com/finder-preview/pages/feed", "真实视频标题", "真实视频标题"},
+		{"https://example.com/article", "视频号", "视频号"},
+	} {
+		t.Run(test.title+test.url, func(t *testing.T) {
+			original := httpClient
+			t.Cleanup(func() { httpClient = original })
+			httpClient = &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Header:     http.Header{"Content-Type": []string{"text/html"}},
+					Body:       io.NopCloser(strings.NewReader("<title>" + test.title + "</title>")),
+					Request:    req,
+				}, nil
+			})}
+			meta, err := GetHTMLMeta(test.url)
+			require.NoError(t, err)
+			require.Equal(t, test.want, meta.Title)
+		})
+	}
+}
