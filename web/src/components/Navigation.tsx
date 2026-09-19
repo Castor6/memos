@@ -19,12 +19,12 @@ interface NavLinkItem {
 
 interface Props {
   collapsed?: boolean;
-  horizontal?: boolean;
+  mobileTabs?: boolean;
   className?: string;
 }
 
 const Navigation = (props: Props) => {
-  const { collapsed, horizontal, className } = props;
+  const { collapsed, mobileTabs, className } = props;
   const t = useTranslate();
   const currentUser = useCurrentUser();
   const { data: notifications = [] } = useNotifications();
@@ -87,20 +87,21 @@ const Navigation = (props: Props) => {
     : [exploreNavLink, aboutNavLink, signInNavLink];
   const inboxAriaLabel = unreadCount > 0 ? `${t("common.inbox")}, ${unreadCount} unread` : t("common.inbox");
 
-  if (horizontal) {
+  if (mobileTabs) {
+    if (!currentUser) return null;
     return (
-      <nav aria-label="主导航" className={cn("flex min-w-0 flex-1 items-center justify-between gap-0.5", className)}>
-        {primaryNavLinks.map((item) => (
+      <nav aria-label="笔记与待办" className={cn("flex items-center gap-1 rounded-xl bg-muted/60 p-1", className)}>
+        {primaryNavLinks.slice(0, 2).map((item) => (
           <NavLink
             key={item.id}
             to={item.path}
             end={item.path === Routes.HOME}
-            aria-label={item.id === "header-inbox" ? inboxAriaLabel : item.title}
+            aria-label={item.title}
             title={item.title}
             className={({ isActive }) =>
               cn(
-                "flex h-11 min-w-10 flex-1 items-center justify-center rounded-xl transition-colors",
-                isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-muted-foreground hover:bg-muted",
+                "flex h-10 w-12 items-center justify-center rounded-lg transition-colors",
+                isActive ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
               )
             }
             viewTransition
@@ -108,11 +109,6 @@ const Navigation = (props: Props) => {
             {item.icon}
           </NavLink>
         ))}
-        {currentUser && (
-          <div className="flex h-11 min-w-10 items-center justify-center">
-            <UserMenu collapsed />
-          </div>
-        )}
       </nav>
     );
   }
