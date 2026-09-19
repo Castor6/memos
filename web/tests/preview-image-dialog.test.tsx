@@ -116,3 +116,59 @@ describe("<PreviewImageDialog>", () => {
     expect(screen.getByRole("button", { name: /next item/i })).toBeInTheDocument();
   });
 });
+
+describe("image pointer gestures", () => {
+  const setup = () => {
+    const view = render(<PreviewImageDialog open onOpenChange={vi.fn()} items={[
+      { id: "one", kind: "image", sourceUrl: "/one.png", posterUrl: "/one.png", filename: "one" },
+      { id: "two", kind: "image", sourceUrl: "/two.png", posterUrl: "/two.png", filename: "two" },
+    ]} />);
+    const image = screen.getByAltText("Preview image 1 of 2");
+    const surface = image.parentElement!;
+    for (const el of [image, surface]) {
+      Object.defineProperty(el, "clientWidth", { configurable: true, value: 300 });
+      Object.defineProperty(el, "clientHeight", { configurable: true, value: 300 });
+    }
+    surface.getBoundingClientRect = () => ({ left: 0, top: 0, width: 300, height: 300 } as DOMRect);
+    surface.setPointerCapture = vi.fn();
+    surface.hasPointerCapture = () => false;
+    const pointer = (id: number, x: number, y: number) => ({ pointerId: id, pointerType: "touch", clientX: x, clientY: y });
+    return { ...view, image, surface, pointer };
+  };
+  it("pinches around the midpoint and continues with one-finger panning without jumping", () => {
+    const { image, surface, pointer } = setup();
+    fireEvent.pointerDown(surface, pointer(1, 100, 150));
+    fireEvent.pointerDown(surface, pointer(2, 200, 150));
+    fireEvent.pointerMove(surface, pointer(1, 50, 150));
+    fireEvent.pointerMove(surface, pointer(2, 250, 150));
+    expect(screen.getByText("200%")).toBeInTheDocument();
+    fireEvent.pointerUp(surface, pointer(2, 250, 150));
+    fireEvent.pointerMove(surface, pointer(1, 100, 150));
+    expect(image).toHaveStyle({ transform: "translate3d(50px, 0px, 0) scale(2)" });
+    fireEvent.pointerMove(surface, pointer(1, 1000, 150));
+    expect(image).toHaveStyle({ transform: "translate3d(150px, 0px, 0) scale(2)" });
+  });
+  it("supports double tap, caps pinch zoom, and resets when switching images", () => {
+    const { surface, pointer } = setup();
+    for (let i = 0; i < 2; i++) {
+      fireEvent.pointerDown(surface, pointer(1, 150, 150));
+      fireEvent.pointerUp(surface, pointer(1, 150, 150));
+    }
+    expect(screen.getByText("200%")).toBeInTheDocument();
+    fireEvent.pointerDown(surface, pointer(1, 100, 150));
+    fireEvent.pointerDown(surface, pointer(2, 200, 150));
+    fireEvent.pointerMove(surface, pointer(2, 1200, 150));
+    expect(screen.getByText("400%")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Next item" }));
+    expect(screen.getByText("100%")).toBeInTheDocument();
+    expect(screen.getByAltText("Preview image 2 of 2")).toHaveStyle({ transform: "translate3d(0px, 0px, 0) scale(1)" });
+  });
+  it("ends a cancelled gesture so later moves do not drag the image", () => {
+    const { image, surface, pointer } = setup();
+    fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
+    fireEvent.pointerDown(surface, pointer(1, 150, 150));
+    fireEvent.pointerCancel(surface, pointer(1, 150, 150));
+    fireEvent.pointerMove(surface, pointer(1, 190, 150));
+    expect(image).toHaveStyle({ transform: "translate3d(0px, 0px, 0) scale(1.2)" });
+  });
+});

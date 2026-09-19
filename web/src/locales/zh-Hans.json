@@ -265,8 +265,8 @@
     "order-by": "排序",
     "search-placeholder": "搜索笔记",
     "shown-time": "显示时间",
-    "show-less": "显示较少",
-    "show-more": "查看更多",
+    "show-less": "收起",
+    "show-more": "展开",
     "to-do": "待办",
     "view-detail": "查看详情",
     "visibility": {

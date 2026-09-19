@@ -5,6 +5,7 @@ import {
   BookmarkPlusIcon,
   CheckCheckIcon,
   CopyIcon,
+  DownloadIcon,
   Edit3Icon,
   FileTextIcon,
   LinkIcon,
@@ -13,7 +14,7 @@ import {
   MoreVerticalIcon,
   TrashIcon,
 } from "lucide-react";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,10 +26,14 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { downloadMemoMarkdown, exportMemoMarkdown, memoExportFilename } from "@/lib/memo-export";
 import { State } from "@/types/proto/api/v1/common_pb";
 import { useTranslate } from "@/utils/i18n";
+import { lazyWithReload } from "@/utils/lazy";
 import { useMemoActionHandlers } from "./hooks";
 import type { MemoActionMenuProps } from "./types";
+
+const MemoExportPdfDialog = lazyWithReload(() => import("./MemoExportPdfDialog"));
 
 const MemoActionMenu = (props: MemoActionMenuProps) => {
   const { memo, readonly } = props;
@@ -36,6 +41,7 @@ const MemoActionMenu = (props: MemoActionMenuProps) => {
 
   // Dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [pdfOpen, setPdfOpen] = useState(false);
 
   // Derived state
   const isComment = Boolean(memo.parent);
@@ -62,7 +68,7 @@ const MemoActionMenu = (props: MemoActionMenuProps) => {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="size-4" />}>
+      <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="size-4" aria-label="笔记操作" />}>
         <MoreVerticalIcon className="text-muted-foreground" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" sideOffset={2}>
@@ -101,6 +107,26 @@ const MemoActionMenu = (props: MemoActionMenuProps) => {
             </DropdownMenuSubContent>
           </DropdownMenuSub>
         )}
+
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>
+            <DownloadIcon className="size-4" />
+            导出
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent>
+            <DropdownMenuItem
+              onClick={() =>
+                downloadMemoMarkdown(
+                  exportMemoMarkdown(memo.content, window.location.origin),
+                  memoExportFilename(memo.name, memo.property?.title || "", "md"),
+                )
+              }
+            >
+              Markdown (.md)
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setPdfOpen(true)}>PDF (.pdf)</DropdownMenuItem>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
 
         {/* Task submenu (writable task memos) */}
         {canMutateTasks && (
@@ -141,6 +167,12 @@ const MemoActionMenu = (props: MemoActionMenuProps) => {
           </>
         )}
       </DropdownMenuContent>
+
+      {pdfOpen && (
+        <Suspense fallback={null}>
+          <MemoExportPdfDialog memo={memo} onClose={() => setPdfOpen(false)} />
+        </Suspense>
+      )}
 
       {/* Delete confirmation dialog */}
       <ConfirmDialog

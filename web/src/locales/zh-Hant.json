@@ -293,8 +293,8 @@
       "shared-by": "由 {{creator}} 分享",
       "title": "分享這份備忘錄"
     },
-    "show-less": "顯示較少",
-    "show-more": "查看更多",
+    "show-less": "收起",
+    "show-more": "展開",
     "to-do": "待辦事項",
     "view-detail": "查看詳情",
     "visibility": {

@@ -19,11 +19,12 @@ interface NavLinkItem {
 
 interface Props {
   collapsed?: boolean;
+  mobileTabs?: boolean;
   className?: string;
 }
 
 const Navigation = (props: Props) => {
-  const { collapsed, className } = props;
+  const { collapsed, mobileTabs, className } = props;
   const t = useTranslate();
   const currentUser = useCurrentUser();
   const { data: notifications = [] } = useNotifications();
@@ -85,6 +86,32 @@ const Navigation = (props: Props) => {
       ]
     : [exploreNavLink, aboutNavLink, signInNavLink];
   const inboxAriaLabel = unreadCount > 0 ? `${t("common.inbox")}, ${unreadCount} unread` : t("common.inbox");
+
+  if (mobileTabs) {
+    if (!currentUser) return null;
+    return (
+      <nav aria-label="笔记与待办" className={cn("flex items-center gap-1 rounded-xl bg-muted/60 p-1", className)}>
+        {primaryNavLinks.slice(0, 2).map((item) => (
+          <NavLink
+            key={item.id}
+            to={item.path}
+            end={item.path === Routes.HOME}
+            aria-label={item.title}
+            title={item.title}
+            className={({ isActive }) =>
+              cn(
+                "flex h-10 w-12 items-center justify-center rounded-lg transition-colors",
+                isActive ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+              )
+            }
+            viewTransition
+          >
+            {item.icon}
+          </NavLink>
+        ))}
+      </nav>
+    );
+  }
 
   return (
     <header className={cn("w-full h-full overflow-auto flex flex-col justify-between items-start gap-4", className)}>
