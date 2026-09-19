@@ -19,11 +19,12 @@ interface NavLinkItem {
 
 interface Props {
   collapsed?: boolean;
+  horizontal?: boolean;
   className?: string;
 }
 
 const Navigation = (props: Props) => {
-  const { collapsed, className } = props;
+  const { collapsed, horizontal, className } = props;
   const t = useTranslate();
   const currentUser = useCurrentUser();
   const { data: notifications = [] } = useNotifications();
@@ -85,6 +86,36 @@ const Navigation = (props: Props) => {
       ]
     : [exploreNavLink, aboutNavLink, signInNavLink];
   const inboxAriaLabel = unreadCount > 0 ? `${t("common.inbox")}, ${unreadCount} unread` : t("common.inbox");
+
+  if (horizontal) {
+    return (
+      <nav aria-label="主导航" className={cn("flex min-w-0 flex-1 items-center justify-between gap-0.5", className)}>
+        {primaryNavLinks.map((item) => (
+          <NavLink
+            key={item.id}
+            to={item.path}
+            end={item.path === Routes.HOME}
+            aria-label={item.id === "header-inbox" ? inboxAriaLabel : item.title}
+            title={item.title}
+            className={({ isActive }) =>
+              cn(
+                "flex h-11 min-w-10 flex-1 items-center justify-center rounded-xl transition-colors",
+                isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-muted-foreground hover:bg-muted",
+              )
+            }
+            viewTransition
+          >
+            {item.icon}
+          </NavLink>
+        ))}
+        {currentUser && (
+          <div className="flex h-11 min-w-10 items-center justify-center">
+            <UserMenu collapsed />
+          </div>
+        )}
+      </nav>
+    );
+  }
 
   return (
     <header className={cn("w-full h-full overflow-auto flex flex-col justify-between items-start gap-4", className)}>

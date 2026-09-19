@@ -4,6 +4,7 @@ import MotionPhotoPreview from "@/components/MotionPhotoPreview";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@/components/ui/visually-hidden";
+import { useImageGestures } from "@/hooks/useImageGestures";
 import useMediaQuery from "@/hooks/useMediaQuery";
 import { cn } from "@/lib/utils";
 import type { PreviewMediaItem } from "@/utils/media-item";
@@ -19,14 +20,10 @@ interface Props {
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 4;
 const ZOOM_STEP = 0.2;
-const DOUBLE_TAP_ZOOM = 2;
-
-const clampZoom = (scale: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, scale));
 
 function PreviewImageDialog({ open, onOpenChange, imgUrls = [], items, initialIndex = 0 }: Props) {
   const sm = useMediaQuery("sm");
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
-  const [zoomScale, setZoomScale] = useState(MIN_ZOOM);
   const previewItems = useMemo(
     () => items ?? imgUrls.map((url) => ({ id: url, kind: "image" as const, sourceUrl: url, posterUrl: url, filename: "Image" })),
     [imgUrls, items],
@@ -43,6 +40,8 @@ function PreviewImageDialog({ open, onOpenChange, imgUrls = [], items, initialIn
   const currentItem = previewItems[safeIndex];
   const hasMultiple = itemCount > 1;
   const isImagePreview = currentItem?.kind === "image";
+  const gestures = useImageGestures(`${currentItem?.id}:${open}`, isImagePreview && open);
+  const zoomScale = gestures.transform.scale;
   const canGoPrevious = safeIndex > 0;
   const canGoNext = safeIndex < itemCount - 1;
   const zoomPercent = Math.round(zoomScale * 100);
@@ -73,10 +72,6 @@ function PreviewImageDialog({ open, onOpenChange, imgUrls = [], items, initialIn
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [itemCount, onOpenChange, open]);
 
-  useEffect(() => {
-    setZoomScale(MIN_ZOOM);
-  }, [currentItem?.id, open]);
-
   const handleClose = () => onOpenChange(false);
   const handlePrevious = () => {
     setCurrentIndex((prev) => Math.max(prev - 1, 0));
@@ -86,9 +81,9 @@ function PreviewImageDialog({ open, onOpenChange, imgUrls = [], items, initialIn
   };
 
   const updateZoom = (nextScale: number) => {
-    setZoomScale(clampZoom(nextScale));
+    gestures.zoom(nextScale);
   };
-  const resetZoom = () => setZoomScale(MIN_ZOOM);
+  const resetZoom = gestures.reset;
   const handleZoomIn = () => updateZoom(zoomScale + ZOOM_STEP);
   const handleZoomOut = () => updateZoom(zoomScale - ZOOM_STEP);
   const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
@@ -97,7 +92,7 @@ function PreviewImageDialog({ open, onOpenChange, imgUrls = [], items, initialIn
       updateZoom(zoomScale + (event.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP));
     }
   };
-  const handleDoubleClick = () => setZoomScale((scale) => (scale === MIN_ZOOM ? DOUBLE_TAP_ZOOM : MIN_ZOOM));
+  const handleDoubleClick = gestures.toggleZoom;
 
   if (!itemCount || !currentItem) {
     return null;
@@ -154,7 +149,14 @@ function PreviewImageDialog({ open, onOpenChange, imgUrls = [], items, initialIn
             }
           }}
         >
-          <div className="flex max-h-full max-w-full items-center justify-center" onClick={(event) => event.stopPropagation()}>
+          <div
+            ref={gestures.surfaceRef}
+            className={cn("flex items-center justify-center", isImagePreview ? "h-full w-full overflow-hidden" : "max-h-full max-w-full")}
+            style={isImagePreview ? { touchAction: "none", cursor: isZoomed ? "grab" : "zoom-in" } : undefined}
+            {...gestures.handlers}
+            onDoubleClick={handleDoubleClick}
+            onClick={(event) => event.stopPropagation()}
+          >
             {currentItem.kind === "video" ? (
               <video
                 key={currentItem.id}
@@ -177,15 +179,14 @@ function PreviewImageDialog({ open, onOpenChange, imgUrls = [], items, initialIn
               />
             ) : (
               <img
+                ref={gestures.imageRef}
                 src={currentItem.sourceUrl}
                 alt={`Preview image ${safeIndex + 1} of ${itemCount}`}
                 className="max-h-[calc(100vh-8rem)] max-w-[calc(100vw-1.5rem)] rounded-md object-contain select-none sm:max-h-[calc(100vh-7rem)] sm:max-w-[calc(100vw-8rem)]"
                 style={{
-                  transform: `translate3d(0px, 0px, 0) scale(${zoomScale})`,
-                  transition: "transform 120ms ease-out",
+                  transform: `translate3d(${gestures.transform.x}px, ${gestures.transform.y}px, 0) scale(${zoomScale})`,
                   transformOrigin: "center center",
                 }}
-                onDoubleClick={handleDoubleClick}
                 draggable={false}
                 loading="eager"
                 decoding="async"

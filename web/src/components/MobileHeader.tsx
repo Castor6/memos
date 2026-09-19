@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import useMediaQuery from "@/hooks/useMediaQuery";
 import { cn } from "@/lib/utils";
-import NavigationDrawer from "./NavigationDrawer";
+import Navigation from "./Navigation";
 
 interface Props {
   className?: string;
@@ -37,8 +37,8 @@ const MobileHeader = (props: Props) => {
         className,
       )}
     >
-      {!sm && <NavigationDrawer />}
-      <div className="w-full flex flex-row justify-end items-center">{children}</div>
+      {!sm && <Navigation horizontal />}
+      {children && <div className={cn("flex shrink-0 items-center justify-end", sm && "w-full")}>{children}</div>}
     </div>
   );
 };

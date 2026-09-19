@@ -33,7 +33,7 @@ const MemoExplorerDrawer = (props: Props) => {
         onOpenChange?.(nextOpen);
       }}
     >
-      <SheetTrigger render={<Button variant="ghost" />}>
+      <SheetTrigger render={<Button variant="ghost" size="icon" aria-label="筛选笔记" />}>
         <MenuIcon className="size-5 text-foreground" />
       </SheetTrigger>
       <SheetContent side="right" className="w-80 max-w-full bg-background">
