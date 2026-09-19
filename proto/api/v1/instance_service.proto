@@ -15,6 +15,32 @@ import "google/type/color.proto";
 option go_package = "gen/api/v1";
 
 service InstanceService {
+  // Gets the admin-only WeChat KF configuration with secrets omitted.
+  rpc GetWechatKfSetting(GetWechatKfSettingRequest) returns (WechatKfSetting) {
+    option (google.api.http) = {get: "/api/v1/instance/wechat-kf"};
+  }
+
+  // Replaces the admin-only configuration; empty secrets retain stored values.
+  rpc UpdateWechatKfSetting(UpdateWechatKfSettingRequest) returns (WechatKfSetting) {
+    option (google.api.http) = {
+      patch: "/api/v1/instance/wechat-kf"
+      body: "*"
+    };
+  }
+
+  // Gets redacted processing statistics. Admin only.
+  rpc GetWechatKfStatus(GetWechatKfStatusRequest) returns (WechatKfStatus) {
+    option (google.api.http) = {get: "/api/v1/instance/wechat-kf/status"};
+  }
+
+  // Verifies stored credentials against the configured customer-service account.
+  rpc TestWechatKfSetting(TestWechatKfSettingRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/api/v1/instance/wechat-kf:test"
+      body: "*"
+    };
+  }
+
   // Gets the instance profile.
   rpc GetInstanceProfile(GetInstanceProfileRequest) returns (InstanceProfile) {
     option (google.api.http) = {get: "/api/v1/instance/profile"};
@@ -357,4 +383,60 @@ message InstanceStats {
     // size_bytes is the database size in bytes; -1 if unavailable.
     int64 size_bytes = 2;
   }
+}
+
+// Admin-only configuration for one personal WeChat customer-service integration.
+message WechatKfSetting {
+  bool enabled = 1;
+  string owner = 2;
+  string space = 3;
+  string corp_id = 4;
+  string kf_id = 5;
+  repeated string allowed_users = 6;
+  repeated string default_tags = 7;
+  string chat_tag = 8;
+  bool receipts_enabled = 9;
+  int32 max_media_mb = 10;
+  string secret = 11 [(google.api.field_behavior) = INPUT_ONLY];
+  string callback_token = 12 [(google.api.field_behavior) = INPUT_ONLY];
+  string encoding_aes_key = 13 [(google.api.field_behavior) = INPUT_ONLY];
+  bool secret_set = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool callback_token_set = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool encoding_aes_key_set = 16 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int64 revision = 17;
+  string callback_path = 18 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Request for the current WeChat configuration.
+message GetWechatKfSettingRequest {}
+
+// Request to replace a configuration at a known revision.
+message UpdateWechatKfSettingRequest {
+  WechatKfSetting setting = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+// Request for processing statistics.
+message GetWechatKfStatusRequest {}
+
+// Request to validate stored credentials without sending messages.
+message TestWechatKfSettingRequest {}
+
+// Redacted statistics; source payloads and secret material are never returned.
+message WechatKfStatus {
+  bool enabled = 1;
+  bool consumer_active = 2;
+  map<string, int64> jobs = 3;
+  map<string, int64> replies = 4;
+  repeated WechatKfResult recent_results = 5;
+  string sync_error = 6;
+  int64 next_sync_time = 7;
+}
+
+// A recent processing result, without the original message or sender identifier.
+message WechatKfResult {
+  string type = 1;
+  string state = 2;
+  int32 attempts = 3;
+  string error = 4;
+  int64 created_time = 5;
 }

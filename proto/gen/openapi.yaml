@@ -544,6 +544,90 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /api/v1/instance/wechat-kf:
+        get:
+            tags:
+                - InstanceService
+            description: Gets the admin-only WeChat KF configuration with secrets omitted.
+            operationId: InstanceService_GetWechatKfSetting
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/WechatKfSetting'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+        patch:
+            tags:
+                - InstanceService
+            description: Replaces the admin-only configuration; empty secrets retain stored values.
+            operationId: InstanceService_UpdateWechatKfSetting
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/UpdateWechatKfSettingRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/WechatKfSetting'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /api/v1/instance/wechat-kf/status:
+        get:
+            tags:
+                - InstanceService
+            description: Gets redacted processing statistics. Admin only.
+            operationId: InstanceService_GetWechatKfStatus
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/WechatKfStatus'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /api/v1/instance/wechat-kf:test:
+        post:
+            tags:
+                - InstanceService
+            description: Verifies stored credentials against the configured customer-service account.
+            operationId: InstanceService_TestWechatKfSetting
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/TestWechatKfSettingRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content: {}
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /api/v1/instance/{instance}/*:
         get:
             tags:
@@ -3714,6 +3798,10 @@ components:
                     type: string
                     description: Optional. Recipient email address. If omitted, the current user's email address is used.
             description: Request message for TestInstanceEmailSetting method.
+        TestWechatKfSettingRequest:
+            type: object
+            properties: {}
+            description: Request to validate stored credentials without sending messages.
         TranscribeRequest:
             required:
                 - audio
@@ -3746,6 +3834,14 @@ components:
                 contentType:
                     type: string
                     description: Optional. The MIME type of the input audio.
+        UpdateWechatKfSettingRequest:
+            required:
+                - setting
+            type: object
+            properties:
+                setting:
+                    $ref: '#/components/schemas/WechatKfSetting'
+            description: Request to replace a configuration at a known revision.
         UpsertMemoReactionRequest:
             required:
                 - name
@@ -4085,6 +4181,97 @@ components:
                     type: boolean
                     description: Whether a signing secret is configured for this webhook.
             description: UserWebhook represents a webhook owned by a user.
+        WechatKfResult:
+            type: object
+            properties:
+                type:
+                    type: string
+                state:
+                    type: string
+                attempts:
+                    type: integer
+                    format: int32
+                error:
+                    type: string
+                createdTime:
+                    type: string
+            description: A recent processing result, without the original message or sender identifier.
+        WechatKfSetting:
+            type: object
+            properties:
+                enabled:
+                    type: boolean
+                owner:
+                    type: string
+                space:
+                    type: string
+                corpId:
+                    type: string
+                kfId:
+                    type: string
+                allowedUsers:
+                    type: array
+                    items:
+                        type: string
+                defaultTags:
+                    type: array
+                    items:
+                        type: string
+                chatTag:
+                    type: string
+                receiptsEnabled:
+                    type: boolean
+                maxMediaMb:
+                    type: integer
+                    format: int32
+                secret:
+                    writeOnly: true
+                    type: string
+                callbackToken:
+                    writeOnly: true
+                    type: string
+                encodingAesKey:
+                    writeOnly: true
+                    type: string
+                secretSet:
+                    readOnly: true
+                    type: boolean
+                callbackTokenSet:
+                    readOnly: true
+                    type: boolean
+                encodingAesKeySet:
+                    readOnly: true
+                    type: boolean
+                revision:
+                    type: string
+                callbackPath:
+                    readOnly: true
+                    type: string
+            description: Admin-only configuration for one personal WeChat customer-service integration.
+        WechatKfStatus:
+            type: object
+            properties:
+                enabled:
+                    type: boolean
+                consumerActive:
+                    type: boolean
+                jobs:
+                    type: object
+                    additionalProperties:
+                        type: string
+                replies:
+                    type: object
+                    additionalProperties:
+                        type: string
+                recentResults:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/WechatKfResult'
+                syncError:
+                    type: string
+                nextSyncTime:
+                    type: string
+            description: Redacted statistics; source payloads and secret material are never returned.
 tags:
     - name: AIService
     - name: AttachmentService

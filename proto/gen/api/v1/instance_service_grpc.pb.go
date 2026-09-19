@@ -20,6 +20,10 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
+	InstanceService_GetWechatKfSetting_FullMethodName       = "/memos.api.v1.InstanceService/GetWechatKfSetting"
+	InstanceService_UpdateWechatKfSetting_FullMethodName    = "/memos.api.v1.InstanceService/UpdateWechatKfSetting"
+	InstanceService_GetWechatKfStatus_FullMethodName        = "/memos.api.v1.InstanceService/GetWechatKfStatus"
+	InstanceService_TestWechatKfSetting_FullMethodName      = "/memos.api.v1.InstanceService/TestWechatKfSetting"
 	InstanceService_GetInstanceProfile_FullMethodName       = "/memos.api.v1.InstanceService/GetInstanceProfile"
 	InstanceService_GetInstanceSetting_FullMethodName       = "/memos.api.v1.InstanceService/GetInstanceSetting"
 	InstanceService_BatchGetInstanceSettings_FullMethodName = "/memos.api.v1.InstanceService/BatchGetInstanceSettings"
@@ -32,6 +36,14 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type InstanceServiceClient interface {
+	// Gets the admin-only WeChat KF configuration with secrets omitted.
+	GetWechatKfSetting(ctx context.Context, in *GetWechatKfSettingRequest, opts ...grpc.CallOption) (*WechatKfSetting, error)
+	// Replaces the admin-only configuration; empty secrets retain stored values.
+	UpdateWechatKfSetting(ctx context.Context, in *UpdateWechatKfSettingRequest, opts ...grpc.CallOption) (*WechatKfSetting, error)
+	// Gets redacted processing statistics. Admin only.
+	GetWechatKfStatus(ctx context.Context, in *GetWechatKfStatusRequest, opts ...grpc.CallOption) (*WechatKfStatus, error)
+	// Verifies stored credentials against the configured customer-service account.
+	TestWechatKfSetting(ctx context.Context, in *TestWechatKfSettingRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Gets the instance profile.
 	GetInstanceProfile(ctx context.Context, in *GetInstanceProfileRequest, opts ...grpc.CallOption) (*InstanceProfile, error)
 	// Gets an instance setting.
@@ -52,6 +64,46 @@ type instanceServiceClient struct {
 
 func NewInstanceServiceClient(cc grpc.ClientConnInterface) InstanceServiceClient {
 	return &instanceServiceClient{cc}
+}
+
+func (c *instanceServiceClient) GetWechatKfSetting(ctx context.Context, in *GetWechatKfSettingRequest, opts ...grpc.CallOption) (*WechatKfSetting, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(WechatKfSetting)
+	err := c.cc.Invoke(ctx, InstanceService_GetWechatKfSetting_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *instanceServiceClient) UpdateWechatKfSetting(ctx context.Context, in *UpdateWechatKfSettingRequest, opts ...grpc.CallOption) (*WechatKfSetting, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(WechatKfSetting)
+	err := c.cc.Invoke(ctx, InstanceService_UpdateWechatKfSetting_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *instanceServiceClient) GetWechatKfStatus(ctx context.Context, in *GetWechatKfStatusRequest, opts ...grpc.CallOption) (*WechatKfStatus, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(WechatKfStatus)
+	err := c.cc.Invoke(ctx, InstanceService_GetWechatKfStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *instanceServiceClient) TestWechatKfSetting(ctx context.Context, in *TestWechatKfSettingRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, InstanceService_TestWechatKfSetting_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *instanceServiceClient) GetInstanceProfile(ctx context.Context, in *GetInstanceProfileRequest, opts ...grpc.CallOption) (*InstanceProfile, error) {
@@ -118,6 +170,14 @@ func (c *instanceServiceClient) GetInstanceStats(ctx context.Context, in *GetIns
 // All implementations must embed UnimplementedInstanceServiceServer
 // for forward compatibility.
 type InstanceServiceServer interface {
+	// Gets the admin-only WeChat KF configuration with secrets omitted.
+	GetWechatKfSetting(context.Context, *GetWechatKfSettingRequest) (*WechatKfSetting, error)
+	// Replaces the admin-only configuration; empty secrets retain stored values.
+	UpdateWechatKfSetting(context.Context, *UpdateWechatKfSettingRequest) (*WechatKfSetting, error)
+	// Gets redacted processing statistics. Admin only.
+	GetWechatKfStatus(context.Context, *GetWechatKfStatusRequest) (*WechatKfStatus, error)
+	// Verifies stored credentials against the configured customer-service account.
+	TestWechatKfSetting(context.Context, *TestWechatKfSettingRequest) (*emptypb.Empty, error)
 	// Gets the instance profile.
 	GetInstanceProfile(context.Context, *GetInstanceProfileRequest) (*InstanceProfile, error)
 	// Gets an instance setting.
@@ -140,6 +200,18 @@ type InstanceServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedInstanceServiceServer struct{}
 
+func (UnimplementedInstanceServiceServer) GetWechatKfSetting(context.Context, *GetWechatKfSettingRequest) (*WechatKfSetting, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetWechatKfSetting not implemented")
+}
+func (UnimplementedInstanceServiceServer) UpdateWechatKfSetting(context.Context, *UpdateWechatKfSettingRequest) (*WechatKfSetting, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateWechatKfSetting not implemented")
+}
+func (UnimplementedInstanceServiceServer) GetWechatKfStatus(context.Context, *GetWechatKfStatusRequest) (*WechatKfStatus, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetWechatKfStatus not implemented")
+}
+func (UnimplementedInstanceServiceServer) TestWechatKfSetting(context.Context, *TestWechatKfSettingRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method TestWechatKfSetting not implemented")
+}
 func (UnimplementedInstanceServiceServer) GetInstanceProfile(context.Context, *GetInstanceProfileRequest) (*InstanceProfile, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetInstanceProfile not implemented")
 }
@@ -177,6 +249,78 @@ func RegisterInstanceServiceServer(s grpc.ServiceRegistrar, srv InstanceServiceS
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&InstanceService_ServiceDesc, srv)
+}
+
+func _InstanceService_GetWechatKfSetting_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetWechatKfSettingRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InstanceServiceServer).GetWechatKfSetting(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InstanceService_GetWechatKfSetting_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InstanceServiceServer).GetWechatKfSetting(ctx, req.(*GetWechatKfSettingRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InstanceService_UpdateWechatKfSetting_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateWechatKfSettingRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InstanceServiceServer).UpdateWechatKfSetting(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InstanceService_UpdateWechatKfSetting_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InstanceServiceServer).UpdateWechatKfSetting(ctx, req.(*UpdateWechatKfSettingRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InstanceService_GetWechatKfStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetWechatKfStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InstanceServiceServer).GetWechatKfStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InstanceService_GetWechatKfStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InstanceServiceServer).GetWechatKfStatus(ctx, req.(*GetWechatKfStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InstanceService_TestWechatKfSetting_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(TestWechatKfSettingRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InstanceServiceServer).TestWechatKfSetting(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InstanceService_TestWechatKfSetting_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InstanceServiceServer).TestWechatKfSetting(ctx, req.(*TestWechatKfSettingRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _InstanceService_GetInstanceProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -294,6 +438,22 @@ var InstanceService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "memos.api.v1.InstanceService",
 	HandlerType: (*InstanceServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "GetWechatKfSetting",
+			Handler:    _InstanceService_GetWechatKfSetting_Handler,
+		},
+		{
+			MethodName: "UpdateWechatKfSetting",
+			Handler:    _InstanceService_UpdateWechatKfSetting_Handler,
+		},
+		{
+			MethodName: "GetWechatKfStatus",
+			Handler:    _InstanceService_GetWechatKfStatus_Handler,
+		},
+		{
+			MethodName: "TestWechatKfSetting",
+			Handler:    _InstanceService_TestWechatKfSetting_Handler,
+		},
 		{
 			MethodName: "GetInstanceProfile",
 			Handler:    _InstanceService_GetInstanceProfile_Handler,
