@@ -34,6 +34,18 @@ const (
 // reflection-formatted method names, remove the leading slash and convert the remaining slash to a
 // period.
 const (
+	// InstanceServiceGetWechatKfSettingProcedure is the fully-qualified name of the InstanceService's
+	// GetWechatKfSetting RPC.
+	InstanceServiceGetWechatKfSettingProcedure = "/memos.api.v1.InstanceService/GetWechatKfSetting"
+	// InstanceServiceUpdateWechatKfSettingProcedure is the fully-qualified name of the
+	// InstanceService's UpdateWechatKfSetting RPC.
+	InstanceServiceUpdateWechatKfSettingProcedure = "/memos.api.v1.InstanceService/UpdateWechatKfSetting"
+	// InstanceServiceGetWechatKfStatusProcedure is the fully-qualified name of the InstanceService's
+	// GetWechatKfStatus RPC.
+	InstanceServiceGetWechatKfStatusProcedure = "/memos.api.v1.InstanceService/GetWechatKfStatus"
+	// InstanceServiceTestWechatKfSettingProcedure is the fully-qualified name of the InstanceService's
+	// TestWechatKfSetting RPC.
+	InstanceServiceTestWechatKfSettingProcedure = "/memos.api.v1.InstanceService/TestWechatKfSetting"
 	// InstanceServiceGetInstanceProfileProcedure is the fully-qualified name of the InstanceService's
 	// GetInstanceProfile RPC.
 	InstanceServiceGetInstanceProfileProcedure = "/memos.api.v1.InstanceService/GetInstanceProfile"
@@ -56,6 +68,14 @@ const (
 
 // InstanceServiceClient is a client for the memos.api.v1.InstanceService service.
 type InstanceServiceClient interface {
+	// Gets the admin-only WeChat KF configuration with secrets omitted.
+	GetWechatKfSetting(context.Context, *connect.Request[v1.GetWechatKfSettingRequest]) (*connect.Response[v1.WechatKfSetting], error)
+	// Replaces the admin-only configuration; empty secrets retain stored values.
+	UpdateWechatKfSetting(context.Context, *connect.Request[v1.UpdateWechatKfSettingRequest]) (*connect.Response[v1.WechatKfSetting], error)
+	// Gets redacted processing statistics. Admin only.
+	GetWechatKfStatus(context.Context, *connect.Request[v1.GetWechatKfStatusRequest]) (*connect.Response[v1.WechatKfStatus], error)
+	// Verifies stored credentials against the configured customer-service account.
+	TestWechatKfSetting(context.Context, *connect.Request[v1.TestWechatKfSettingRequest]) (*connect.Response[emptypb.Empty], error)
 	// Gets the instance profile.
 	GetInstanceProfile(context.Context, *connect.Request[v1.GetInstanceProfileRequest]) (*connect.Response[v1.InstanceProfile], error)
 	// Gets an instance setting.
@@ -81,6 +101,30 @@ func NewInstanceServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 	baseURL = strings.TrimRight(baseURL, "/")
 	instanceServiceMethods := v1.File_api_v1_instance_service_proto.Services().ByName("InstanceService").Methods()
 	return &instanceServiceClient{
+		getWechatKfSetting: connect.NewClient[v1.GetWechatKfSettingRequest, v1.WechatKfSetting](
+			httpClient,
+			baseURL+InstanceServiceGetWechatKfSettingProcedure,
+			connect.WithSchema(instanceServiceMethods.ByName("GetWechatKfSetting")),
+			connect.WithClientOptions(opts...),
+		),
+		updateWechatKfSetting: connect.NewClient[v1.UpdateWechatKfSettingRequest, v1.WechatKfSetting](
+			httpClient,
+			baseURL+InstanceServiceUpdateWechatKfSettingProcedure,
+			connect.WithSchema(instanceServiceMethods.ByName("UpdateWechatKfSetting")),
+			connect.WithClientOptions(opts...),
+		),
+		getWechatKfStatus: connect.NewClient[v1.GetWechatKfStatusRequest, v1.WechatKfStatus](
+			httpClient,
+			baseURL+InstanceServiceGetWechatKfStatusProcedure,
+			connect.WithSchema(instanceServiceMethods.ByName("GetWechatKfStatus")),
+			connect.WithClientOptions(opts...),
+		),
+		testWechatKfSetting: connect.NewClient[v1.TestWechatKfSettingRequest, emptypb.Empty](
+			httpClient,
+			baseURL+InstanceServiceTestWechatKfSettingProcedure,
+			connect.WithSchema(instanceServiceMethods.ByName("TestWechatKfSetting")),
+			connect.WithClientOptions(opts...),
+		),
 		getInstanceProfile: connect.NewClient[v1.GetInstanceProfileRequest, v1.InstanceProfile](
 			httpClient,
 			baseURL+InstanceServiceGetInstanceProfileProcedure,
@@ -122,12 +166,36 @@ func NewInstanceServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 
 // instanceServiceClient implements InstanceServiceClient.
 type instanceServiceClient struct {
+	getWechatKfSetting       *connect.Client[v1.GetWechatKfSettingRequest, v1.WechatKfSetting]
+	updateWechatKfSetting    *connect.Client[v1.UpdateWechatKfSettingRequest, v1.WechatKfSetting]
+	getWechatKfStatus        *connect.Client[v1.GetWechatKfStatusRequest, v1.WechatKfStatus]
+	testWechatKfSetting      *connect.Client[v1.TestWechatKfSettingRequest, emptypb.Empty]
 	getInstanceProfile       *connect.Client[v1.GetInstanceProfileRequest, v1.InstanceProfile]
 	getInstanceSetting       *connect.Client[v1.GetInstanceSettingRequest, v1.InstanceSetting]
 	batchGetInstanceSettings *connect.Client[v1.BatchGetInstanceSettingsRequest, v1.BatchGetInstanceSettingsResponse]
 	updateInstanceSetting    *connect.Client[v1.UpdateInstanceSettingRequest, v1.InstanceSetting]
 	testInstanceEmailSetting *connect.Client[v1.TestInstanceEmailSettingRequest, emptypb.Empty]
 	getInstanceStats         *connect.Client[v1.GetInstanceStatsRequest, v1.InstanceStats]
+}
+
+// GetWechatKfSetting calls memos.api.v1.InstanceService.GetWechatKfSetting.
+func (c *instanceServiceClient) GetWechatKfSetting(ctx context.Context, req *connect.Request[v1.GetWechatKfSettingRequest]) (*connect.Response[v1.WechatKfSetting], error) {
+	return c.getWechatKfSetting.CallUnary(ctx, req)
+}
+
+// UpdateWechatKfSetting calls memos.api.v1.InstanceService.UpdateWechatKfSetting.
+func (c *instanceServiceClient) UpdateWechatKfSetting(ctx context.Context, req *connect.Request[v1.UpdateWechatKfSettingRequest]) (*connect.Response[v1.WechatKfSetting], error) {
+	return c.updateWechatKfSetting.CallUnary(ctx, req)
+}
+
+// GetWechatKfStatus calls memos.api.v1.InstanceService.GetWechatKfStatus.
+func (c *instanceServiceClient) GetWechatKfStatus(ctx context.Context, req *connect.Request[v1.GetWechatKfStatusRequest]) (*connect.Response[v1.WechatKfStatus], error) {
+	return c.getWechatKfStatus.CallUnary(ctx, req)
+}
+
+// TestWechatKfSetting calls memos.api.v1.InstanceService.TestWechatKfSetting.
+func (c *instanceServiceClient) TestWechatKfSetting(ctx context.Context, req *connect.Request[v1.TestWechatKfSettingRequest]) (*connect.Response[emptypb.Empty], error) {
+	return c.testWechatKfSetting.CallUnary(ctx, req)
 }
 
 // GetInstanceProfile calls memos.api.v1.InstanceService.GetInstanceProfile.
@@ -162,6 +230,14 @@ func (c *instanceServiceClient) GetInstanceStats(ctx context.Context, req *conne
 
 // InstanceServiceHandler is an implementation of the memos.api.v1.InstanceService service.
 type InstanceServiceHandler interface {
+	// Gets the admin-only WeChat KF configuration with secrets omitted.
+	GetWechatKfSetting(context.Context, *connect.Request[v1.GetWechatKfSettingRequest]) (*connect.Response[v1.WechatKfSetting], error)
+	// Replaces the admin-only configuration; empty secrets retain stored values.
+	UpdateWechatKfSetting(context.Context, *connect.Request[v1.UpdateWechatKfSettingRequest]) (*connect.Response[v1.WechatKfSetting], error)
+	// Gets redacted processing statistics. Admin only.
+	GetWechatKfStatus(context.Context, *connect.Request[v1.GetWechatKfStatusRequest]) (*connect.Response[v1.WechatKfStatus], error)
+	// Verifies stored credentials against the configured customer-service account.
+	TestWechatKfSetting(context.Context, *connect.Request[v1.TestWechatKfSettingRequest]) (*connect.Response[emptypb.Empty], error)
 	// Gets the instance profile.
 	GetInstanceProfile(context.Context, *connect.Request[v1.GetInstanceProfileRequest]) (*connect.Response[v1.InstanceProfile], error)
 	// Gets an instance setting.
@@ -183,6 +259,30 @@ type InstanceServiceHandler interface {
 // and JSON codecs. They also support gzip compression.
 func NewInstanceServiceHandler(svc InstanceServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
 	instanceServiceMethods := v1.File_api_v1_instance_service_proto.Services().ByName("InstanceService").Methods()
+	instanceServiceGetWechatKfSettingHandler := connect.NewUnaryHandler(
+		InstanceServiceGetWechatKfSettingProcedure,
+		svc.GetWechatKfSetting,
+		connect.WithSchema(instanceServiceMethods.ByName("GetWechatKfSetting")),
+		connect.WithHandlerOptions(opts...),
+	)
+	instanceServiceUpdateWechatKfSettingHandler := connect.NewUnaryHandler(
+		InstanceServiceUpdateWechatKfSettingProcedure,
+		svc.UpdateWechatKfSetting,
+		connect.WithSchema(instanceServiceMethods.ByName("UpdateWechatKfSetting")),
+		connect.WithHandlerOptions(opts...),
+	)
+	instanceServiceGetWechatKfStatusHandler := connect.NewUnaryHandler(
+		InstanceServiceGetWechatKfStatusProcedure,
+		svc.GetWechatKfStatus,
+		connect.WithSchema(instanceServiceMethods.ByName("GetWechatKfStatus")),
+		connect.WithHandlerOptions(opts...),
+	)
+	instanceServiceTestWechatKfSettingHandler := connect.NewUnaryHandler(
+		InstanceServiceTestWechatKfSettingProcedure,
+		svc.TestWechatKfSetting,
+		connect.WithSchema(instanceServiceMethods.ByName("TestWechatKfSetting")),
+		connect.WithHandlerOptions(opts...),
+	)
 	instanceServiceGetInstanceProfileHandler := connect.NewUnaryHandler(
 		InstanceServiceGetInstanceProfileProcedure,
 		svc.GetInstanceProfile,
@@ -221,6 +321,14 @@ func NewInstanceServiceHandler(svc InstanceServiceHandler, opts ...connect.Handl
 	)
 	return "/memos.api.v1.InstanceService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
+		case InstanceServiceGetWechatKfSettingProcedure:
+			instanceServiceGetWechatKfSettingHandler.ServeHTTP(w, r)
+		case InstanceServiceUpdateWechatKfSettingProcedure:
+			instanceServiceUpdateWechatKfSettingHandler.ServeHTTP(w, r)
+		case InstanceServiceGetWechatKfStatusProcedure:
+			instanceServiceGetWechatKfStatusHandler.ServeHTTP(w, r)
+		case InstanceServiceTestWechatKfSettingProcedure:
+			instanceServiceTestWechatKfSettingHandler.ServeHTTP(w, r)
 		case InstanceServiceGetInstanceProfileProcedure:
 			instanceServiceGetInstanceProfileHandler.ServeHTTP(w, r)
 		case InstanceServiceGetInstanceSettingProcedure:
@@ -241,6 +349,22 @@ func NewInstanceServiceHandler(svc InstanceServiceHandler, opts ...connect.Handl
 
 // UnimplementedInstanceServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedInstanceServiceHandler struct{}
+
+func (UnimplementedInstanceServiceHandler) GetWechatKfSetting(context.Context, *connect.Request[v1.GetWechatKfSettingRequest]) (*connect.Response[v1.WechatKfSetting], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("memos.api.v1.InstanceService.GetWechatKfSetting is not implemented"))
+}
+
+func (UnimplementedInstanceServiceHandler) UpdateWechatKfSetting(context.Context, *connect.Request[v1.UpdateWechatKfSettingRequest]) (*connect.Response[v1.WechatKfSetting], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("memos.api.v1.InstanceService.UpdateWechatKfSetting is not implemented"))
+}
+
+func (UnimplementedInstanceServiceHandler) GetWechatKfStatus(context.Context, *connect.Request[v1.GetWechatKfStatusRequest]) (*connect.Response[v1.WechatKfStatus], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("memos.api.v1.InstanceService.GetWechatKfStatus is not implemented"))
+}
+
+func (UnimplementedInstanceServiceHandler) TestWechatKfSetting(context.Context, *connect.Request[v1.TestWechatKfSettingRequest]) (*connect.Response[emptypb.Empty], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("memos.api.v1.InstanceService.TestWechatKfSetting is not implemented"))
+}
 
 func (UnimplementedInstanceServiceHandler) GetInstanceProfile(context.Context, *connect.Request[v1.GetInstanceProfileRequest]) (*connect.Response[v1.InstanceProfile], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("memos.api.v1.InstanceService.GetInstanceProfile is not implemented"))

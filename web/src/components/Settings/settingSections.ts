@@ -26,6 +26,7 @@ import ResourceStatsSection from "@/components/Settings/ResourceStatsSection";
 import SSOSection from "@/components/Settings/SSOSection";
 import StorageSection from "@/components/Settings/StorageSection";
 import WebhookSection from "@/components/Settings/WebhookSection";
+import WechatKfSection from "@/components/Settings/WechatKfSection";
 import { InstanceSetting_Key } from "@/types/proto/api/v1/instance_service_pb";
 
 export type SettingSectionKey =
@@ -40,7 +41,8 @@ export type SettingSectionKey =
   | "notification"
   | "sso"
   | "ai"
-  | "resource-stats";
+  | "resource-stats"
+  | "wechat-kf";
 
 type SettingSectionScope = "basic" | "admin";
 
@@ -54,6 +56,7 @@ export interface SettingSectionDefinition {
 }
 
 export const SETTINGS_SECTIONS: SettingSectionDefinition[] = [
+  { key: "wechat-kf", scope: "admin", labelKey: "setting.wechat-kf.label", icon: WebhookIcon, component: WechatKfSection },
   {
     key: "my-account",
     scope: "basic",

@@ -20,7 +20,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file api/v1/instance_service.proto.
  */
 export const file_api_v1_instance_service: GenFile = /*@__PURE__*/
-  fileDesc("Ch1hcGkvdjEvaW5zdGFuY2Vfc2VydmljZS5wcm90bxIMbWVtb3MuYXBpLnYxIo4BCg9JbnN0YW5jZVByb2ZpbGUSDwoHdmVyc2lvbhgCIAEoCRIMCgRkZW1vGAMgASgIEhQKDGluc3RhbmNlX3VybBgGIAEoCRIhCgVhZG1pbhgHIAEoCzISLm1lbW9zLmFwaS52MS5Vc2VyEg4KBmNvbW1pdBgIIAEoCRITCgtuZWVkc19zZXR1cBgJIAEoCCIbChlHZXRJbnN0YW5jZVByb2ZpbGVSZXF1ZXN0IvUVCg9JbnN0YW5jZVNldHRpbmcSEQoEbmFtZRgBIAEoCUID4EEIEkcKD2dlbmVyYWxfc2V0dGluZxgCIAEoCzIsLm1lbW9zLmFwaS52MS5JbnN0YW5jZVNldHRpbmcuR2VuZXJhbFNldHRpbmdIABJHCg9zdG9yYWdlX3NldHRpbmcYAyABKAsyLC5tZW1vcy5hcGkudjEuSW5zdGFuY2VTZXR0aW5nLlN0b3JhZ2VTZXR0aW5nSAASUAoUbWVtb19yZWxhdGVkX3NldHRpbmcYBCABKAsyMC5tZW1vcy5hcGkudjEuSW5zdGFuY2VTZXR0aW5nLk1lbW9SZWxhdGVkU2V0dGluZ0gAEkEKDHRhZ3Nfc2V0dGluZxgFIAEoCzIpLm1lbW9zLmFwaS52MS5JbnN0YW5jZVNldHRpbmcuVGFnc1NldHRpbmdIABJRChRub3RpZmljYXRpb25fc2V0dGluZxgGIAEoCzIxLm1lbW9zLmFwaS52MS5JbnN0YW5jZVNldHRpbmcuTm90aWZpY2F0aW9uU2V0dGluZ0gAEj0KCmFpX3NldHRpbmcYByABKAsyJy5tZW1vcy5hcGkudjEuSW5zdGFuY2VTZXR0aW5nLkFJU2V0dGluZ0gAGocDCg5HZW5lcmFsU2V0dGluZxIiChpkaXNhbGxvd191c2VyX3JlZ2lzdHJhdGlvbhgCIAEoCBIeChZkaXNhbGxvd19wYXNzd29yZF9hdXRoGAMgASgIEhkKEWFkZGl0aW9uYWxfc2NyaXB0GAQgASgJEhgKEGFkZGl0aW9uYWxfc3R5bGUYBSABKAkSUgoOY3VzdG9tX3Byb2ZpbGUYBiABKAsyOi5tZW1vcy5hcGkudjEuSW5zdGFuY2VTZXR0aW5nLkdlbmVyYWxTZXR0aW5nLkN1c3RvbVByb2ZpbGUSHQoVd2Vla19zdGFydF9kYXlfb2Zmc2V0GAcgASgFEiAKGGRpc2FsbG93X2NoYW5nZV91c2VybmFtZRgIIAEoCBIgChhkaXNhbGxvd19jaGFuZ2Vfbmlja25hbWUYCSABKAgaRQoNQ3VzdG9tUHJvZmlsZRINCgV0aXRsZRgBIAEoCRITCgtkZXNjcmlwdGlvbhgCIAEoCRIQCghsb2dvX3VybBgDIAEoCRrhAwoOU3RvcmFnZVNldHRpbmcSTgoMc3RvcmFnZV90eXBlGAEgASgOMjgubWVtb3MuYXBpLnYxLkluc3RhbmNlU2V0dGluZy5TdG9yYWdlU2V0dGluZy5TdG9yYWdlVHlwZRIZChFmaWxlcGF0aF90ZW1wbGF0ZRgCIAEoCRIcChR1cGxvYWRfc2l6ZV9saW1pdF9tYhgDIAEoAxJICglzM19jb25maWcYBCABKAsyNS5tZW1vcy5hcGkudjEuSW5zdGFuY2VTZXR0aW5nLlN0b3JhZ2VTZXR0aW5nLlMzQ29uZmlnGq0BCghTM0NvbmZpZxIVCg1hY2Nlc3Nfa2V5X2lkGAEgASgJEh4KEWFjY2Vzc19rZXlfc2VjcmV0GAIgASgJQgPgQQQSEAoIZW5kcG9pbnQYAyABKAkSDgoGcmVnaW9uGAQgASgJEg4KBmJ1Y2tldBgFIAEoCRIWCg51c2VfcGF0aF9zdHlsZRgGIAEoCBIgChhpbnNlY3VyZV9za2lwX3Rsc192ZXJpZnkYByABKAgiTAoLU3RvcmFnZVR5cGUSHAoYU1RPUkFHRV9UWVBFX1VOU1BFQ0lGSUVEEAASDAoIREFUQUJBU0UQARIJCgVMT0NBTBACEgYKAlMzEAMahwEKEk1lbW9SZWxhdGVkU2V0dGluZxIcChRjb250ZW50X2xlbmd0aF9saW1pdBgDIAEoBRIgChhlbmFibGVfZG91YmxlX2NsaWNrX2VkaXQYBCABKAgSEQoJcmVhY3Rpb25zGAcgAygJSgQIAhADUhhkaXNwbGF5X3dpdGhfdXBkYXRlX3RpbWUaUQoLVGFnTWV0YWRhdGESLAoQYmFja2dyb3VuZF9jb2xvchgBIAEoCzISLmdvb2dsZS50eXBlLkNvbG9yEhQKDGJsdXJfY29udGVudBgCIAEoCBqoAQoLVGFnc1NldHRpbmcSQQoEdGFncxgBIAMoCzIzLm1lbW9zLmFwaS52MS5JbnN0YW5jZVNldHRpbmcuVGFnc1NldHRpbmcuVGFnc0VudHJ5GlYKCVRhZ3NFbnRyeRILCgNrZXkYASABKAkSOAoFdmFsdWUYAiABKAsyKS5tZW1vcy5hcGkudjEuSW5zdGFuY2VTZXR0aW5nLlRhZ01ldGFkYXRhOgI4ARq6AgoTTm90aWZpY2F0aW9uU2V0dGluZxJNCgVlbWFpbBgBIAEoCzI+Lm1lbW9zLmFwaS52MS5JbnN0YW5jZVNldHRpbmcuTm90aWZpY2F0aW9uU2V0dGluZy5FbWFpbFNldHRpbmca0wEKDEVtYWlsU2V0dGluZxIPCgdlbmFibGVkGAEgASgIEhEKCXNtdHBfaG9zdBgCIAEoCRIRCglzbXRwX3BvcnQYAyABKAUSFQoNc210cF91c2VybmFtZRgEIAEoCRIaCg1zbXRwX3Bhc3N3b3JkGAUgASgJQgPgQQQSEgoKZnJvbV9lbWFpbBgGIAEoCRIRCglmcm9tX25hbWUYByABKAkSEAoIcmVwbHlfdG8YCCABKAkSDwoHdXNlX3RscxgJIAEoCBIPCgd1c2Vfc3NsGAogASgIGpgBCglBSVNldHRpbmcSQQoJcHJvdmlkZXJzGAEgAygLMi4ubWVtb3MuYXBpLnYxLkluc3RhbmNlU2V0dGluZy5BSVByb3ZpZGVyQ29uZmlnEkgKDXRyYW5zY3JpcHRpb24YAiABKAsyMS5tZW1vcy5hcGkudjEuSW5zdGFuY2VTZXR0aW5nLlRyYW5zY3JpcHRpb25Db25maWcaxgEKEEFJUHJvdmlkZXJDb25maWcSCgoCaWQYASABKAkSDQoFdGl0bGUYAiABKAkSOgoEdHlwZRgDIAEoDjIsLm1lbW9zLmFwaS52MS5JbnN0YW5jZVNldHRpbmcuQUlQcm92aWRlclR5cGUSEAoIZW5kcG9pbnQYBCABKAkSFAoHYXBpX2tleRgFIAEoCUID4EEEEhgKC2FwaV9rZXlfc2V0GAggASgIQgPgQQMSGQoMYXBpX2tleV9oaW50GAkgASgJQgPgQQMaWwoTVHJhbnNjcmlwdGlvbkNvbmZpZxITCgtwcm92aWRlcl9pZBgBIAEoCRINCgVtb2RlbBgCIAEoCRIQCghsYW5ndWFnZRgDIAEoCRIOCgZwcm9tcHQYBCABKAkiagoDS2V5EhMKD0tFWV9VTlNQRUNJRklFRBAAEgsKB0dFTkVSQUwQARILCgdTVE9SQUdFEAISEAoMTUVNT19SRUxBVEVEEAMSCAoEVEFHUxAEEhAKDE5PVElGSUNBVElPThAFEgYKAkFJEAYiSgoOQUlQcm92aWRlclR5cGUSIAocQUlfUFJPVklERVJfVFlQRV9VTlNQRUNJRklFRBAAEgoKBk9QRU5BSRABEgoKBkdFTUlOSRACOmHqQV4KHG1lbW9zLmFwaS52MS9JbnN0YW5jZVNldHRpbmcSG2luc3RhbmNlL3NldHRpbmdzL3tzZXR0aW5nfSoQaW5zdGFuY2VTZXR0aW5nczIPaW5zdGFuY2VTZXR0aW5nQgcKBXZhbHVlIk8KGUdldEluc3RhbmNlU2V0dGluZ1JlcXVlc3QSMgoEbmFtZRgBIAEoCUIk4EEC+kEeChxtZW1vcy5hcGkudjEvSW5zdGFuY2VTZXR0aW5nIlYKH0JhdGNoR2V0SW5zdGFuY2VTZXR0aW5nc1JlcXVlc3QSMwoFbmFtZXMYASADKAlCJOBBAvpBHgocbWVtb3MuYXBpLnYxL0luc3RhbmNlU2V0dGluZyJTCiBCYXRjaEdldEluc3RhbmNlU2V0dGluZ3NSZXNwb25zZRIvCghzZXR0aW5ncxgBIAMoCzIdLm1lbW9zLmFwaS52MS5JbnN0YW5jZVNldHRpbmciiQEKHFVwZGF0ZUluc3RhbmNlU2V0dGluZ1JlcXVlc3QSMwoHc2V0dGluZxgBIAEoCzIdLm1lbW9zLmFwaS52MS5JbnN0YW5jZVNldHRpbmdCA+BBAhI0Cgt1cGRhdGVfbWFzaxgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5GaWVsZE1hc2tCA+BBASKTAQofVGVzdEluc3RhbmNlRW1haWxTZXR0aW5nUmVxdWVzdBJSCgVlbWFpbBgBIAEoCzI+Lm1lbW9zLmFwaS52MS5JbnN0YW5jZVNldHRpbmcuTm90aWZpY2F0aW9uU2V0dGluZy5FbWFpbFNldHRpbmdCA+BBARIcCg9yZWNpcGllbnRfZW1haWwYAiABKAlCA+BBASIZChdHZXRJbnN0YW5jZVN0YXRzUmVxdWVzdCLSAQoNSW5zdGFuY2VTdGF0cxI7CghkYXRhYmFzZRgBIAEoCzIpLm1lbW9zLmFwaS52MS5JbnN0YW5jZVN0YXRzLkRhdGFiYXNlU3RhdHMSGwoTbG9jYWxfc3RvcmFnZV9ieXRlcxgCIAEoAxIyCg5nZW5lcmF0ZWRfdGltZRgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAaMwoNRGF0YWJhc2VTdGF0cxIOCgZkcml2ZXIYASABKAkSEgoKc2l6ZV9ieXRlcxgCIAEoAzKfBwoPSW5zdGFuY2VTZXJ2aWNlEn4KEkdldEluc3RhbmNlUHJvZmlsZRInLm1lbW9zLmFwaS52MS5HZXRJbnN0YW5jZVByb2ZpbGVSZXF1ZXN0Gh0ubWVtb3MuYXBpLnYxLkluc3RhbmNlUHJvZmlsZSIggtPkkwIaEhgvYXBpL3YxL2luc3RhbmNlL3Byb2ZpbGUSjwEKEkdldEluc3RhbmNlU2V0dGluZxInLm1lbW9zLmFwaS52MS5HZXRJbnN0YW5jZVNldHRpbmdSZXF1ZXN0Gh0ubWVtb3MuYXBpLnYxLkluc3RhbmNlU2V0dGluZyIx2kEEbmFtZYLT5JMCJBIiL2FwaS92MS97bmFtZT1pbnN0YW5jZS9zZXR0aW5ncy8qfRKoAQoYQmF0Y2hHZXRJbnN0YW5jZVNldHRpbmdzEi0ubWVtb3MuYXBpLnYxLkJhdGNoR2V0SW5zdGFuY2VTZXR0aW5nc1JlcXVlc3QaLi5tZW1vcy5hcGkudjEuQmF0Y2hHZXRJbnN0YW5jZVNldHRpbmdzUmVzcG9uc2UiLYLT5JMCJzoBKiIiL2FwaS92MS9pbnN0YW5jZS9zZXR0aW5nczpiYXRjaEdldBK1AQoVVXBkYXRlSW5zdGFuY2VTZXR0aW5nEioubWVtb3MuYXBpLnYxLlVwZGF0ZUluc3RhbmNlU2V0dGluZ1JlcXVlc3QaHS5tZW1vcy5hcGkudjEuSW5zdGFuY2VTZXR0aW5nIlHaQRNzZXR0aW5nLHVwZGF0ZV9tYXNrgtPkkwI1OgdzZXR0aW5nMiovYXBpL3YxL3tzZXR0aW5nLm5hbWU9aW5zdGFuY2Uvc2V0dGluZ3MvKn0SngEKGFRlc3RJbnN0YW5jZUVtYWlsU2V0dGluZxItLm1lbW9zLmFwaS52MS5UZXN0SW5zdGFuY2VFbWFpbFNldHRpbmdSZXF1ZXN0GhYuZ29vZ2xlLnByb3RvYnVmLkVtcHR5IjuC0+STAjU6ASoiMC9hcGkvdjEvaW5zdGFuY2Uvc2V0dGluZ3Mvbm90aWZpY2F0aW9uOnRlc3RFbWFpbBJ2ChBHZXRJbnN0YW5jZVN0YXRzEiUubWVtb3MuYXBpLnYxLkdldEluc3RhbmNlU3RhdHNSZXF1ZXN0GhsubWVtb3MuYXBpLnYxLkluc3RhbmNlU3RhdHMiHoLT5JMCGBIWL2FwaS92MS9pbnN0YW5jZS9zdGF0c0KsAQoQY29tLm1lbW9zLmFwaS52MUIUSW5zdGFuY2VTZXJ2aWNlUHJvdG9QAVowZ2l0aHViLmNvbS91c2VtZW1vcy9tZW1vcy9wcm90by9nZW4vYXBpL3YxO2FwaXYxogIDTUFYqgIMTWVtb3MuQXBpLlYxygIMTWVtb3NcQXBpXFYx4gIYTWVtb3NcQXBpXFYxXEdQQk1ldGFkYXRh6gIOTWVtb3M6OkFwaTo6VjFiBnByb3RvMw", [file_api_v1_user_service, file_google_api_annotations, file_google_api_client, file_google_api_field_behavior, file_google_api_resource, file_google_protobuf_empty, file_google_protobuf_field_mask, file_google_protobuf_timestamp, file_google_type_color]);
+  fileDesc("Ch1hcGkvdjEvaW5zdGFuY2Vfc2VydmljZS5wcm90bxIMbWVtb3MuYXBpLnYxIo4BCg9JbnN0YW5jZVByb2ZpbGUSDwoHdmVyc2lvbhgCIAEoCRIMCgRkZW1vGAMgASgIEhQKDGluc3RhbmNlX3VybBgGIAEoCRIhCgVhZG1pbhgHIAEoCzISLm1lbW9zLmFwaS52MS5Vc2VyEg4KBmNvbW1pdBgIIAEoCRITCgtuZWVkc19zZXR1cBgJIAEoCCIbChlHZXRJbnN0YW5jZVByb2ZpbGVSZXF1ZXN0IvUVCg9JbnN0YW5jZVNldHRpbmcSEQoEbmFtZRgBIAEoCUID4EEIEkcKD2dlbmVyYWxfc2V0dGluZxgCIAEoCzIsLm1lbW9zLmFwaS52MS5JbnN0YW5jZVNldHRpbmcuR2VuZXJhbFNldHRpbmdIABJHCg9zdG9yYWdlX3NldHRpbmcYAyABKAsyLC5tZW1vcy5hcGkudjEuSW5zdGFuY2VTZXR0aW5nLlN0b3JhZ2VTZXR0aW5nSAASUAoUbWVtb19yZWxhdGVkX3NldHRpbmcYBCABKAsyMC5tZW1vcy5hcGkudjEuSW5zdGFuY2VTZXR0aW5nLk1lbW9SZWxhdGVkU2V0dGluZ0gAEkEKDHRhZ3Nfc2V0dGluZxgFIAEoCzIpLm1lbW9zLmFwaS52MS5JbnN0YW5jZVNldHRpbmcuVGFnc1NldHRpbmdIABJRChRub3RpZmljYXRpb25fc2V0dGluZxgGIAEoCzIxLm1lbW9zLmFwaS52MS5JbnN0YW5jZVNldHRpbmcuTm90aWZpY2F0aW9uU2V0dGluZ0gAEj0KCmFpX3NldHRpbmcYByABKAsyJy5tZW1vcy5hcGkudjEuSW5zdGFuY2VTZXR0aW5nLkFJU2V0dGluZ0gAGocDCg5HZW5lcmFsU2V0dGluZxIiChpkaXNhbGxvd191c2VyX3JlZ2lzdHJhdGlvbhgCIAEoCBIeChZkaXNhbGxvd19wYXNzd29yZF9hdXRoGAMgASgIEhkKEWFkZGl0aW9uYWxfc2NyaXB0GAQgASgJEhgKEGFkZGl0aW9uYWxfc3R5bGUYBSABKAkSUgoOY3VzdG9tX3Byb2ZpbGUYBiABKAsyOi5tZW1vcy5hcGkudjEuSW5zdGFuY2VTZXR0aW5nLkdlbmVyYWxTZXR0aW5nLkN1c3RvbVByb2ZpbGUSHQoVd2Vla19zdGFydF9kYXlfb2Zmc2V0GAcgASgFEiAKGGRpc2FsbG93X2NoYW5nZV91c2VybmFtZRgIIAEoCBIgChhkaXNhbGxvd19jaGFuZ2Vfbmlja25hbWUYCSABKAgaRQoNQ3VzdG9tUHJvZmlsZRINCgV0aXRsZRgBIAEoCRITCgtkZXNjcmlwdGlvbhgCIAEoCRIQCghsb2dvX3VybBgDIAEoCRrhAwoOU3RvcmFnZVNldHRpbmcSTgoMc3RvcmFnZV90eXBlGAEgASgOMjgubWVtb3MuYXBpLnYxLkluc3RhbmNlU2V0dGluZy5TdG9yYWdlU2V0dGluZy5TdG9yYWdlVHlwZRIZChFmaWxlcGF0aF90ZW1wbGF0ZRgCIAEoCRIcChR1cGxvYWRfc2l6ZV9saW1pdF9tYhgDIAEoAxJICglzM19jb25maWcYBCABKAsyNS5tZW1vcy5hcGkudjEuSW5zdGFuY2VTZXR0aW5nLlN0b3JhZ2VTZXR0aW5nLlMzQ29uZmlnGq0BCghTM0NvbmZpZxIVCg1hY2Nlc3Nfa2V5X2lkGAEgASgJEh4KEWFjY2Vzc19rZXlfc2VjcmV0GAIgASgJQgPgQQQSEAoIZW5kcG9pbnQYAyABKAkSDgoGcmVnaW9uGAQgASgJEg4KBmJ1Y2tldBgFIAEoCRIWCg51c2VfcGF0aF9zdHlsZRgGIAEoCBIgChhpbnNlY3VyZV9za2lwX3Rsc192ZXJpZnkYByABKAgiTAoLU3RvcmFnZVR5cGUSHAoYU1RPUkFHRV9UWVBFX1VOU1BFQ0lGSUVEEAASDAoIREFUQUJBU0UQARIJCgVMT0NBTBACEgYKAlMzEAMahwEKEk1lbW9SZWxhdGVkU2V0dGluZxIcChRjb250ZW50X2xlbmd0aF9saW1pdBgDIAEoBRIgChhlbmFibGVfZG91YmxlX2NsaWNrX2VkaXQYBCABKAgSEQoJcmVhY3Rpb25zGAcgAygJSgQIAhADUhhkaXNwbGF5X3dpdGhfdXBkYXRlX3RpbWUaUQoLVGFnTWV0YWRhdGESLAoQYmFja2dyb3VuZF9jb2xvchgBIAEoCzISLmdvb2dsZS50eXBlLkNvbG9yEhQKDGJsdXJfY29udGVudBgCIAEoCBqoAQoLVGFnc1NldHRpbmcSQQoEdGFncxgBIAMoCzIzLm1lbW9zLmFwaS52MS5JbnN0YW5jZVNldHRpbmcuVGFnc1NldHRpbmcuVGFnc0VudHJ5GlYKCVRhZ3NFbnRyeRILCgNrZXkYASABKAkSOAoFdmFsdWUYAiABKAsyKS5tZW1vcy5hcGkudjEuSW5zdGFuY2VTZXR0aW5nLlRhZ01ldGFkYXRhOgI4ARq6AgoTTm90aWZpY2F0aW9uU2V0dGluZxJNCgVlbWFpbBgBIAEoCzI+Lm1lbW9zLmFwaS52MS5JbnN0YW5jZVNldHRpbmcuTm90aWZpY2F0aW9uU2V0dGluZy5FbWFpbFNldHRpbmca0wEKDEVtYWlsU2V0dGluZxIPCgdlbmFibGVkGAEgASgIEhEKCXNtdHBfaG9zdBgCIAEoCRIRCglzbXRwX3BvcnQYAyABKAUSFQoNc210cF91c2VybmFtZRgEIAEoCRIaCg1zbXRwX3Bhc3N3b3JkGAUgASgJQgPgQQQSEgoKZnJvbV9lbWFpbBgGIAEoCRIRCglmcm9tX25hbWUYByABKAkSEAoIcmVwbHlfdG8YCCABKAkSDwoHdXNlX3RscxgJIAEoCBIPCgd1c2Vfc3NsGAogASgIGpgBCglBSVNldHRpbmcSQQoJcHJvdmlkZXJzGAEgAygLMi4ubWVtb3MuYXBpLnYxLkluc3RhbmNlU2V0dGluZy5BSVByb3ZpZGVyQ29uZmlnEkgKDXRyYW5zY3JpcHRpb24YAiABKAsyMS5tZW1vcy5hcGkudjEuSW5zdGFuY2VTZXR0aW5nLlRyYW5zY3JpcHRpb25Db25maWcaxgEKEEFJUHJvdmlkZXJDb25maWcSCgoCaWQYASABKAkSDQoFdGl0bGUYAiABKAkSOgoEdHlwZRgDIAEoDjIsLm1lbW9zLmFwaS52MS5JbnN0YW5jZVNldHRpbmcuQUlQcm92aWRlclR5cGUSEAoIZW5kcG9pbnQYBCABKAkSFAoHYXBpX2tleRgFIAEoCUID4EEEEhgKC2FwaV9rZXlfc2V0GAggASgIQgPgQQMSGQoMYXBpX2tleV9oaW50GAkgASgJQgPgQQMaWwoTVHJhbnNjcmlwdGlvbkNvbmZpZxITCgtwcm92aWRlcl9pZBgBIAEoCRINCgVtb2RlbBgCIAEoCRIQCghsYW5ndWFnZRgDIAEoCRIOCgZwcm9tcHQYBCABKAkiagoDS2V5EhMKD0tFWV9VTlNQRUNJRklFRBAAEgsKB0dFTkVSQUwQARILCgdTVE9SQUdFEAISEAoMTUVNT19SRUxBVEVEEAMSCAoEVEFHUxAEEhAKDE5PVElGSUNBVElPThAFEgYKAkFJEAYiSgoOQUlQcm92aWRlclR5cGUSIAocQUlfUFJPVklERVJfVFlQRV9VTlNQRUNJRklFRBAAEgoKBk9QRU5BSRABEgoKBkdFTUlOSRACOmHqQV4KHG1lbW9zLmFwaS52MS9JbnN0YW5jZVNldHRpbmcSG2luc3RhbmNlL3NldHRpbmdzL3tzZXR0aW5nfSoQaW5zdGFuY2VTZXR0aW5nczIPaW5zdGFuY2VTZXR0aW5nQgcKBXZhbHVlIk8KGUdldEluc3RhbmNlU2V0dGluZ1JlcXVlc3QSMgoEbmFtZRgBIAEoCUIk4EEC+kEeChxtZW1vcy5hcGkudjEvSW5zdGFuY2VTZXR0aW5nIlYKH0JhdGNoR2V0SW5zdGFuY2VTZXR0aW5nc1JlcXVlc3QSMwoFbmFtZXMYASADKAlCJOBBAvpBHgocbWVtb3MuYXBpLnYxL0luc3RhbmNlU2V0dGluZyJTCiBCYXRjaEdldEluc3RhbmNlU2V0dGluZ3NSZXNwb25zZRIvCghzZXR0aW5ncxgBIAMoCzIdLm1lbW9zLmFwaS52MS5JbnN0YW5jZVNldHRpbmciiQEKHFVwZGF0ZUluc3RhbmNlU2V0dGluZ1JlcXVlc3QSMwoHc2V0dGluZxgBIAEoCzIdLm1lbW9zLmFwaS52MS5JbnN0YW5jZVNldHRpbmdCA+BBAhI0Cgt1cGRhdGVfbWFzaxgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5GaWVsZE1hc2tCA+BBASKTAQofVGVzdEluc3RhbmNlRW1haWxTZXR0aW5nUmVxdWVzdBJSCgVlbWFpbBgBIAEoCzI+Lm1lbW9zLmFwaS52MS5JbnN0YW5jZVNldHRpbmcuTm90aWZpY2F0aW9uU2V0dGluZy5FbWFpbFNldHRpbmdCA+BBARIcCg9yZWNpcGllbnRfZW1haWwYAiABKAlCA+BBASIZChdHZXRJbnN0YW5jZVN0YXRzUmVxdWVzdCLSAQoNSW5zdGFuY2VTdGF0cxI7CghkYXRhYmFzZRgBIAEoCzIpLm1lbW9zLmFwaS52MS5JbnN0YW5jZVN0YXRzLkRhdGFiYXNlU3RhdHMSGwoTbG9jYWxfc3RvcmFnZV9ieXRlcxgCIAEoAxIyCg5nZW5lcmF0ZWRfdGltZRgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAaMwoNRGF0YWJhc2VTdGF0cxIOCgZkcml2ZXIYASABKAkSEgoKc2l6ZV9ieXRlcxgCIAEoAyKrAwoPV2VjaGF0S2ZTZXR0aW5nEg8KB2VuYWJsZWQYASABKAgSDQoFb3duZXIYAiABKAkSDQoFc3BhY2UYAyABKAkSDwoHY29ycF9pZBgEIAEoCRINCgVrZl9pZBgFIAEoCRIVCg1hbGxvd2VkX3VzZXJzGAYgAygJEhQKDGRlZmF1bHRfdGFncxgHIAMoCRIQCghjaGF0X3RhZxgIIAEoCRIYChByZWNlaXB0c19lbmFibGVkGAkgASgIEhQKDG1heF9tZWRpYV9tYhgKIAEoBRITCgZzZWNyZXQYCyABKAlCA+BBBBIbCg5jYWxsYmFja190b2tlbhgMIAEoCUID4EEEEh0KEGVuY29kaW5nX2Flc19rZXkYDSABKAlCA+BBBBIXCgpzZWNyZXRfc2V0GA4gASgIQgPgQQMSHwoSY2FsbGJhY2tfdG9rZW5fc2V0GA8gASgIQgPgQQMSIQoUZW5jb2RpbmdfYWVzX2tleV9zZXQYECABKAhCA+BBAxIQCghyZXZpc2lvbhgRIAEoAxIaCg1jYWxsYmFja19wYXRoGBIgASgJQgPgQQMiGwoZR2V0V2VjaGF0S2ZTZXR0aW5nUmVxdWVzdCJTChxVcGRhdGVXZWNoYXRLZlNldHRpbmdSZXF1ZXN0EjMKB3NldHRpbmcYASABKAsyHS5tZW1vcy5hcGkudjEuV2VjaGF0S2ZTZXR0aW5nQgPgQQIiGgoYR2V0V2VjaGF0S2ZTdGF0dXNSZXF1ZXN0IhwKGlRlc3RXZWNoYXRLZlNldHRpbmdSZXF1ZXN0IusCCg5XZWNoYXRLZlN0YXR1cxIPCgdlbmFibGVkGAEgASgIEhcKD2NvbnN1bWVyX2FjdGl2ZRgCIAEoCBI0CgRqb2JzGAMgAygLMiYubWVtb3MuYXBpLnYxLldlY2hhdEtmU3RhdHVzLkpvYnNFbnRyeRI6CgdyZXBsaWVzGAQgAygLMikubWVtb3MuYXBpLnYxLldlY2hhdEtmU3RhdHVzLlJlcGxpZXNFbnRyeRI0Cg5yZWNlbnRfcmVzdWx0cxgFIAMoCzIcLm1lbW9zLmFwaS52MS5XZWNoYXRLZlJlc3VsdBISCgpzeW5jX2Vycm9yGAYgASgJEhYKDm5leHRfc3luY190aW1lGAcgASgDGisKCUpvYnNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAM6AjgBGi4KDFJlcGxpZXNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAM6AjgBImQKDldlY2hhdEtmUmVzdWx0EgwKBHR5cGUYASABKAkSDQoFc3RhdGUYAiABKAkSEAoIYXR0ZW1wdHMYAyABKAUSDQoFZXJyb3IYBCABKAkSFAoMY3JlYXRlZF90aW1lGAUgASgDMrsLCg9JbnN0YW5jZVNlcnZpY2USgAEKEkdldFdlY2hhdEtmU2V0dGluZxInLm1lbW9zLmFwaS52MS5HZXRXZWNoYXRLZlNldHRpbmdSZXF1ZXN0Gh0ubWVtb3MuYXBpLnYxLldlY2hhdEtmU2V0dGluZyIigtPkkwIcEhovYXBpL3YxL2luc3RhbmNlL3dlY2hhdC1rZhKJAQoVVXBkYXRlV2VjaGF0S2ZTZXR0aW5nEioubWVtb3MuYXBpLnYxLlVwZGF0ZVdlY2hhdEtmU2V0dGluZ1JlcXVlc3QaHS5tZW1vcy5hcGkudjEuV2VjaGF0S2ZTZXR0aW5nIiWC0+STAh86ASoyGi9hcGkvdjEvaW5zdGFuY2Uvd2VjaGF0LWtmEoQBChFHZXRXZWNoYXRLZlN0YXR1cxImLm1lbW9zLmFwaS52MS5HZXRXZWNoYXRLZlN0YXR1c1JlcXVlc3QaHC5tZW1vcy5hcGkudjEuV2VjaGF0S2ZTdGF0dXMiKYLT5JMCIxIhL2FwaS92MS9pbnN0YW5jZS93ZWNoYXQta2Yvc3RhdHVzEoMBChNUZXN0V2VjaGF0S2ZTZXR0aW5nEigubWVtb3MuYXBpLnYxLlRlc3RXZWNoYXRLZlNldHRpbmdSZXF1ZXN0GhYuZ29vZ2xlLnByb3RvYnVmLkVtcHR5IiqC0+STAiQ6ASoiHy9hcGkvdjEvaW5zdGFuY2Uvd2VjaGF0LWtmOnRlc3QSfgoSR2V0SW5zdGFuY2VQcm9maWxlEicubWVtb3MuYXBpLnYxLkdldEluc3RhbmNlUHJvZmlsZVJlcXVlc3QaHS5tZW1vcy5hcGkudjEuSW5zdGFuY2VQcm9maWxlIiCC0+STAhoSGC9hcGkvdjEvaW5zdGFuY2UvcHJvZmlsZRKPAQoSR2V0SW5zdGFuY2VTZXR0aW5nEicubWVtb3MuYXBpLnYxLkdldEluc3RhbmNlU2V0dGluZ1JlcXVlc3QaHS5tZW1vcy5hcGkudjEuSW5zdGFuY2VTZXR0aW5nIjHaQQRuYW1lgtPkkwIkEiIvYXBpL3YxL3tuYW1lPWluc3RhbmNlL3NldHRpbmdzLyp9EqgBChhCYXRjaEdldEluc3RhbmNlU2V0dGluZ3MSLS5tZW1vcy5hcGkudjEuQmF0Y2hHZXRJbnN0YW5jZVNldHRpbmdzUmVxdWVzdBouLm1lbW9zLmFwaS52MS5CYXRjaEdldEluc3RhbmNlU2V0dGluZ3NSZXNwb25zZSItgtPkkwInOgEqIiIvYXBpL3YxL2luc3RhbmNlL3NldHRpbmdzOmJhdGNoR2V0ErUBChVVcGRhdGVJbnN0YW5jZVNldHRpbmcSKi5tZW1vcy5hcGkudjEuVXBkYXRlSW5zdGFuY2VTZXR0aW5nUmVxdWVzdBodLm1lbW9zLmFwaS52MS5JbnN0YW5jZVNldHRpbmciUdpBE3NldHRpbmcsdXBkYXRlX21hc2uC0+STAjU6B3NldHRpbmcyKi9hcGkvdjEve3NldHRpbmcubmFtZT1pbnN0YW5jZS9zZXR0aW5ncy8qfRKeAQoYVGVzdEluc3RhbmNlRW1haWxTZXR0aW5nEi0ubWVtb3MuYXBpLnYxLlRlc3RJbnN0YW5jZUVtYWlsU2V0dGluZ1JlcXVlc3QaFi5nb29nbGUucHJvdG9idWYuRW1wdHkiO4LT5JMCNToBKiIwL2FwaS92MS9pbnN0YW5jZS9zZXR0aW5ncy9ub3RpZmljYXRpb246dGVzdEVtYWlsEnYKEEdldEluc3RhbmNlU3RhdHMSJS5tZW1vcy5hcGkudjEuR2V0SW5zdGFuY2VTdGF0c1JlcXVlc3QaGy5tZW1vcy5hcGkudjEuSW5zdGFuY2VTdGF0cyIegtPkkwIYEhYvYXBpL3YxL2luc3RhbmNlL3N0YXRzQqwBChBjb20ubWVtb3MuYXBpLnYxQhRJbnN0YW5jZVNlcnZpY2VQcm90b1ABWjBnaXRodWIuY29tL3VzZW1lbW9zL21lbW9zL3Byb3RvL2dlbi9hcGkvdjE7YXBpdjGiAgNNQViqAgxNZW1vcy5BcGkuVjHKAgxNZW1vc1xBcGlcVjHiAhhNZW1vc1xBcGlcVjFcR1BCTWV0YWRhdGHqAg5NZW1vczo6QXBpOjpWMWIGcHJvdG8z", [file_api_v1_user_service, file_google_api_annotations, file_google_api_client, file_google_api_field_behavior, file_google_api_resource, file_google_protobuf_empty, file_google_protobuf_field_mask, file_google_protobuf_timestamp, file_google_type_color]);
 
 /**
  * Instance profile message containing basic instance information.
@@ -987,9 +987,305 @@ export const InstanceStats_DatabaseStatsSchema: GenMessage<InstanceStats_Databas
   messageDesc(file_api_v1_instance_service, 9, 0);
 
 /**
+ * Admin-only configuration for one personal WeChat customer-service integration.
+ *
+ * @generated from message memos.api.v1.WechatKfSetting
+ */
+export type WechatKfSetting = Message<"memos.api.v1.WechatKfSetting"> & {
+  /**
+   * @generated from field: bool enabled = 1;
+   */
+  enabled: boolean;
+
+  /**
+   * @generated from field: string owner = 2;
+   */
+  owner: string;
+
+  /**
+   * @generated from field: string space = 3;
+   */
+  space: string;
+
+  /**
+   * @generated from field: string corp_id = 4;
+   */
+  corpId: string;
+
+  /**
+   * @generated from field: string kf_id = 5;
+   */
+  kfId: string;
+
+  /**
+   * @generated from field: repeated string allowed_users = 6;
+   */
+  allowedUsers: string[];
+
+  /**
+   * @generated from field: repeated string default_tags = 7;
+   */
+  defaultTags: string[];
+
+  /**
+   * @generated from field: string chat_tag = 8;
+   */
+  chatTag: string;
+
+  /**
+   * @generated from field: bool receipts_enabled = 9;
+   */
+  receiptsEnabled: boolean;
+
+  /**
+   * @generated from field: int32 max_media_mb = 10;
+   */
+  maxMediaMb: number;
+
+  /**
+   * @generated from field: string secret = 11;
+   */
+  secret: string;
+
+  /**
+   * @generated from field: string callback_token = 12;
+   */
+  callbackToken: string;
+
+  /**
+   * @generated from field: string encoding_aes_key = 13;
+   */
+  encodingAesKey: string;
+
+  /**
+   * @generated from field: bool secret_set = 14;
+   */
+  secretSet: boolean;
+
+  /**
+   * @generated from field: bool callback_token_set = 15;
+   */
+  callbackTokenSet: boolean;
+
+  /**
+   * @generated from field: bool encoding_aes_key_set = 16;
+   */
+  encodingAesKeySet: boolean;
+
+  /**
+   * @generated from field: int64 revision = 17;
+   */
+  revision: bigint;
+
+  /**
+   * @generated from field: string callback_path = 18;
+   */
+  callbackPath: string;
+};
+
+/**
+ * Describes the message memos.api.v1.WechatKfSetting.
+ * Use `create(WechatKfSettingSchema)` to create a new message.
+ */
+export const WechatKfSettingSchema: GenMessage<WechatKfSetting> = /*@__PURE__*/
+  messageDesc(file_api_v1_instance_service, 10);
+
+/**
+ * Request for the current WeChat configuration.
+ *
+ * @generated from message memos.api.v1.GetWechatKfSettingRequest
+ */
+export type GetWechatKfSettingRequest = Message<"memos.api.v1.GetWechatKfSettingRequest"> & {
+};
+
+/**
+ * Describes the message memos.api.v1.GetWechatKfSettingRequest.
+ * Use `create(GetWechatKfSettingRequestSchema)` to create a new message.
+ */
+export const GetWechatKfSettingRequestSchema: GenMessage<GetWechatKfSettingRequest> = /*@__PURE__*/
+  messageDesc(file_api_v1_instance_service, 11);
+
+/**
+ * Request to replace a configuration at a known revision.
+ *
+ * @generated from message memos.api.v1.UpdateWechatKfSettingRequest
+ */
+export type UpdateWechatKfSettingRequest = Message<"memos.api.v1.UpdateWechatKfSettingRequest"> & {
+  /**
+   * @generated from field: memos.api.v1.WechatKfSetting setting = 1;
+   */
+  setting?: WechatKfSetting | undefined;
+};
+
+/**
+ * Describes the message memos.api.v1.UpdateWechatKfSettingRequest.
+ * Use `create(UpdateWechatKfSettingRequestSchema)` to create a new message.
+ */
+export const UpdateWechatKfSettingRequestSchema: GenMessage<UpdateWechatKfSettingRequest> = /*@__PURE__*/
+  messageDesc(file_api_v1_instance_service, 12);
+
+/**
+ * Request for processing statistics.
+ *
+ * @generated from message memos.api.v1.GetWechatKfStatusRequest
+ */
+export type GetWechatKfStatusRequest = Message<"memos.api.v1.GetWechatKfStatusRequest"> & {
+};
+
+/**
+ * Describes the message memos.api.v1.GetWechatKfStatusRequest.
+ * Use `create(GetWechatKfStatusRequestSchema)` to create a new message.
+ */
+export const GetWechatKfStatusRequestSchema: GenMessage<GetWechatKfStatusRequest> = /*@__PURE__*/
+  messageDesc(file_api_v1_instance_service, 13);
+
+/**
+ * Request to validate stored credentials without sending messages.
+ *
+ * @generated from message memos.api.v1.TestWechatKfSettingRequest
+ */
+export type TestWechatKfSettingRequest = Message<"memos.api.v1.TestWechatKfSettingRequest"> & {
+};
+
+/**
+ * Describes the message memos.api.v1.TestWechatKfSettingRequest.
+ * Use `create(TestWechatKfSettingRequestSchema)` to create a new message.
+ */
+export const TestWechatKfSettingRequestSchema: GenMessage<TestWechatKfSettingRequest> = /*@__PURE__*/
+  messageDesc(file_api_v1_instance_service, 14);
+
+/**
+ * Redacted statistics; source payloads and secret material are never returned.
+ *
+ * @generated from message memos.api.v1.WechatKfStatus
+ */
+export type WechatKfStatus = Message<"memos.api.v1.WechatKfStatus"> & {
+  /**
+   * @generated from field: bool enabled = 1;
+   */
+  enabled: boolean;
+
+  /**
+   * @generated from field: bool consumer_active = 2;
+   */
+  consumerActive: boolean;
+
+  /**
+   * @generated from field: map<string, int64> jobs = 3;
+   */
+  jobs: { [key: string]: bigint };
+
+  /**
+   * @generated from field: map<string, int64> replies = 4;
+   */
+  replies: { [key: string]: bigint };
+
+  /**
+   * @generated from field: repeated memos.api.v1.WechatKfResult recent_results = 5;
+   */
+  recentResults: WechatKfResult[];
+
+  /**
+   * @generated from field: string sync_error = 6;
+   */
+  syncError: string;
+
+  /**
+   * @generated from field: int64 next_sync_time = 7;
+   */
+  nextSyncTime: bigint;
+};
+
+/**
+ * Describes the message memos.api.v1.WechatKfStatus.
+ * Use `create(WechatKfStatusSchema)` to create a new message.
+ */
+export const WechatKfStatusSchema: GenMessage<WechatKfStatus> = /*@__PURE__*/
+  messageDesc(file_api_v1_instance_service, 15);
+
+/**
+ * A recent processing result, without the original message or sender identifier.
+ *
+ * @generated from message memos.api.v1.WechatKfResult
+ */
+export type WechatKfResult = Message<"memos.api.v1.WechatKfResult"> & {
+  /**
+   * @generated from field: string type = 1;
+   */
+  type: string;
+
+  /**
+   * @generated from field: string state = 2;
+   */
+  state: string;
+
+  /**
+   * @generated from field: int32 attempts = 3;
+   */
+  attempts: number;
+
+  /**
+   * @generated from field: string error = 4;
+   */
+  error: string;
+
+  /**
+   * @generated from field: int64 created_time = 5;
+   */
+  createdTime: bigint;
+};
+
+/**
+ * Describes the message memos.api.v1.WechatKfResult.
+ * Use `create(WechatKfResultSchema)` to create a new message.
+ */
+export const WechatKfResultSchema: GenMessage<WechatKfResult> = /*@__PURE__*/
+  messageDesc(file_api_v1_instance_service, 16);
+
+/**
  * @generated from service memos.api.v1.InstanceService
  */
 export const InstanceService: GenService<{
+  /**
+   * Gets the admin-only WeChat KF configuration with secrets omitted.
+   *
+   * @generated from rpc memos.api.v1.InstanceService.GetWechatKfSetting
+   */
+  getWechatKfSetting: {
+    methodKind: "unary";
+    input: typeof GetWechatKfSettingRequestSchema;
+    output: typeof WechatKfSettingSchema;
+  },
+  /**
+   * Replaces the admin-only configuration; empty secrets retain stored values.
+   *
+   * @generated from rpc memos.api.v1.InstanceService.UpdateWechatKfSetting
+   */
+  updateWechatKfSetting: {
+    methodKind: "unary";
+    input: typeof UpdateWechatKfSettingRequestSchema;
+    output: typeof WechatKfSettingSchema;
+  },
+  /**
+   * Gets redacted processing statistics. Admin only.
+   *
+   * @generated from rpc memos.api.v1.InstanceService.GetWechatKfStatus
+   */
+  getWechatKfStatus: {
+    methodKind: "unary";
+    input: typeof GetWechatKfStatusRequestSchema;
+    output: typeof WechatKfStatusSchema;
+  },
+  /**
+   * Verifies stored credentials against the configured customer-service account.
+   *
+   * @generated from rpc memos.api.v1.InstanceService.TestWechatKfSetting
+   */
+  testWechatKfSetting: {
+    methodKind: "unary";
+    input: typeof TestWechatKfSettingRequestSchema;
+    output: typeof EmptySchema;
+  },
   /**
    * Gets the instance profile.
    *

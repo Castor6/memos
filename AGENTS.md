@@ -30,10 +30,20 @@ Memos is a self-hosted note-taking app.
 - Retrieve history on demand: search `docs/tasks/INDEX.md` by task ID, keywords or affected module; open only relevant task records and necessary linked documents. Do not load all historical tasks at startup.
 - 涉及线上排查、部署或服务器维护时，先读取仓库根目录的 `LOCAL_OPS.md`（若存在），按其中的路径查阅私有维护说明，不做全局目录搜索。该文件仅保存在本机，使用 `.git/info/exclude` 排除，不提交私有路径或凭据；本机缺少该文件时向用户确认维护入口。
 - `docs/README.md` is a navigation entry, not a mandatory reading list. Read `docs/development.md` when running or verifying locally; read deployment documentation only for deployment/upstream work.
-- For substantive work, create or reuse one record from `docs/tasks/TEMPLATE.md`; capture agreed acceptance criteria before implementation and actual verification afterward. Distinguish implemented, verified and deployed. Small related fixes may share a record.
+- 实质工作使用 `docs/tasks/TEMPLATE.md` 创建或续接任务，先记目标和验收标准，收尾记录带日期的实现、实际验证与未覆盖范围；相关小修可共用记录。
+- Task 是工作事实记录，不维护依赖外部变化的 CI、合并、部署状态；索引只负责检索。已发生的操作可附日期/提交/证据链接，后续进展查 PR、Actions、Release 或私有运维记录；不为追赶外部状态反复提交文档。
 - Promote durable decisions into this guide or the relevant module documentation. Keep task details, logs and screenshots out of this file; search archived task indexes only when relevant.
 - Default UI verification to the Codex in-app browser with local disposable data: desktop 1440×900; the user's iPhone 15 Pro Max uses a 430px-wide layout, checked at heights 739 and 932 (see `docs/development.md`). Verify no persistent left sidebar on mobile. Restore viewport overrides afterward. Use the regular Chrome profile only for a problem specific to it.
 - Narrow viewport checks do not establish iPhone/Safari, software keyboard, touch or PWA behavior; record any required real-device checks explicitly.
+
+## 内置微信客服模块
+
+- 2026-09-19 用户选择将微信客服能力以 Go 模块内置到定制 Memos，随同一应用、镜像和版本发布；主开发位置为 `~/Code/memos`，主任务见 `docs/tasks/TASK-20260919-wechat-kf-integration.md`。
+- `~/Code/wechat-kf-memos`（远端 `Castor6/wechat-kf-memos`）保留旧 Python 实现和测试，作为历史参照及必要回退入口；产品规则和开通记录已归档到 `docs/wechat-kf/legacy`；不是另一个需要永久同步开发的产品。新增内置能力及 Task 归入 Memos。
+- 维护协议兼容时读取 `docs/wechat-kf-integration.md` 和归档规则，必要时参照旧项目代码，按行为等价维护，不能因内置化遗漏白名单、幂等、重试、回执窗口或未知发送状态。迁移前若 Memos 变更影响仍在运行的旧服务，检查并完成必要兼容适配。
+- 内置剪藏复用 Memos 的笔记、标签、空间、附件和权限业务逻辑；协议处理与后台任务保持模块边界。状态通过 Memos store 与三驱动迁移管理，不绕过权限/校验直接插入笔记，不再以 Memos PAT 请求自身 HTTP API。
+- 旧队列、游标、去重和回执状态必须可迁移、可验证；切换前保留旧服务及私有备份，避免两个消费者同时处理。运行迁移、停旧服务和仓库归档分别记录实际结果，不能由文档或 PR 合并推定已完成。
+- 本机路径中的 `~` 指当前用户主目录。跨仓库操作先检查工作区并保留已有改动；迁移期配套提交/PR 互引，长期维护与发布在 Memos 内完成。
 
 ## Commands
 

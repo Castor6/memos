@@ -63,6 +63,38 @@ func (s *ConnectServiceHandler) GetInstanceStats(ctx context.Context, req *conne
 	return connect.NewResponse(resp), nil
 }
 
+func (s *ConnectServiceHandler) GetWechatKfSetting(ctx context.Context, req *connect.Request[v1pb.GetWechatKfSettingRequest]) (*connect.Response[v1pb.WechatKfSetting], error) {
+	resp, err := s.APIV1Service.GetWechatKfSetting(ctx, req.Msg)
+	if err != nil {
+		return nil, convertGRPCError(err)
+	}
+	return connect.NewResponse(resp), nil
+}
+
+func (s *ConnectServiceHandler) UpdateWechatKfSetting(ctx context.Context, req *connect.Request[v1pb.UpdateWechatKfSettingRequest]) (*connect.Response[v1pb.WechatKfSetting], error) {
+	resp, err := s.APIV1Service.UpdateWechatKfSetting(ctx, req.Msg)
+	if err != nil {
+		return nil, convertGRPCError(err)
+	}
+	return connect.NewResponse(resp), nil
+}
+
+func (s *ConnectServiceHandler) GetWechatKfStatus(ctx context.Context, req *connect.Request[v1pb.GetWechatKfStatusRequest]) (*connect.Response[v1pb.WechatKfStatus], error) {
+	resp, err := s.APIV1Service.GetWechatKfStatus(ctx, req.Msg)
+	if err != nil {
+		return nil, convertGRPCError(err)
+	}
+	return connect.NewResponse(resp), nil
+}
+
+func (s *ConnectServiceHandler) TestWechatKfSetting(ctx context.Context, req *connect.Request[v1pb.TestWechatKfSettingRequest]) (*connect.Response[emptypb.Empty], error) {
+	resp, err := s.APIV1Service.TestWechatKfSetting(ctx, req.Msg)
+	if err != nil {
+		return nil, convertGRPCError(err)
+	}
+	return connect.NewResponse(resp), nil
+}
+
 // AuthService
 //
 // Auth service methods need special handling for response headers (cookies).

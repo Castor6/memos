@@ -16,6 +16,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/usememos/memos/internal/profile"
+	corekf "github.com/usememos/memos/internal/wechatkf"
 	storepb "github.com/usememos/memos/proto/gen/store"
 	apiv1 "github.com/usememos/memos/server/router/api/v1"
 	"github.com/usememos/memos/server/router/fileserver"
@@ -23,6 +24,7 @@ import (
 	"github.com/usememos/memos/server/router/mcp"
 	"github.com/usememos/memos/server/router/rss"
 	"github.com/usememos/memos/server/runner/s3presign"
+	kfrunner "github.com/usememos/memos/server/runner/wechatkf"
 	"github.com/usememos/memos/store"
 )
 
@@ -33,9 +35,10 @@ type Server struct {
 	Profile *profile.Profile
 	Store   *store.Store
 
-	echoServer *echo.Echo
-	httpServer *http.Server
-	sseHub     *apiv1.SSEHub
+	echoServer   *echo.Echo
+	httpServer   *http.Server
+	sseHub       *apiv1.SSEHub
+	wechatRunner *kfrunner.Runner
 
 	backgroundRunnerCancels []context.CancelFunc
 	backgroundRunnerWG      sync.WaitGroup
@@ -75,6 +78,11 @@ func NewServer(ctx context.Context, profile *profile.Profile, store *store.Store
 
 	apiV1Service := apiv1.NewAPIV1Service(s.Secret, profile, store)
 	s.sseHub = apiV1Service.SSEHub
+	s.wechatRunner = kfrunner.New(s.Store, s.Secret, func(config corekf.Config) corekf.Notes {
+		return apiV1Service.NewWeChatKFNotes(config.OwnerID, config.Space)
+	})
+	echoServer.GET("/wechat/callback", s.wechatRunner.Callback)
+	echoServer.POST("/wechat/callback", s.wechatRunner.Callback)
 
 	// Register HTTP file server routes BEFORE gRPC-Gateway to ensure proper range request handling for Safari.
 	// This uses native HTTP serving (http.ServeContent) instead of gRPC for video/audio files.
@@ -151,6 +159,12 @@ func (s *Server) Shutdown(ctx context.Context) {
 }
 
 func (s *Server) startBackgroundRunners(ctx context.Context) {
+	if s.wechatRunner != nil {
+		wechatContext, cancel := context.WithCancel(ctx)
+		s.backgroundRunnerCancels = append(s.backgroundRunnerCancels, cancel)
+		s.backgroundRunnerWG.Add(1)
+		go func() { defer s.backgroundRunnerWG.Done(); s.wechatRunner.Run(wechatContext) }()
+	}
 	// Create a separate context for each background runner
 	// This allows us to control cancellation for each runner independently
 	s3Context, s3Cancel := context.WithCancel(ctx)
