@@ -43,6 +43,14 @@ func newHTTPClient() *http.Client {
 			if len(via) >= 10 {
 				return errors.New("too many redirects")
 			}
+			// net/http copies the original headers across redirects. Keep the
+			// WeChat request profile confined to the destination's exact host.
+			if isWeChatArticleURL(via[0].URL) || isWeChatArticleURL(via[len(via)-1].URL) {
+				req.Header.Del("User-Agent")
+				req.Header.Del("Accept-Language")
+				req.Header.Del("Referer")
+			}
+			setWeChatArticleHeaders(req)
 			return nil
 		},
 	}
@@ -133,16 +141,38 @@ type HTMLMeta struct {
 	Image       string `json:"image"`
 }
 
+func isWeChatArticleURL(u *url.URL) bool {
+	return strings.EqualFold(u.Hostname(), "mp.weixin.qq.com")
+}
+
+func setWeChatArticleHeaders(req *http.Request) {
+	if !isWeChatArticleURL(req.URL) {
+		return
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 Chrome/120.0.0.0")
+	req.Header.Set("Accept-Language", "zh-CN,zh;q=0.9")
+	req.Header.Set("Referer", "https://mp.weixin.qq.com/")
+}
+
 func GetHTMLMeta(urlStr string) (*HTMLMeta, error) {
 	if err := validateURL(urlStr); err != nil {
 		return nil, err
 	}
 
-	response, err := httpClient.Get(urlStr)
+	req, err := http.NewRequest(http.MethodGet, urlStr, nil)
+	if err != nil {
+		return nil, errors.Wrap(err, "create link metadata request")
+	}
+	setWeChatArticleHeaders(req)
+	response, err := httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer response.Body.Close()
+
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		return nil, errors.Errorf("unexpected HTTP status: %d", response.StatusCode)
+	}
 
 	mediatype, err := getMediatype(response)
 	if err != nil {
@@ -172,13 +202,15 @@ func extractHTMLMeta(resp io.Reader) *HTMLMeta {
 			}
 
 			if token.DataAtom == atom.Title {
-				tokenizer.Next()
-				token := tokenizer.Token()
-				htmlMeta.Title = token.Data
+				// An empty <title></title> yields an end tag, whose Data is "title".
+				// Only use actual text, and never overwrite an earlier Open Graph title.
+				if tokenizer.Next() == html.TextToken && htmlMeta.Title == "" {
+					htmlMeta.Title = strings.TrimSpace(tokenizer.Token().Data)
+				}
 			} else if token.DataAtom == atom.Meta {
 				ogTitle, ok := extractMetaProperty(token, "og:title")
-				if ok {
-					htmlMeta.Title = ogTitle
+				if ok && strings.TrimSpace(ogTitle) != "" {
+					htmlMeta.Title = strings.TrimSpace(ogTitle)
 				}
 
 				ogDescription, ok := extractMetaProperty(token, "og:description")
@@ -216,6 +248,20 @@ func extractMetaProperty(token html.Token, prop string) (content string, ok bool
 }
 
 func enrichSiteMeta(url *url.URL, meta *HTMLMeta) {
+	// These are site-shell titles, not article or video titles. Leave the title
+	// empty so clients can keep the original link instead of a misleading card.
+	switch strings.ToLower(url.Hostname()) {
+	case "mp.weixin.qq.com":
+		if strings.EqualFold(meta.Title, "title") || meta.Title == "微信公众平台" {
+			meta.Title = ""
+		}
+	case "channels.weixin.qq.com":
+		if strings.EqualFold(meta.Title, "title") || meta.Title == "视频号" {
+			meta.Title = ""
+		}
+	default:
+		// Preserve titles from other sites.
+	}
 	if url.Hostname() == "www.youtube.com" {
 		if url.Path == "/watch" {
 			vid := url.Query().Get("v")

@@ -25,13 +25,12 @@ const LinkMetadataCard = ({ url, fallback, enabled = true }: LinkMetadataCardPro
   const description = metadata?.description.trim() ?? "";
   const image = metadata?.image.trim() ?? "";
   const hostname = getHostname(metadata?.url || url);
-  const hasUsefulMetadata = title !== "" || description !== "";
 
   useEffect(() => {
     setImageFailed(false);
   }, [url, image]);
 
-  if (!isSuccess || !hasUsefulMetadata) {
+  if (!isSuccess || title === "") {
     return fallback;
   }
 
