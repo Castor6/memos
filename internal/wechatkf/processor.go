@@ -9,7 +9,7 @@ import (
 )
 
 // Notes is implemented by Memos' existing business services, never by self-HTTP.
-// Calls are serialized by the future durable worker, and must tolerate replay.
+// Calls are serialized by the durable worker, and must tolerate replay.
 type Notes interface {
 	Ensure(context.Context, string, Clip) error
 	Attach(context.Context, string, string, string, string, Download) (string, error)
@@ -56,7 +56,7 @@ func NewProcessor(binding Binding, notes Notes, download Download) (*Processor, 
 	return &Processor{binding: binding, notes: notes, download: download}, nil
 }
 
-// Outcome is recorded by the future queue before a result receipt can be sent.
+// Outcome is recorded by the queue before a result receipt can be sent.
 type Outcome struct {
 	Ignored bool
 	MemoID  string
@@ -66,6 +66,11 @@ type Outcome struct {
 // Process saves one input as one private memo and its attachments. A successful
 // return alone is not permission to send: the worker must persist the outcome.
 func (p *Processor) Process(ctx context.Context, message Message) (Outcome, error) {
+	return p.ProcessWithProgress(ctx, message, nil)
+}
+
+// ProcessWithProgress durably records a created draft before transferring media.
+func (p *Processor) ProcessWithProgress(ctx context.Context, message Message, progress func(string) error) (Outcome, error) {
 	user := stringValue(message["external_userid"])
 	allowed := false
 	for _, id := range p.binding.AllowedUsers {
@@ -91,6 +96,11 @@ func (p *Processor) Process(ctx context.Context, message Message) (Outcome, erro
 		return Outcome{}, failure("创建笔记", err)
 	}
 	out := Outcome{MemoID: uid}
+	if progress != nil {
+		if err := progress(uid); err != nil {
+			return out, failure("记录笔记进度", err)
+		}
+	}
 	clip, err = Render(message, p.binding.DefaultTags, p.binding.ChatTag, func(mediaID, kind string) (string, error) {
 		return p.notes.Attach(ctx, uid, StableID(uid, mediaID), mediaID, kind, p.download)
 	})

@@ -11,7 +11,7 @@
 | 启动本地应用、准备数据或验证修改 | [本地开发与验证](development.md) |
 | 提交发布说明、了解 CI 和版本 PR | [CI 与版本流程](release.md) |
 | 了解上游基线、个人差异、发布和部署方案 | [定制与部署记录](customization-and-deployment.zh-CN.md) |
-| 查看内置微信客服的目标与迁移范围 | [内置接入方案](wechat-kf-integration.md)、[迁移任务](tasks/TASK-20260919-wechat-kf-integration.md) |
+| 配置微信客服或从旧服务迁移 | [内置接入方案](wechat-kf-integration.md)、[迁移任务](tasks/TASK-20260919-wechat-kf-integration.md) |
 | 查看长期协作和代码规则 | [AGENTS.md](../AGENTS.md) |
 
 ## 记录维护方式
@@ -29,4 +29,4 @@
 
 ## 微信客服内置迁移
 
-用户已选择把微信客服做成 Memos 的 Go 内置模块。主方案、功能实现和后续 Task 归入本仓库；`~/Code/wechat-kf-memos` 保留 Python 实现及历史证据，供等价迁移与切换前维护使用。迁移期的配套任务和 PR 互引，不继续建设两套长期同步的产品。详见[迁移任务](tasks/TASK-20260919-wechat-kf-integration.md)。
+用户已选择把微信客服做成 Memos 的 Go 内置模块。主方案、功能实现和后续 Task 归入本仓库；开通、需求和原任务已归档到 `docs/wechat-kf/legacy`；`~/Code/wechat-kf-memos` 保留 Python 代码作为历史参照。迁移期的配套任务和 PR 互引，不继续建设两套长期同步的产品。详见[迁移任务](tasks/TASK-20260919-wechat-kf-integration.md)。

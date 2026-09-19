@@ -2,6 +2,7 @@ package v1
 
 import (
 	"context"
+	"strings"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -47,8 +48,24 @@ func clipStoreError(err error) error {
 	if err == nil {
 		return nil
 	}
-	// gRPC details may contain raw database errors or paths: only expose the code.
-	return &wechatkf.Failure{Stage: "Memos 保存", Reason: "业务操作失败，代码 " + status.Code(err).String()}
+	// Only translate known business errors; raw details may include paths or SQL.
+	detail := status.Convert(err).Message()
+	reason := map[string]string{
+		"file size exceeds the limit":                    "附件超过 Memos 配置的大小上限",
+		"invalid MIME type format":                       "附件类型格式无效",
+		"filename contains invalid characters or format": "附件文件名格式无效",
+		"too many tags":                                  "标签数量超过 Memos 上限",
+		"invalid or duplicate tag":                       "标签格式无效或重复",
+		"unknown personal space":                         "绑定空间不存在",
+		"too many image processing requests":             "图片处理繁忙",
+	}[detail]
+	if reason == "" && strings.HasPrefix(detail, "content too long (max ") {
+		reason = "正文超过 Memos 配置的长度上限"
+	}
+	if reason == "" {
+		reason = "业务操作失败，代码 " + status.Code(err).String()
+	}
+	return &wechatkf.Failure{Stage: "Memos 保存", Reason: reason}
 }
 func (n *wechatKFNotes) memo(ctx context.Context, uid string) (*store.Memo, error) {
 	memo, err := n.service.Store.GetMemo(ctx, &store.FindMemo{UID: &uid})

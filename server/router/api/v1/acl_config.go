@@ -1,5 +1,10 @@
 package v1
 
+// PublicMethods defines API endpoints that do not require a Memos session.
+// The native /wechat/callback route is registered separately in server.NewServer.
+// It authenticates every request using WeChat signature/AES verification, not a
+// Memos session. All Get/Update/TestWechatKf RPCs remain protected and admin-only.
+//
 // PublicMethods defines API endpoints that don't require authentication.
 // All other endpoints require a valid session or access token.
 //

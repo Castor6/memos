@@ -161,6 +161,11 @@ func (c *Client) request(ctx context.Context, endpoint string, payload, target a
 	for attempt := 0; attempt < 2; attempt++ {
 		token, err := c.accessToken(ctx)
 		if err != nil {
+			// No send request has been dispatched when token acquisition fails.
+			var remote *RemoteError
+			if errors.As(err, &remote) {
+				return &RemoteError{Category: remote.Category, Code: remote.Code}
+			}
 			return err
 		}
 		data, _, err := c.exchange(ctx, endpoint, url.Values{"access_token": {token}}, payload, maxJSONBytes)

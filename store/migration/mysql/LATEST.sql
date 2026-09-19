@@ -135,3 +135,59 @@ CREATE INDEX idx_memo_space_pinned_updated ON memo (creator_id, space, row_statu
 CREATE INDEX idx_attachment_space_updated ON attachment (creator_id, space, updated_ts DESC);
 CREATE INDEX idx_attachment_memo_space ON attachment (memo_id, space);
 CREATE INDEX idx_memo_relation_target ON memo_relation (related_memo_id, type, memo_id);
+
+-- Durable state for the built-in, single-account WeChat KF integration.
+CREATE TABLE wechat_kf_config (
+  id INTEGER PRIMARY KEY,
+  value TEXT NOT NULL,
+  revision BIGINT NOT NULL DEFAULT 0,
+  lease_owner VARCHAR(64) NOT NULL DEFAULT '',
+  lease_until BIGINT NOT NULL DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+INSERT INTO wechat_kf_config(id, value) VALUES (1, '');
+CREATE TABLE wechat_kf_sync (
+  id INTEGER PRIMARY KEY,
+  cursor TEXT NOT NULL,
+  token TEXT NOT NULL,
+  token_time BIGINT NOT NULL DEFAULT 0,
+  generation BIGINT NOT NULL DEFAULT 0,
+  next_at BIGINT NOT NULL DEFAULT 0,
+  last_error TEXT NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+INSERT INTO wechat_kf_sync(id, cursor, token, last_error) VALUES (1, '', '', '');
+CREATE TABLE wechat_kf_jobs (
+  id VARCHAR(191) PRIMARY KEY,
+  payload LONGTEXT,
+  kind VARCHAR(64) NOT NULL,
+  user_id VARCHAR(191) NOT NULL,
+  state VARCHAR(24) NOT NULL DEFAULT 'pending',
+  attempts INTEGER NOT NULL DEFAULT 0,
+  next_at BIGINT NOT NULL DEFAULT 0,
+  error TEXT NOT NULL,
+  memo TEXT NOT NULL,
+  created_at BIGINT NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+CREATE INDEX wechat_kf_jobs_due ON wechat_kf_jobs(state, next_at);
+CREATE TABLE wechat_kf_windows (
+  user_id VARCHAR(191) PRIMARY KEY,
+  latest BIGINT NOT NULL,
+  used INTEGER NOT NULL DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+CREATE TABLE wechat_kf_replies (
+  id VARCHAR(64) PRIMARY KEY,
+  user_id VARCHAR(191) NOT NULL,
+  content TEXT NOT NULL,
+  state VARCHAR(24) NOT NULL DEFAULT 'pending',
+  attempts INTEGER NOT NULL DEFAULT 0,
+  next_at BIGINT NOT NULL DEFAULT 0,
+  created_at BIGINT NOT NULL,
+  error TEXT NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+CREATE INDEX wechat_kf_replies_due ON wechat_kf_replies(state, next_at);
+CREATE TABLE wechat_kf_events (
+  id VARCHAR(191) PRIMARY KEY,
+  event_type VARCHAR(64) NOT NULL,
+  payload LONGTEXT NOT NULL,
+  received_at BIGINT NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+CREATE INDEX wechat_kf_events_retention ON wechat_kf_events(received_at);
