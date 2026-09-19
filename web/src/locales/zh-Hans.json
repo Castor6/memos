@@ -460,6 +460,15 @@
       "transcription-warning-no-key": "所选供应商未设置 API 密钥。请在上方编辑集成信息以添加密钥。"
     },
     "preference": {
+      "themes": {
+        "system": "跟随系统",
+        "default": "浅色",
+        "default-dark": "深色",
+        "paper": "纸张",
+        "cream": "奶油卡片",
+        "mint": "薄荷花园",
+        "flomo": "flomo 简约"
+      },
       "appearance-description": "选择当前账号使用的界面语言和外观主题。",
       "appearance-title": "外观",
       "default-memo-sort-option": "备忘录显示时间",

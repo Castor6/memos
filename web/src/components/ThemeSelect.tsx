@@ -1,6 +1,7 @@
 import { Monitor, Moon, Palette, Sun } from "lucide-react";
 import type { ReactElement } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useTranslate } from "@/utils/i18n";
 import { loadTheme, THEME_OPTIONS } from "@/utils/theme";
 
 interface ThemeSelectProps {
@@ -15,11 +16,19 @@ const THEME_ICONS: Record<string, ReactElement> = {
   default: <Sun className="w-4 h-4" />,
   "default-dark": <Moon className="w-4 h-4" />,
   paper: <Palette className="w-4 h-4" />,
+  cream: <Palette className="w-4 h-4" />,
+  mint: <Palette className="w-4 h-4" />,
+  flomo: <Palette className="w-4 h-4" />,
 };
 
 const ThemeSelect = ({ value, onValueChange, className, compact = false }: ThemeSelectProps = {}) => {
+  const t = useTranslate();
+  const options = THEME_OPTIONS.map((option) => ({
+    ...option,
+    label: t(`setting.preference.themes.${option.value}`),
+  }));
   const currentTheme = value || "system";
-  const triggerLabel = currentTheme === "system" ? "System" : THEME_OPTIONS.find((option) => option.value === currentTheme)?.label;
+  const triggerLabel = options.find((option) => option.value === currentTheme)?.label;
 
   const handleThemeChange = (newTheme: string) => {
     // Apply theme globally immediately
@@ -31,7 +40,7 @@ const ThemeSelect = ({ value, onValueChange, className, compact = false }: Theme
   };
 
   return (
-    <Select value={currentTheme} items={THEME_OPTIONS} onValueChange={handleThemeChange}>
+    <Select value={currentTheme} items={options} onValueChange={handleThemeChange}>
       <SelectTrigger className={className}>
         <div className="flex min-w-0 flex-1 items-center gap-2">
           {compact && THEME_ICONS[currentTheme]}
@@ -39,7 +48,7 @@ const ThemeSelect = ({ value, onValueChange, className, compact = false }: Theme
         </div>
       </SelectTrigger>
       <SelectContent>
-        {THEME_OPTIONS.map((option) => (
+        {options.map((option) => (
           <SelectItem key={option.value} value={option.value}>
             <div className="flex items-center gap-2">
               {THEME_ICONS[option.value]}

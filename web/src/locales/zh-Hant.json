@@ -554,6 +554,15 @@
       "use-tls-description": "以 STARTTLS 升級 SMTP 連線。Gmail 搭配連接埠 587 時請保持啟用。"
     },
     "preference": {
+      "themes": {
+        "system": "跟隨系統",
+        "default": "淺色",
+        "default-dark": "深色",
+        "paper": "紙張",
+        "cream": "奶油卡片",
+        "mint": "薄荷花園",
+        "flomo": "flomo 簡約"
+      },
       "appearance-description": "選擇應用程式的外觀及帳號使用的語言。",
       "appearance-title": "外觀",
       "default-memo-sort-option": "備忘錄顯示時間",
