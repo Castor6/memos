@@ -1,27 +1,25 @@
-# 任务索引
+# 任务检索
 
-按编号、标题、模块或关键词搜索，只读取当前工作相关的任务详情。此索引不维护实时状态；详情中的事实以各自记录日期为准。
+任务以独立 Markdown 文件保存。本页只提供固定检索说明，不逐项列出任务；新增或续接任务无需修改本页。
 
-| 编号 | 标题 | 模块 / 关键词 | 详情 |
-| --- | --- | --- | --- |
-| TASK-20260919-mobile-export-experience | 移动导航、导出与图片交互 | 手机、MD、PDF、图片手势、中文搜索 | [详情](TASK-20260919-mobile-export-experience.md) |
-| TASK-20260919-builtin-three-themes | 内置三套界面主题 | 主题、奶油、薄荷、flomo、外观 | [详情](TASK-20260919-builtin-three-themes.md) |
-| TASK-20260919-wechat-link-preview | 公众号链接预览与标题回退 | 链接预览、微信、HTTP、HTML | [详情](TASK-20260919-wechat-link-preview.md) |
-| TASK-20260919-wechat-kf-integration | 微信客服内置到 Memos | 微信客服、Go、迁移、设置、统一发布 | [详情](TASK-20260919-wechat-kf-integration.md) |
-| TASK-20260919-task-records | 两项目任务记录与开发联动约定 | Task、事实记录、微信客服、接口联动 | [详情](TASK-20260919-task-records.md) |
-| TASK-20260917-tag-menu-image-preview | 标签操作与图片预览尺寸 | 标签、右键、图标、图片 | [详情](TASK-20260917-tag-menu-image-preview.md) |
-| TASK-20260917-pre-commit-whitespace | 提交前空白检查 | Git、空白、CI、开发环境 | [详情](TASK-20260917-pre-commit-whitespace.md) |
-| TASK-20260917-sidebar-tag-settings | 侧栏标签设置入口 | 侧栏、标签、Emoji、菜单 | [详情](TASK-20260917-sidebar-tag-settings.md) |
-| TASK-20260917-editor-and-todo-experience | 编辑器与待办交互完善 | 编辑器、待办、侧栏、标签、平铺、引用 | [详情](TASK-20260917-editor-and-todo-experience.md) |
-| TASK-20260917-task-list-cursor | 编辑器任务列表光标位置修复 | 富文本、任务列表、光标、CSS | [详情](TASK-20260917-task-list-cursor.md) |
-| TASK-20260917-local-ops-entry | 本地私有运维入口与历史资料整理 | AGENTS、本地入口、私有资料、历史归档 | [详情](TASK-20260917-local-ops-entry.md) |
-| TASK-20260917-github-release | 版本 PR 自动生成 GitHub Release | Release、发布、标签、附件 | [详情](TASK-20260917-github-release.md) |
-| TASK-20260917-deployment-retention | 升级备份与配套镜像清理 | 自动部署、备份、镜像、恢复 | [详情](TASK-20260917-deployment-retention.md) |
-| TASK-20260917-release-note-whitespace | 修复多段发布说明阻塞 | Changesets、CHANGELOG、版本 PR、发布生成器 | [详情](TASK-20260917-release-note-whitespace.md) |
-| TASK-20260916-notes-requirements | 笔记编辑、个人空间与独立待办需求 | 编辑器、标签、文件、常用词、空间隔离、待办、引用卡片 | [详情](TASK-20260916-notes-requirements.md) |
-| TASK-20260916-automated-deployment | 免费镜像仓库与自动部署 | ACR、Docker、发布、SQLite、备份、恢复 | [详情](TASK-20260916-automated-deployment.md) |
-| TASK-20260915-repository-presentation | 启用 Issues 与清理上游赞助展示 | Fork、Issues、README、赞助、FUNDING、问题模板 | [详情](TASK-20260915-repository-presentation.md) |
-| TASK-20260915-release-workflow | PR、版本发布与 CI 基础设施 | Fork、BrowserRig、Changesets、Release Please、Version PR、版本号、CI、主分支保护 | [详情](TASK-20260915-release-workflow.md) |
-| TASK-20260915-local-environment | 协作记录与本地验证环境初始化 | 开发环境、按需检索、SQLite、宽屏、窄屏、iPhone 15 Pro Max、内置浏览器 | [详情](TASK-20260915-local-environment.md) |
+从仓库根目录运行：
 
-新增记录使用 [模板](TEMPLATE.md)。目前没有归档索引。
+```bash
+# 按文件名定位任务（包含子目录中的历史记录）
+rg --files docs/tasks -g 'TASK-*.md'
+
+# 按任务编号定位
+rg --files docs/tasks -g '*wechat-kf-integration*'
+
+# 按标题、模块或正文关键词筛选文件，再打开相关详情
+rg -l '图片|导出' docs/tasks -g 'TASK-*.md'
+
+# 查看相关事实所在行
+rg -n '验收|未覆盖' docs/tasks/TASK-20260919-task-record-search.md
+```
+
+旧微信客服记录仅在相关时搜索 `docs/wechat-kf/legacy/tasks/`。已有历史目录保留，不要求批量整理或重建索引。
+
+新增记录使用[模板](TEMPLATE.md)，文件名为 `TASK-YYYYMMDD-短主题.md`，标题和模块关键词应便于检索。单个任务文件由一个会话负责维护；其他会话独立开展的工作另建文件并通过相对链接关联，交接后可继续原文件。
+
+如需浏览总目录，可按需生成本地结果，不提交生成的目录文件。记录范围与协作约定见[开发入口](../README.md)。
