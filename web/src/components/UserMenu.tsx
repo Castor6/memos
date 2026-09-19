@@ -174,7 +174,7 @@ const UserMenu = (props: Props) => {
               <DropdownMenuItem key={option.value} onClick={() => handleThemeChange(option.value)}>
                 {currentTheme === option.value && <CheckIcon className="w-4 h-auto" />}
                 {currentTheme !== option.value && <span className="w-4" />}
-                {option.label}
+                {t(`setting.preference.themes.${option.value}`)}
               </DropdownMenuItem>
             ))}
           </DropdownMenuSubContent>

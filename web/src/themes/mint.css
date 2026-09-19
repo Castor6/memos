@@ -1,0 +1,73 @@
+/* 薄荷花园 */
+:root {
+  --background: #f1f8f3;
+  --foreground: #2d3e34;
+  --card: #ffffff;
+  --card-foreground: #2d3e34;
+  --popover: #ffffff;
+  --popover-foreground: #2d3e34;
+  --primary: #54896b;
+  --primary-foreground: #ffffff;
+  --secondary: #e7f2ea;
+  --secondary-foreground: #2d3e34;
+  --muted: #e3eee6;
+  --muted-foreground: #738579;
+  --accent: #dceee1;
+  --accent-foreground: #2d3e34;
+  --border: #dcebe1;
+  --input: #cddfd3;
+  --ring: #54896b;
+  --sidebar: #edf6ef;
+  --sidebar-foreground: #2d3e34;
+  --sidebar-accent: #dceee1;
+  --sidebar-accent-foreground: #37664c;
+  --sidebar-accent-border: transparent;
+  --radius: 12px;
+  --theme-tag-bg: #f0f8f2;
+  --theme-tag-fg: #47795a;
+  --theme-tag-border: #a4c9b0;
+  --theme-card-shadow: 0 3px 16px rgb(65 110 80 / 4%);
+}
+
+/* 仅覆盖外观；保留原有布局、移动导航、编辑器高度与弹窗层级。 */
+html[data-theme="mint"] body {
+  background-color: var(--background);
+  color: var(--foreground);
+}
+html[data-theme="mint"] article.bg-card,
+html[data-theme="mint"] [data-editor-shell] {
+  background-color: var(--card);
+  border-color: var(--border);
+  box-shadow: var(--theme-card-shadow);
+}
+/* 保留评论预览卡片原有的下边缘拼接。 */
+html[data-theme="mint"] article.bg-card:not(.rounded-b-none),
+html[data-theme="mint"] [data-editor-shell] {
+  border-radius: var(--radius);
+}
+html[data-theme="mint"] article.bg-card.rounded-b-none {
+  border-top-left-radius: var(--radius);
+  border-top-right-radius: var(--radius);
+}
+html[data-theme="mint"] article.bg-card [data-tag]:not([style]) {
+  background-color: var(--theme-tag-bg);
+  color: var(--theme-tag-fg);
+  border: 1px solid var(--theme-tag-border);
+  border-radius: 999px;
+  padding: 1px 9px;
+}
+html[data-theme="mint"] a[id^="header-"][aria-current="page"] {
+  background-color: var(--sidebar-accent);
+  color: var(--sidebar-accent-foreground);
+  border-color: transparent;
+  filter: none;
+}
+html[data-theme="mint"] [data-editor-shell] button.bg-primary {
+  border-radius: 9px;
+}
+@media (max-width: 767px) {
+  html[data-theme="mint"] article.bg-card,
+  html[data-theme="mint"] [data-editor-shell] {
+    box-shadow: none;
+  }
+}
