@@ -105,6 +105,7 @@ const UserMenu = (props: Props) => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
+        aria-label="用户菜单"
         nativeButton={false}
         disabled={!currentUser}
         render={

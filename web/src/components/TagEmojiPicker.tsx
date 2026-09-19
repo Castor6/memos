@@ -3,7 +3,10 @@ import data from "@emoji-mart/data/sets/15/native.json";
 import { Picker } from "emoji-mart";
 import { useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { withChineseEmojiKeywords } from "@/lib/emoji-search";
 import { getThemeWithFallback, resolveTheme } from "@/utils/theme";
+
+const searchableData = withChineseEmojiKeywords(data);
 
 export default function TagEmojiPicker({ onSelect, disabled }: { onSelect: (emoji: string) => void; disabled: boolean }) {
   const container = useRef<HTMLDivElement>(null);
@@ -14,8 +17,8 @@ export default function TagEmojiPicker({ onSelect, disabled }: { onSelect: (emoj
     const host = container.current;
     if (!host) return;
     const picker = new Picker({
-      data,
-      i18n: { ...zh, search: "搜索（如 cat、book）" },
+      data: searchableData,
+      i18n: { ...zh, search: "搜索（如 猫、书、cat）" },
       locale: "zh",
       theme,
       set: "native",

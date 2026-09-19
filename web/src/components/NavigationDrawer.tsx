@@ -19,13 +19,13 @@ const NavigationDrawer = () => {
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger render={<Button variant="ghost" className="px-2" />}>
+      <SheetTrigger render={<Button variant="ghost" className="max-w-full px-0" aria-label="打开导航菜单" />}>
         <UserAvatar className="shrink-0 w-6 h-6 rounded-md" avatarUrl={avatarUrl} />
-        <span className="font-bold text-lg leading-10 text-ellipsis overflow-hidden text-foreground">{title}</span>
+        <span className="font-bold text-base leading-10 truncate text-foreground">{title}</span>
       </SheetTrigger>
       <SheetContent side="left" className="w-80 max-w-full overflow-auto px-2 bg-background">
         <SheetHeader>
-          <SheetTitle />
+          <SheetTitle className="sr-only">导航菜单</SheetTitle>
         </SheetHeader>
         <Navigation className="pb-4" />
       </SheetContent>
