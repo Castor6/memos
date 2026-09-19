@@ -630,6 +630,15 @@
       "use-tls-description": "Upgrade the SMTP connection with STARTTLS. Keep this on for Gmail with port 587."
     },
     "preference": {
+      "themes": {
+        "system": "Sync with system",
+        "default": "Light",
+        "default-dark": "Dark",
+        "paper": "Paper",
+        "cream": "Cream Cards",
+        "mint": "Mint Garden",
+        "flomo": "flomo Minimal"
+      },
       "appearance-description": "Choose how the app looks and which language it uses for your account.",
       "appearance-title": "Appearance",
       "default-memo-sort-option": "Memo display time",

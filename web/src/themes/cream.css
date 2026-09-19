@@ -1,0 +1,78 @@
+/* 奶油卡片 */
+:root {
+  --background: #fcf9f5;
+  --foreground: #34302d;
+  --card: #fffefd;
+  --card-foreground: #34302d;
+  --popover: #ffffff;
+  --popover-foreground: #34302d;
+  --primary: #ad5935;
+  --primary-foreground: #ffffff;
+  --secondary: #f7e9dc;
+  --secondary-foreground: #34302d;
+  --muted: #f2ece5;
+  --muted-foreground: #82796f;
+  --accent: #ffe0c8;
+  --accent-foreground: #34302d;
+  --border: #efe5db;
+  --input: #e5d9cc;
+  --ring: #ad5935;
+  --sidebar: #faf6ef;
+  --sidebar-foreground: #34302d;
+  --sidebar-accent: #ffe0c8;
+  --sidebar-accent-foreground: #9c4d2c;
+  --sidebar-accent-border: transparent;
+  --radius: 12px;
+  --theme-tag-bg: #ffe9d8;
+  --theme-tag-fg: #99522f;
+  --theme-tag-border: #efc9ac;
+  --theme-card-shadow: 0 4px 18px rgb(135 95 56 / 6%);
+}
+
+/* 仅覆盖外观；保留原有布局、移动导航、编辑器高度与弹窗层级。 */
+html[data-theme="cream"] body {
+  background-color: var(--background);
+  color: var(--foreground);
+}
+html[data-theme="cream"] article.bg-card,
+html[data-theme="cream"] [data-editor-shell] {
+  background-color: var(--card);
+  border-color: var(--border);
+  box-shadow: var(--theme-card-shadow);
+}
+/* 保留评论预览卡片原有的下边缘拼接。 */
+html[data-theme="cream"] article.bg-card:not(.rounded-b-none),
+html[data-theme="cream"] [data-editor-shell] {
+  border-radius: var(--radius);
+}
+html[data-theme="cream"] article.bg-card.rounded-b-none {
+  border-top-left-radius: var(--radius);
+  border-top-right-radius: var(--radius);
+}
+html[data-theme="cream"] article.bg-card [data-tag]:not([style]) {
+  background-color: var(--theme-tag-bg);
+  color: var(--theme-tag-fg);
+  border: 1px solid var(--theme-tag-border);
+  border-radius: 999px;
+  padding: 1px 9px;
+}
+html[data-theme="cream"] a[id^="header-"][aria-current="page"] {
+  background-color: var(--sidebar-accent);
+  color: var(--sidebar-accent-foreground);
+  border-color: transparent;
+  filter: none;
+}
+html[data-theme="cream"] [data-editor-shell] button.bg-primary {
+  border-radius: 9px;
+}
+@media (max-width: 767px) {
+  html[data-theme="cream"] article.bg-card,
+  html[data-theme="cream"] [data-editor-shell] {
+    box-shadow: none;
+  }
+}
+
+html[data-theme="cream"] [data-editor-shell] button.bg-primary {
+  background: #ffdfc7;
+  color: #984723;
+}

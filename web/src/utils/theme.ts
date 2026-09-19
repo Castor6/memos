@@ -1,17 +1,20 @@
+import creamThemeContent from "../themes/cream.css?raw";
 import defaultDarkThemeContent from "../themes/default-dark.css?raw";
+import flomoThemeContent from "../themes/flomo.css?raw";
+import mintThemeContent from "../themes/mint.css?raw";
 import paperThemeContent from "../themes/paper.css?raw";
 
 // ============================================================================
 // Types and Constants
 // ============================================================================
 
-const VALID_THEMES = ["system", "default", "default-dark", "paper"] as const;
+const VALID_THEMES = ["system", "default", "default-dark", "paper", "cream", "mint", "flomo"] as const;
 
 export type Theme = (typeof VALID_THEMES)[number];
 export type ResolvedTheme = Exclude<Theme, "system">;
 
 export interface ThemeOption {
-  value: string;
+  value: Theme;
   label: string;
 }
 
@@ -22,12 +25,18 @@ const THEME_CONTENT: Record<ResolvedTheme, string | null> = {
   default: null,
   "default-dark": defaultDarkThemeContent,
   paper: paperThemeContent,
+  cream: creamThemeContent,
+  mint: mintThemeContent,
+  flomo: flomoThemeContent,
 };
 
 const THEME_COLORS: Record<ResolvedTheme, string> = {
   default: "#faf9f5",
   "default-dark": "#1d1f23",
   paper: "#f5ede4",
+  cream: "#fcf9f5",
+  mint: "#f1f8f3",
+  flomo: "#f8f8f8",
 };
 
 export const THEME_OPTIONS: ThemeOption[] = [
@@ -35,6 +44,9 @@ export const THEME_OPTIONS: ThemeOption[] = [
   { value: "default", label: "Light" },
   { value: "default-dark", label: "Dark" },
   { value: "paper", label: "Paper" },
+  { value: "cream", label: "Cream Cards" },
+  { value: "mint", label: "Mint Garden" },
+  { value: "flomo", label: "flomo Minimal" },
 ];
 
 // ============================================================================

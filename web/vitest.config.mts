@@ -16,6 +16,8 @@ export default defineConfig({
   },
   test: {
     environment: "jsdom",
+    // Theme lifecycle tests exercise the actual CSS imported with ?raw.
+    css: { include: /themes\/.*\.css/ },
     setupFiles: ["./tests/setup.ts"],
     include: ["tests/**/*.test.{ts,tsx}"],
     // Keep each test hermetic:
