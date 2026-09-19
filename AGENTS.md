@@ -35,6 +35,14 @@ Memos is a self-hosted note-taking app.
 - Default UI verification to the Codex in-app browser with local disposable data: desktop 1440×900; the user's iPhone 15 Pro Max uses a 430px-wide layout, checked at heights 739 and 932 (see `docs/development.md`). Verify no persistent left sidebar on mobile. Restore viewport overrides afterward. Use the regular Chrome profile only for a problem specific to it.
 - Narrow viewport checks do not establish iPhone/Safari, software keyboard, touch or PWA behavior; record any required real-device checks explicitly.
 
+## 微信客服项目联动
+
+- 本机定制 Memos 位于 `~/Code/memos`；微信客服剪藏项目位于 `~/Code/wechat-kf-memos`（`~` 指当前用户主目录）。远端分别为 `Castor6/memos`、`Castor6/wechat-kf-memos`。
+- 修改笔记创建/更新、独立标签、空间、附件、认证或其返回结构时，主动读取客服项目的 `AGENTS.md`、`docs/memos-contract.md` 和相关调用代码，确认影响；不等用户再次提醒。
+- 有影响时，把客服适配、接口文档更新和必要验证纳入当前同一任务，在两个项目中一起完成。无影响时说明判断依据，不为同步而修改无关代码。
+- 修改另一项目之前检查其工作区和项目约定，保留已有改动。若本地目录不可用，明确说明尚未完成的联动检查，不把单边修改报告为全部完成。
+- 两个仓库分别提交；配套提交或 PR 互相引用。最终统一汇报两边改动、验证及剩余事项。此约定用于开发任务联动，不自动触发部署。
+
 ## Commands
 
 Run from the repository root unless a command starts with `cd`.
