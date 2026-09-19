@@ -36,13 +36,14 @@ Memos is a self-hosted note-taking app.
 - Default UI verification to the Codex in-app browser with local disposable data: desktop 1440×900; the user's iPhone 15 Pro Max uses a 430px-wide layout, checked at heights 739 and 932 (see `docs/development.md`). Verify no persistent left sidebar on mobile. Restore viewport overrides afterward. Use the regular Chrome profile only for a problem specific to it.
 - Narrow viewport checks do not establish iPhone/Safari, software keyboard, touch or PWA behavior; record any required real-device checks explicitly.
 
-## 微信客服项目联动
+## 内置微信客服模块
 
-- 本机定制 Memos 位于 `~/Code/memos`；微信客服剪藏项目位于 `~/Code/wechat-kf-memos`（`~` 指当前用户主目录）。远端分别为 `Castor6/memos`、`Castor6/wechat-kf-memos`。
-- 修改笔记创建/更新、独立标签、空间、附件、认证或其返回结构时，主动读取客服项目的 `AGENTS.md`、`docs/memos-contract.md` 和相关调用代码，确认影响；不等用户再次提醒。
-- 有影响时，把客服适配、接口文档更新和必要验证纳入当前同一任务，在两个项目中一起完成。无影响时说明判断依据，不为同步而修改无关代码。
-- 修改另一项目之前检查其工作区和项目约定，保留已有改动。若本地目录不可用，明确说明尚未完成的联动检查，不把单边修改报告为全部完成。
-- 两个仓库分别提交；配套提交或 PR 互相引用。最终统一汇报两边改动、验证及剩余事项。此约定用于开发任务联动，不自动触发部署。
+- 2026-09-19 用户选择将微信客服能力以 Go 模块内置到定制 Memos，随同一应用、镜像和版本发布；主开发位置为 `~/Code/memos`，主任务见 `docs/tasks/TASK-20260919-wechat-kf-integration.md`。
+- `~/Code/wechat-kf-memos`（远端 `Castor6/wechat-kf-memos`）保留现有 Python 实现、产品规则和测试，作为迁移参照及切换前的维护入口；不是另一个需要永久同步开发的产品。新增内置能力及 Task 归入 Memos。
+- 实现前读取旧项目 AGENTS、消息/标签/回执规则及相关代码，按行为等价迁移，不能因内置化遗漏白名单、幂等、重试、回执窗口或未知发送状态。迁移前若 Memos 变更影响仍在运行的旧服务，检查并完成必要兼容适配。
+- 内置剪藏复用 Memos 的笔记、标签、空间、附件和权限业务逻辑；协议处理与后台任务保持模块边界。状态通过 Memos store 与三驱动迁移管理，不绕过权限/校验直接插入笔记，不再以 Memos PAT 请求自身 HTTP API。
+- 旧队列、游标、去重和回执状态必须可迁移、可验证；切换前保留旧服务及私有备份，避免两个消费者同时处理。运行迁移、停旧服务和仓库归档分别记录实际结果，不能由文档或 PR 合并推定已完成。
+- 本机路径中的 `~` 指当前用户主目录。跨仓库操作先检查工作区并保留已有改动；迁移期配套提交/PR 互引，长期维护与发布在 Memos 内完成。
 
 ## Commands
 

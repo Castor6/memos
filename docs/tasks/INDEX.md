@@ -4,6 +4,7 @@
 
 | 编号 | 标题 | 模块 / 关键词 | 详情 |
 | --- | --- | --- | --- |
+| TASK-20260919-wechat-kf-integration | 微信客服内置到 Memos | 微信客服、Go、迁移、设置、统一发布 | [详情](TASK-20260919-wechat-kf-integration.md) |
 | TASK-20260919-task-records | 两项目任务记录与开发联动约定 | Task、事实记录、微信客服、接口联动 | [详情](TASK-20260919-task-records.md) |
 | TASK-20260917-tag-menu-image-preview | 标签操作与图片预览尺寸 | 标签、右键、图标、图片 | [详情](TASK-20260917-tag-menu-image-preview.md) |
 | TASK-20260917-pre-commit-whitespace | 提交前空白检查 | Git、空白、CI、开发环境 | [详情](TASK-20260917-pre-commit-whitespace.md) |
