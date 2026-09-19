@@ -30,7 +30,8 @@ Memos is a self-hosted note-taking app.
 - Retrieve history on demand: search `docs/tasks/INDEX.md` by task ID, keywords or affected module; open only relevant task records and necessary linked documents. Do not load all historical tasks at startup.
 - 涉及线上排查、部署或服务器维护时，先读取仓库根目录的 `LOCAL_OPS.md`（若存在），按其中的路径查阅私有维护说明，不做全局目录搜索。该文件仅保存在本机，使用 `.git/info/exclude` 排除，不提交私有路径或凭据；本机缺少该文件时向用户确认维护入口。
 - `docs/README.md` is a navigation entry, not a mandatory reading list. Read `docs/development.md` when running or verifying locally; read deployment documentation only for deployment/upstream work.
-- For substantive work, create or reuse one record from `docs/tasks/TEMPLATE.md`; capture agreed acceptance criteria before implementation and actual verification afterward. Distinguish implemented, verified and deployed. Small related fixes may share a record.
+- 实质工作使用 `docs/tasks/TEMPLATE.md` 创建或续接任务，先记目标和验收标准，收尾记录带日期的实现、实际验证与未覆盖范围；相关小修可共用记录。
+- Task 是工作事实记录，不维护依赖外部变化的 CI、合并、部署状态；索引只负责检索。已发生的操作可附日期/提交/证据链接，后续进展查 PR、Actions、Release 或私有运维记录；不为追赶外部状态反复提交文档。
 - Promote durable decisions into this guide or the relevant module documentation. Keep task details, logs and screenshots out of this file; search archived task indexes only when relevant.
 - Default UI verification to the Codex in-app browser with local disposable data: desktop 1440×900; the user's iPhone 15 Pro Max uses a 430px-wide layout, checked at heights 739 and 932 (see `docs/development.md`). Verify no persistent left sidebar on mobile. Restore viewport overrides afterward. Use the regular Chrome profile only for a problem specific to it.
 - Narrow viewport checks do not establish iPhone/Safari, software keyboard, touch or PWA behavior; record any required real-device checks explicitly.
