@@ -13,6 +13,7 @@ import { isSuperUser } from "@/utils/user";
 import { MemoBody, MemoCommentListView, MemoHeader } from "./components";
 import { MEMO_CARD_BASE_CLASSES } from "./constants";
 import { useImagePreview } from "./hooks";
+import { useMemoContextMenu } from "./hooks/useMemoContextMenu";
 import { computeCommentAmount, MemoViewContext } from "./MemoViewContext";
 import type { MemoViewProps } from "./types";
 
@@ -22,6 +23,7 @@ const PreviewImageDialog = lazyWithReload(() => import("../PreviewImageDialog"))
 const MemoView: React.FC<MemoViewProps> = (props: MemoViewProps) => {
   const { memo: memoData, className, parentPage: parentPageProp, compact, showCreator, showVisibility, showPinned } = props;
   const cardRef = useRef<HTMLDivElement>(null);
+  const contextMenu = useMemoContextMenu();
   const [showEditor, setShowEditor] = useState(false);
   const [EditorComponent, setEditorComponent] = useState<ComponentType<MemoEditorProps>>();
   const [cardWidth, setCardWidth] = useState(0);
@@ -123,8 +125,15 @@ const MemoView: React.FC<MemoViewProps> = (props: MemoViewProps) => {
       className={cn(MEMO_CARD_BASE_CLASSES, showCommentPreview ? "mb-0 rounded-b-none" : "mb-2", className)}
       ref={cardRef}
       tabIndex={readonly ? -1 : 0}
+      {...contextMenu.handlers}
     >
-      <MemoHeader showCreator={showCreator} showVisibility={showVisibility} showPinned={showPinned} />
+      <MemoHeader
+        showCreator={showCreator}
+        showVisibility={showVisibility}
+        showPinned={showPinned}
+        contextMenuPosition={contextMenu.position}
+        onContextMenuClose={contextMenu.close}
+      />
 
       <MemoBody compact={compact} />
 

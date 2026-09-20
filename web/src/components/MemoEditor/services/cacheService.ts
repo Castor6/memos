@@ -4,7 +4,7 @@ import { MemoSchema } from "@/types/proto/api/v1/memo_service_pb";
 import type { EditorState } from "../state";
 export const CACHE_DEBOUNCE_DELAY = 500;
 
-const pendingSaves = new Map<string, ReturnType<typeof window.setTimeout>>();
+const pendingSaves = new Map<string, number>();
 const STRUCTURED_CACHE_ENTRY_KIND = "memos.editor-cache";
 const STRUCTURED_CACHE_ENTRY_VERSION = 1;
 

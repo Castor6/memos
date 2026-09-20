@@ -20,7 +20,7 @@ import { useMemoActions } from "../hooks";
 import { useMemoViewContext, useMemoViewDerived } from "../MemoViewContext";
 import type { MemoHeaderProps } from "../types";
 
-const MemoHeader: React.FC<MemoHeaderProps> = ({ showCreator, showVisibility, showPinned }) => {
+const MemoHeader: React.FC<MemoHeaderProps> = ({ showCreator, showVisibility, showPinned, contextMenuPosition, onContextMenuClose }) => {
   const t = useTranslate();
   const [reactionSelectorOpen, setReactionSelectorOpen] = useState(false);
 
@@ -111,7 +111,13 @@ const MemoHeader: React.FC<MemoHeaderProps> = ({ showCreator, showVisibility, sh
             ☑ {tasks.filter((task) => task.checked).length}/{tasks.length}
           </span>
         )}
-        <MemoActionMenu memo={memo} readonly={readonly} onEdit={openEditor} />
+        <MemoActionMenu
+          memo={memo}
+          readonly={readonly}
+          onEdit={openEditor}
+          contextMenuPosition={contextMenuPosition}
+          onContextMenuClose={onContextMenuClose}
+        />
       </div>
     </div>
   );

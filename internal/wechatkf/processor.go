@@ -84,6 +84,11 @@ func (p *Processor) ProcessWithProgress(ctx context.Context, message Message, pr
 		return Outcome{}, errors.New("missing WeChat message ID")
 	}
 	kind := stringValue(message["msgtype"])
+	if kind == "text" {
+		if text, ok := object(message["text"]); ok && stringValue(text["content"]) == "1" {
+			return Outcome{Ignored: true}, nil
+		}
+	}
 	clip, err := Render(message, p.binding.DefaultTags, p.binding.ChatTag, func(_, kind string) (string, error) { return "[" + Label(kind) + "：待保存]", nil })
 	if err != nil {
 		return Outcome{}, failure("解析消息", err)

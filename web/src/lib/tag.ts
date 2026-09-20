@@ -1,4 +1,18 @@
+import type { CSSProperties } from "react";
+import { colorToHex } from "@/lib/color";
 import type { UserSetting_TagMetadata, UserSetting_TagsSetting } from "@/types/proto/api/v1/user_service_pb";
+
+/** Shared custom tag colors for memo cards, editors and filters. */
+export const getTagStyle = (metadata?: UserSetting_TagMetadata): CSSProperties | undefined => {
+  const color = colorToHex(metadata?.backgroundColor);
+  return color
+    ? {
+        borderColor: color,
+        color: `color-mix(in srgb, ${color} 60%, black)`,
+        backgroundColor: `color-mix(in srgb, ${color} 15%, transparent)`,
+      }
+    : undefined;
+};
 
 // Cache compiled regexes to avoid re-compiling on every tag render.
 const compiledPatternCache = new Map<string, RegExp | null>();

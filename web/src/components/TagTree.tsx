@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import TagSettingsMenu from "@/components/TagSettingsMenu";
 import { useAuth } from "@/contexts/AuthContext";
 import { type MemoFilter, useMemoFilterContext } from "@/contexts/MemoFilterContext";
-import { findTagMetadata } from "@/lib/tag";
+import { findTagMetadata, getTagStyle } from "@/lib/tag";
 
 interface Tag {
   key: string;
@@ -90,7 +90,8 @@ interface TagItemContainerProps {
 const TagItemContainer = (props: TagItemContainerProps) => {
   const { tag, expandSubTags } = props;
   const { userTagsSetting } = useAuth();
-  const emoji = userTagsSetting ? findTagMetadata(tag.text, userTagsSetting)?.emoji : undefined;
+  const metadata = userTagsSetting ? findTagMetadata(tag.text, userTagsSetting) : undefined;
+  const emoji = metadata?.emoji;
   const { getFiltersByFactor, addFilter, removeFilter } = useMemoFilterContext();
   const tagFilters = getFiltersByFactor("tagSearch");
   const isActive = tagFilters.some((f: MemoFilter) => f.value === tag.text);
@@ -128,6 +129,8 @@ const TagItemContainer = (props: TagItemContainerProps) => {
               isActive ? "text-primary" : "text-muted-foreground"
             }`}
             onClick={handleTagClick}
+            data-tag={tag.text}
+            style={getTagStyle(metadata)}
           >
             {emoji ? <span className="mr-1">{emoji}</span> : <HashIcon className="w-4 h-auto shrink-0 mr-1" />}
             <span className={`truncate hover:opacity-80 ${isActive ? "font-medium" : ""}`}>
