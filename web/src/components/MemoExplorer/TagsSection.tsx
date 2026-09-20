@@ -6,7 +6,7 @@ import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/contexts/AuthContext";
 import { type MemoFilter, useMemoFilterContext } from "@/contexts/MemoFilterContext";
 import { useLocalStorage } from "@/hooks";
-import { findTagMetadata } from "@/lib/tag";
+import { findTagMetadata, getTagStyle } from "@/lib/tag";
 import { cn } from "@/lib/utils";
 import { useTranslate } from "@/utils/i18n";
 import TagTree from "../TagTree";
@@ -86,7 +86,8 @@ const TagsSection = (props: Props) => {
         ) : (
           <div className="w-full flex flex-col justify-start items-stretch relative gap-1">
             {tags.map(([tag, amount]) => {
-              const emoji = userTagsSetting ? findTagMetadata(tag, userTagsSetting)?.emoji : undefined;
+              const metadata = userTagsSetting ? findTagMetadata(tag, userTagsSetting) : undefined;
+              const emoji = metadata?.emoji;
               const isActive = getFiltersByFactor("tagSearch").some((filter: MemoFilter) => filter.value === tag);
               return (
                 <TagSettingsMenu key={tag} tag={tag}>
@@ -97,6 +98,8 @@ const TagsSection = (props: Props) => {
                       isActive ? "text-primary" : "text-muted-foreground",
                     )}
                     onClick={() => handleTagClick(tag)}
+                    data-tag={tag}
+                    style={getTagStyle(metadata)}
                   >
                     {emoji ? <span>{emoji}</span> : <HashIcon className="w-4 h-auto shrink-0" />}
                     <div className="inline-flex flex-nowrap ml-0.5 gap-0.5 max-w-[calc(100%-16px)]">

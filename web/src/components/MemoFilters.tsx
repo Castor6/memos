@@ -12,7 +12,9 @@ import {
   XIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
 import { FilterFactor, getMemoFilterKey, MemoFilter, useMemoFilterContext } from "@/contexts/MemoFilterContext";
+import { findTagMetadata, getTagStyle } from "@/lib/tag";
 import { cn } from "@/lib/utils";
 import { useTranslate } from "@/utils/i18n";
 
@@ -59,6 +61,7 @@ const FILTER_CONFIGS: Record<FilterFactor, FilterConfig> = {
 const MemoFilters = ({ className }: { className?: string }) => {
   const t = useTranslate();
   const { filters, removeFilter } = useMemoFilterContext();
+  const { userTagsSetting } = useAuth();
 
   const handleRemoveFilter = (filter: MemoFilter) => {
     removeFilter((f: MemoFilter) => isEqual(f, filter));
@@ -81,14 +84,22 @@ const MemoFilters = ({ className }: { className?: string }) => {
       {filters.map((filter) => {
         const config = FILTER_CONFIGS[filter.factor];
         const Icon = config?.icon;
+        const isTag = filter.factor === "tagSearch";
+        const metadata = isTag && userTagsSetting ? findTagMetadata(filter.value, userTagsSetting) : undefined;
 
         return (
           <div
             key={getMemoFilterKey(filter)}
+            data-tag={isTag ? filter.value : undefined}
+            style={isTag ? getTagStyle(metadata) : undefined}
             className="group inline-flex items-center gap-1.5 h-7 px-2.5 bg-accent/50 hover:bg-accent border border-border/50 rounded-full text-sm transition-all duration-200 hover:shadow-sm"
           >
-            {Icon && <Icon className="w-3.5 h-3.5 text-muted-foreground shrink-0" />}
-            <span className="text-foreground/80 font-medium max-w-32 truncate">{getFilterDisplayText(filter)}</span>
+            {metadata?.emoji ? (
+              <span aria-hidden>{metadata.emoji}</span>
+            ) : (
+              Icon && <Icon className={cn("w-3.5 h-3.5 shrink-0", !isTag && "text-muted-foreground")} />
+            )}
+            <span className={cn("font-medium max-w-32 truncate", !isTag && "text-foreground/80")}>{getFilterDisplayText(filter)}</span>
             <span className="ml-0.5 -mr-1">
               <Button variant="ghost" size="icon-sm" onClick={() => handleRemoveFilter(filter)} aria-label="Remove filter">
                 <XIcon className="w-3 h-3" />

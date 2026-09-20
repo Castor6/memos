@@ -5,4 +5,6 @@ export interface MemoActionMenuProps {
   readonly?: boolean;
   className?: string;
   onEdit?: () => void;
+  contextMenuPosition?: { x: number; y: number } | null;
+  onContextMenuClose?: () => void;
 }

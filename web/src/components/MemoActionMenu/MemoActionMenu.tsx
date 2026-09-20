@@ -14,7 +14,7 @@ import {
   MoreVerticalIcon,
   TrashIcon,
 } from "lucide-react";
-import { Suspense, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,12 +36,22 @@ import type { MemoActionMenuProps } from "./types";
 const MemoExportPdfDialog = lazyWithReload(() => import("./MemoExportPdfDialog"));
 
 const MemoActionMenu = (props: MemoActionMenuProps) => {
-  const { memo, readonly } = props;
+  const { memo, readonly, contextMenuPosition, onContextMenuClose } = props;
   const t = useTranslate();
 
   // Dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [pdfOpen, setPdfOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const contextAnchor = useMemo(
+    () =>
+      contextMenuPosition
+        ? {
+            getBoundingClientRect: () => DOMRect.fromRect({ x: contextMenuPosition.x, y: contextMenuPosition.y, width: 0, height: 0 }),
+          }
+        : undefined,
+    [contextMenuPosition],
+  );
 
   // Derived state
   const isComment = Boolean(memo.parent);
@@ -67,11 +77,17 @@ const MemoActionMenu = (props: MemoActionMenuProps) => {
   });
 
   return (
-    <DropdownMenu>
+    <DropdownMenu
+      open={Boolean(contextMenuPosition) || menuOpen}
+      onOpenChange={(open) => {
+        setMenuOpen(open);
+        if (!open) onContextMenuClose?.();
+      }}
+    >
       <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="size-4" aria-label="笔记操作" />}>
         <MoreVerticalIcon className="text-muted-foreground" />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" sideOffset={2}>
+      <DropdownMenuContent anchor={contextAnchor} align={contextAnchor ? "start" : "end"} sideOffset={2}>
         {/* Edit actions (non-readonly, non-archived) */}
         {!readonly && !isArchived && (
           <>

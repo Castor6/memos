@@ -3,9 +3,8 @@ import { useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { type MemoFilter, stringifyFilters, useMemoFilterContext } from "@/contexts/MemoFilterContext";
 import useNavigateTo from "@/hooks/useNavigateTo";
-import { colorToHex } from "@/lib/color";
 import { tagStyles } from "@/lib/markdownStyles";
-import { findTagMetadata } from "@/lib/tag";
+import { findTagMetadata, getTagStyle } from "@/lib/tag";
 import { cn } from "@/lib/utils";
 import { Routes } from "@/router";
 import { useMemoViewContext } from "../MemoView/MemoViewContext";
@@ -27,17 +26,10 @@ export const Tag: React.FC<TagProps> = ({ "data-tag": dataTag, children, classNa
 
   // Custom color from user tag metadata. Dynamic hex values must use inline styles
   // because Tailwind can't scan dynamically constructed class names.
-  // Text uses a darkened variant (40% color + black) for contrast on light backgrounds.
+  // Shared styles keep custom colors consistent with editor and filter tags.
   const metadata = userTagsSetting ? findTagMetadata(tag, userTagsSetting) : undefined;
-  const bgHex = colorToHex(metadata?.backgroundColor);
-  const tagStyle: React.CSSProperties | undefined = bgHex
-    ? {
-        borderColor: bgHex,
-        color: `color-mix(in srgb, ${bgHex} 60%, black)`,
-        backgroundColor: `color-mix(in srgb, ${bgHex} 15%, transparent)`,
-        ...style,
-      }
-    : style;
+  const customStyle = getTagStyle(metadata);
+  const tagStyle = customStyle ? { ...customStyle, ...style } : style;
 
   const handleTagClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -67,7 +59,12 @@ export const Tag: React.FC<TagProps> = ({ "data-tag": dataTag, children, classNa
 
   return (
     <span
-      className={cn(tagStyles.base, "cursor-pointer transition-opacity hover:opacity-75", !bgHex && tagStyles.defaultColor, className)}
+      className={cn(
+        tagStyles.base,
+        "cursor-pointer transition-opacity hover:opacity-75",
+        !customStyle && tagStyles.defaultColor,
+        className,
+      )}
       style={tagStyle}
       data-tag={tag}
       {...props}

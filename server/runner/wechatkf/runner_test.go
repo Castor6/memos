@@ -76,6 +76,37 @@ func saveConfig(t *testing.T, ts *apitest.TestService, config core.Config) {
 	require.NoError(t, ts.Store.SaveWeChatConfiguration(context.Background(), sealed, state.Revision))
 }
 
+func TestStandaloneOneAdvancesCursorWithoutMemoOrReceipt(t *testing.T) {
+	ts, runner, config := configured(t)
+	config.Enabled = true
+	config.Receipts = true
+	saveConfig(t, ts, config)
+	ctx := context.Background()
+	state, err := ts.Store.WeChatConfiguration(ctx)
+	require.NoError(t, err)
+	acquired, err := ts.Store.AcquireWeChatConsumer(ctx, "test-owner", state.Revision, time.Now().Unix())
+	require.NoError(t, err)
+	require.True(t, acquired)
+	remote := &fakeRemote{message: core.Message{"msgid": "one", "msgtype": "text", "text": map[string]any{"content": "1"}, "external_userid": "self", "open_kfid": "kf", "origin": 3, "send_time": time.Now().Unix()}}
+	processor, err := core.NewProcessor(config.Binding, runner.notes(config), remote.Download)
+	require.NoError(t, err)
+	require.NoError(t, runner.tick(ctx, "test-owner", state.Revision, config, remote, processor))
+	// A repeated sync page must not create another job or restore the raw message.
+	require.NoError(t, ts.Store.AcceptWeChatPage(ctx, "test-owner", state.Revision, "cursor-after", []core.Message{remote.message}, config.Binding, time.Now().Unix()))
+	require.NoError(t, runner.tick(ctx, "test-owner", state.Revision, config, remote, processor))
+	status, err := ts.Store.WeChatStatus(ctx)
+	require.NoError(t, err)
+	require.EqualValues(t, 1, status.Jobs["done"])
+	require.Empty(t, status.Replies)
+	require.Zero(t, remote.sends)
+	memos, err := ts.Store.ListMemos(ctx, &store.FindMemo{})
+	require.NoError(t, err)
+	require.Empty(t, memos)
+	sync, err := ts.Store.ReadWeChatSync(ctx)
+	require.NoError(t, err)
+	require.Equal(t, "cursor-after", sync.Cursor)
+}
+
 func TestRunnerLifecycleAndAmbiguousReceipt(t *testing.T) {
 	for _, uncertain := range []bool{false, true} {
 		t.Run(strconv.FormatBool(uncertain), func(t *testing.T) {

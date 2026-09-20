@@ -13,6 +13,8 @@ export interface MemoViewProps {
 }
 
 export interface MemoHeaderProps {
+  contextMenuPosition?: { x: number; y: number } | null;
+  onContextMenuClose?: () => void;
   showCreator?: boolean;
   showVisibility?: boolean;
   showPinned?: boolean;

@@ -49,12 +49,16 @@ html[data-theme="flomo"] article.bg-card.rounded-b-none {
   border-top-left-radius: var(--radius);
   border-top-right-radius: var(--radius);
 }
-html[data-theme="flomo"] article.bg-card [data-tag]:not([style]) {
+html[data-theme="flomo"] [data-tag] {
+  border: 1px solid var(--theme-tag-border);
+  border-radius: 5px;
+  padding: 1px 5px;
+  font-size: 0.9em;
+  line-height: 1.4;
+}
+html[data-theme="flomo"] [data-tag]:not([style]) {
   background-color: var(--theme-tag-bg);
   color: var(--theme-tag-fg);
-  border: 1px solid var(--theme-tag-border);
-  border-radius: 999px;
-  padding: 1px 9px;
 }
 html[data-theme="flomo"] a[id^="header-"][aria-current="page"] {
   background-color: var(--sidebar-accent);
@@ -75,9 +79,16 @@ html[data-theme="flomo"] [data-editor-shell] button.bg-primary {
 html[data-theme="flomo"] article.bg-card {
   border-color: transparent;
 }
-html[data-theme="flomo"] article.bg-card [data-tag]:not([style]) {
-  border-radius: 5px;
-  padding: 1px 5px;
+html[data-theme="flomo"] .memo-link,
+html[data-theme="flomo"] .cm-md-link,
+html[data-theme="flomo"] .cm-md-url,
+html[data-theme="flomo"] .cm-memo-tag {
+  color: var(--theme-tag-fg);
+  text-decoration-color: var(--theme-tag-fg);
+}
+html[data-theme="flomo"] [data-slot="checkbox"]:not([data-checked]) {
+  border-color: #8993a2;
+  background-color: var(--card);
 }
 html[data-theme="flomo"] [data-editor-shell] button.bg-primary {
   background: #27c975;
