@@ -129,7 +129,7 @@ const TagItemContainer = (props: TagItemContainerProps) => {
               isActive ? "text-primary" : "text-muted-foreground"
             }`}
             onClick={handleTagClick}
-            data-tag={tag.text}
+            data-sidebar-tag={tag.text}
             style={getTagStyle(metadata)}
           >
             {emoji ? <span className="mr-1">{emoji}</span> : <HashIcon className="w-4 h-auto shrink-0 mr-1" />}

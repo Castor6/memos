@@ -14,7 +14,7 @@ import {
   MoreVerticalIcon,
   TrashIcon,
 } from "lucide-react";
-import { Suspense, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,11 +29,10 @@ import {
 import { downloadMemoMarkdown, exportMemoMarkdown, memoExportFilename } from "@/lib/memo-export";
 import { State } from "@/types/proto/api/v1/common_pb";
 import { useTranslate } from "@/utils/i18n";
-import { lazyWithReload } from "@/utils/lazy";
 import { useMemoActionHandlers } from "./hooks";
 import type { MemoActionMenuProps } from "./types";
 
-const MemoExportPdfDialog = lazyWithReload(() => import("./MemoExportPdfDialog"));
+import { useMemoPdfExport } from "./useMemoPdfExport";
 
 const MemoActionMenu = (props: MemoActionMenuProps) => {
   const { memo, readonly, contextMenuPosition, onContextMenuClose } = props;
@@ -41,7 +40,7 @@ const MemoActionMenu = (props: MemoActionMenuProps) => {
 
   // Dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [pdfOpen, setPdfOpen] = useState(false);
+  const { exporting, download } = useMemoPdfExport(memo);
   const [menuOpen, setMenuOpen] = useState(false);
   const contextAnchor = useMemo(
     () =>
@@ -140,7 +139,9 @@ const MemoActionMenu = (props: MemoActionMenuProps) => {
             >
               Markdown (.md)
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setPdfOpen(true)}>PDF (.pdf)</DropdownMenuItem>
+            <DropdownMenuItem disabled={exporting} onClick={() => void download()}>
+              {exporting ? "正在生成 PDF…" : "PDF (.pdf)"}
+            </DropdownMenuItem>
           </DropdownMenuSubContent>
         </DropdownMenuSub>
 
@@ -183,12 +184,6 @@ const MemoActionMenu = (props: MemoActionMenuProps) => {
           </>
         )}
       </DropdownMenuContent>
-
-      {pdfOpen && (
-        <Suspense fallback={null}>
-          <MemoExportPdfDialog memo={memo} onClose={() => setPdfOpen(false)} />
-        </Suspense>
-      )}
 
       {/* Delete confirmation dialog */}
       <ConfirmDialog

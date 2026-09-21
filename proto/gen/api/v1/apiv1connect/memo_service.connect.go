@@ -38,6 +38,12 @@ const (
 	MemoServiceCreateMemoProcedure = "/memos.api.v1.MemoService/CreateMemo"
 	// MemoServiceListMemosProcedure is the fully-qualified name of the MemoService's ListMemos RPC.
 	MemoServiceListMemosProcedure = "/memos.api.v1.MemoService/ListMemos"
+	// MemoServiceExportMemoPdfProcedure is the fully-qualified name of the MemoService's ExportMemoPdf
+	// RPC.
+	MemoServiceExportMemoPdfProcedure = "/memos.api.v1.MemoService/ExportMemoPdf"
+	// MemoServiceExportSharedMemoPdfProcedure is the fully-qualified name of the MemoService's
+	// ExportSharedMemoPdf RPC.
+	MemoServiceExportSharedMemoPdfProcedure = "/memos.api.v1.MemoService/ExportSharedMemoPdf"
 	// MemoServiceGetMemoProcedure is the fully-qualified name of the MemoService's GetMemo RPC.
 	MemoServiceGetMemoProcedure = "/memos.api.v1.MemoService/GetMemo"
 	// MemoServiceUpdateMemoProcedure is the fully-qualified name of the MemoService's UpdateMemo RPC.
@@ -99,6 +105,10 @@ type MemoServiceClient interface {
 	CreateMemo(context.Context, *connect.Request[v1.CreateMemoRequest]) (*connect.Response[v1.Memo], error)
 	// ListMemos lists memos with pagination and filter.
 	ListMemos(context.Context, *connect.Request[v1.ListMemosRequest]) (*connect.Response[v1.ListMemosResponse], error)
+	// ExportMemoPdf generates a PDF using the full saved memo content.
+	ExportMemoPdf(context.Context, *connect.Request[v1.ExportMemoPdfRequest]) (*connect.Response[v1.ExportMemoPdfResponse], error)
+	// ExportSharedMemoPdf exports only the memo authorized by an active share token.
+	ExportSharedMemoPdf(context.Context, *connect.Request[v1.ExportSharedMemoPdfRequest]) (*connect.Response[v1.ExportMemoPdfResponse], error)
 	// GetMemo gets a memo.
 	GetMemo(context.Context, *connect.Request[v1.GetMemoRequest]) (*connect.Response[v1.Memo], error)
 	// UpdateMemo updates a memo.
@@ -164,6 +174,18 @@ func NewMemoServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			httpClient,
 			baseURL+MemoServiceListMemosProcedure,
 			connect.WithSchema(memoServiceMethods.ByName("ListMemos")),
+			connect.WithClientOptions(opts...),
+		),
+		exportMemoPdf: connect.NewClient[v1.ExportMemoPdfRequest, v1.ExportMemoPdfResponse](
+			httpClient,
+			baseURL+MemoServiceExportMemoPdfProcedure,
+			connect.WithSchema(memoServiceMethods.ByName("ExportMemoPdf")),
+			connect.WithClientOptions(opts...),
+		),
+		exportSharedMemoPdf: connect.NewClient[v1.ExportSharedMemoPdfRequest, v1.ExportMemoPdfResponse](
+			httpClient,
+			baseURL+MemoServiceExportSharedMemoPdfProcedure,
+			connect.WithSchema(memoServiceMethods.ByName("ExportSharedMemoPdf")),
 			connect.WithClientOptions(opts...),
 		),
 		getMemo: connect.NewClient[v1.GetMemoRequest, v1.Memo](
@@ -281,6 +303,8 @@ func NewMemoServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 type memoServiceClient struct {
 	createMemo           *connect.Client[v1.CreateMemoRequest, v1.Memo]
 	listMemos            *connect.Client[v1.ListMemosRequest, v1.ListMemosResponse]
+	exportMemoPdf        *connect.Client[v1.ExportMemoPdfRequest, v1.ExportMemoPdfResponse]
+	exportSharedMemoPdf  *connect.Client[v1.ExportSharedMemoPdfRequest, v1.ExportMemoPdfResponse]
 	getMemo              *connect.Client[v1.GetMemoRequest, v1.Memo]
 	updateMemo           *connect.Client[v1.UpdateMemoRequest, v1.Memo]
 	deleteMemo           *connect.Client[v1.DeleteMemoRequest, emptypb.Empty]
@@ -309,6 +333,16 @@ func (c *memoServiceClient) CreateMemo(ctx context.Context, req *connect.Request
 // ListMemos calls memos.api.v1.MemoService.ListMemos.
 func (c *memoServiceClient) ListMemos(ctx context.Context, req *connect.Request[v1.ListMemosRequest]) (*connect.Response[v1.ListMemosResponse], error) {
 	return c.listMemos.CallUnary(ctx, req)
+}
+
+// ExportMemoPdf calls memos.api.v1.MemoService.ExportMemoPdf.
+func (c *memoServiceClient) ExportMemoPdf(ctx context.Context, req *connect.Request[v1.ExportMemoPdfRequest]) (*connect.Response[v1.ExportMemoPdfResponse], error) {
+	return c.exportMemoPdf.CallUnary(ctx, req)
+}
+
+// ExportSharedMemoPdf calls memos.api.v1.MemoService.ExportSharedMemoPdf.
+func (c *memoServiceClient) ExportSharedMemoPdf(ctx context.Context, req *connect.Request[v1.ExportSharedMemoPdfRequest]) (*connect.Response[v1.ExportMemoPdfResponse], error) {
+	return c.exportSharedMemoPdf.CallUnary(ctx, req)
 }
 
 // GetMemo calls memos.api.v1.MemoService.GetMemo.
@@ -409,6 +443,10 @@ type MemoServiceHandler interface {
 	CreateMemo(context.Context, *connect.Request[v1.CreateMemoRequest]) (*connect.Response[v1.Memo], error)
 	// ListMemos lists memos with pagination and filter.
 	ListMemos(context.Context, *connect.Request[v1.ListMemosRequest]) (*connect.Response[v1.ListMemosResponse], error)
+	// ExportMemoPdf generates a PDF using the full saved memo content.
+	ExportMemoPdf(context.Context, *connect.Request[v1.ExportMemoPdfRequest]) (*connect.Response[v1.ExportMemoPdfResponse], error)
+	// ExportSharedMemoPdf exports only the memo authorized by an active share token.
+	ExportSharedMemoPdf(context.Context, *connect.Request[v1.ExportSharedMemoPdfRequest]) (*connect.Response[v1.ExportMemoPdfResponse], error)
 	// GetMemo gets a memo.
 	GetMemo(context.Context, *connect.Request[v1.GetMemoRequest]) (*connect.Response[v1.Memo], error)
 	// UpdateMemo updates a memo.
@@ -470,6 +508,18 @@ func NewMemoServiceHandler(svc MemoServiceHandler, opts ...connect.HandlerOption
 		MemoServiceListMemosProcedure,
 		svc.ListMemos,
 		connect.WithSchema(memoServiceMethods.ByName("ListMemos")),
+		connect.WithHandlerOptions(opts...),
+	)
+	memoServiceExportMemoPdfHandler := connect.NewUnaryHandler(
+		MemoServiceExportMemoPdfProcedure,
+		svc.ExportMemoPdf,
+		connect.WithSchema(memoServiceMethods.ByName("ExportMemoPdf")),
+		connect.WithHandlerOptions(opts...),
+	)
+	memoServiceExportSharedMemoPdfHandler := connect.NewUnaryHandler(
+		MemoServiceExportSharedMemoPdfProcedure,
+		svc.ExportSharedMemoPdf,
+		connect.WithSchema(memoServiceMethods.ByName("ExportSharedMemoPdf")),
 		connect.WithHandlerOptions(opts...),
 	)
 	memoServiceGetMemoHandler := connect.NewUnaryHandler(
@@ -586,6 +636,10 @@ func NewMemoServiceHandler(svc MemoServiceHandler, opts ...connect.HandlerOption
 			memoServiceCreateMemoHandler.ServeHTTP(w, r)
 		case MemoServiceListMemosProcedure:
 			memoServiceListMemosHandler.ServeHTTP(w, r)
+		case MemoServiceExportMemoPdfProcedure:
+			memoServiceExportMemoPdfHandler.ServeHTTP(w, r)
+		case MemoServiceExportSharedMemoPdfProcedure:
+			memoServiceExportSharedMemoPdfHandler.ServeHTTP(w, r)
 		case MemoServiceGetMemoProcedure:
 			memoServiceGetMemoHandler.ServeHTTP(w, r)
 		case MemoServiceUpdateMemoProcedure:
@@ -637,6 +691,14 @@ func (UnimplementedMemoServiceHandler) CreateMemo(context.Context, *connect.Requ
 
 func (UnimplementedMemoServiceHandler) ListMemos(context.Context, *connect.Request[v1.ListMemosRequest]) (*connect.Response[v1.ListMemosResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("memos.api.v1.MemoService.ListMemos is not implemented"))
+}
+
+func (UnimplementedMemoServiceHandler) ExportMemoPdf(context.Context, *connect.Request[v1.ExportMemoPdfRequest]) (*connect.Response[v1.ExportMemoPdfResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("memos.api.v1.MemoService.ExportMemoPdf is not implemented"))
+}
+
+func (UnimplementedMemoServiceHandler) ExportSharedMemoPdf(context.Context, *connect.Request[v1.ExportSharedMemoPdfRequest]) (*connect.Response[v1.ExportMemoPdfResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("memos.api.v1.MemoService.ExportSharedMemoPdf is not implemented"))
 }
 
 func (UnimplementedMemoServiceHandler) GetMemo(context.Context, *connect.Request[v1.GetMemoRequest]) (*connect.Response[v1.Memo], error) {

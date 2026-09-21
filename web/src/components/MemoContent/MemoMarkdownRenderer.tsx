@@ -7,6 +7,7 @@ import rehypeSanitize from "rehype-sanitize";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 import { isMentionElement, isTagElement, isTaskListItemElement } from "@/types/markdown";
+import type { LinkMetadata } from "@/types/proto/api/v1/memo_service_pb";
 import { lazyWithReload } from "@/utils/lazy";
 import { rehypeHeadingId } from "@/utils/rehype-plugins/rehype-heading-id";
 import { remarkDisableSetext } from "@/utils/remark-plugins/remark-disable-setext";
@@ -29,6 +30,7 @@ import { TrustedIframe } from "./TrustedIframe";
 
 export interface MemoMarkdownRendererProps {
   content: string;
+  linkMetadata?: LinkMetadata[];
   explicitTags?: boolean;
   displayedTags?: readonly string[];
   maxCharacters?: number;
@@ -70,6 +72,7 @@ function getMentionUsername(node: Element, children?: ReactNode): string {
 }
 
 export const MemoMarkdownRendererCore = ({
+  linkMetadata,
   explicitTags = false,
   displayedTags,
   maxCharacters = 0,
@@ -166,7 +169,7 @@ export const MemoMarkdownRendererCore = ({
   };
 
   return (
-    <MarkdownRenderContext.Provider value={rootMarkdownRenderContext}>
+    <MarkdownRenderContext.Provider value={{ ...rootMarkdownRenderContext, linkMetadata }}>
       <ReactMarkdown
         remarkPlugins={[
           remarkDisableSetext,
@@ -211,6 +214,7 @@ export const MemoMarkdownRenderer = memo(
   MemoMarkdownRendererComponent,
   (previous, next) =>
     previous.content === next.content &&
+    previous.linkMetadata === next.linkMetadata &&
     previous.memoName === next.memoName &&
     previous.compact === next.compact &&
     previous.explicitTags === next.explicitTags &&

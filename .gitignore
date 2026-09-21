@@ -37,3 +37,6 @@ web/coverage/
 
 # Python deployment checks.
 __pycache__/
+
+# Server PDF runtime dependencies.
+/scripts/pdf/node_modules/

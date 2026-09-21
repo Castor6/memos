@@ -30,6 +30,20 @@ service MemoService {
     option (google.api.http) = {get: "/api/v1/memos"};
     option (google.api.method_signature) = "";
   }
+  // ExportMemoPdf generates a PDF using the full saved memo content.
+  rpc ExportMemoPdf(ExportMemoPdfRequest) returns (ExportMemoPdfResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/{name=memos/*}:exportPdf"
+      body: "*"
+    };
+  }
+  // ExportSharedMemoPdf exports only the memo authorized by an active share token.
+  rpc ExportSharedMemoPdf(ExportSharedMemoPdfRequest) returns (ExportMemoPdfResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/shares/{share_token}/memo:exportPdf"
+      body: "*"
+    };
+  }
   // GetMemo gets a memo.
   rpc GetMemo(GetMemoRequest) returns (Memo) {
     option (google.api.http) = {get: "/api/v1/{name=memos/*}"};
@@ -274,6 +288,9 @@ message Memo {
   bool is_todo = 20 [(google.api.field_behavior) = OPTIONAL];
   // True when tags are managed separately from Markdown.
   bool explicit_tags = 21 [(google.api.field_behavior) = OPTIONAL];
+
+  // Persisted link previews, available without fetching the source page again.
+  repeated LinkMetadata link_metadata = 22 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Computed properties of a memo.
   message Property {
@@ -664,4 +681,19 @@ message LinkMetadata {
 
   // The link image URL.
   string image = 4;
+}
+
+message ExportMemoPdfRequest {
+  string name = 1 [(google.api.field_behavior) = REQUIRED];
+  // Browser origin used only to make document links absolute when InstanceURL is unset.
+  string origin = 2;
+}
+
+message ExportSharedMemoPdfRequest {
+  string share_token = 1 [(google.api.field_behavior) = REQUIRED];
+  string origin = 2;
+}
+
+message ExportMemoPdfResponse {
+  bytes content = 1;
 }

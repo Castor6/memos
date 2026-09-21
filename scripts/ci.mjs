@@ -5,7 +5,7 @@ import { pathToFileURL } from "node:url";
 export function isReleasable(path) {
   if (/\.(md|test\.[cm]?[jt]sx?|spec\.[cm]?[jt]sx?)$/.test(path) || path.endsWith("_test.go")) return false;
   if (path.startsWith("web/tests/") || path.startsWith("store/test/")) return false;
-  return path.startsWith("web/src/") || path.startsWith("web/public/") || path.startsWith("proto/") || path.startsWith("store/db/") ||
+  return path.startsWith("scripts/pdf/") || path.startsWith("web/src/") || path.startsWith("web/public/") || path.startsWith("proto/") || path.startsWith("store/db/") ||
     path.endsWith(".go") || ["go.mod", "go.sum", "web/package.json", "web/pnpm-lock.yaml", "web/index.html",
       "web/vite.config.mts", "scripts/Dockerfile", "scripts/entrypoint.sh"].includes(path);
 }
@@ -15,10 +15,10 @@ export function classify(paths, { full = false, versionPR = false } = {}) {
   const workflow = paths.some((path) => path.startsWith(".github/workflows/"));
   const all = full || versionPR || workflow;
   return {
-    frontend: all || paths.some((path) => path.startsWith("web/") || path.startsWith("proto/") || path === ".node-version"),
+    frontend: all || paths.some((path) => path.startsWith("scripts/pdf/") || path.startsWith("web/") || path.startsWith("proto/") || path === ".node-version"),
     backend: all || paths.some((path) => path.endsWith(".go") || path.startsWith("proto/") || path.startsWith("store/") || ["go.mod", "go.sum", ".golangci.yaml"].includes(path)),
     proto: all || paths.some((path) => path.startsWith("proto/") && !path.endsWith(".md")),
-    upgrade: full || paths.some((path) => /^(store\/(db|migration)\/|store\/migrator\.go$|server\/server\.go$)/.test(path) ||
+    upgrade: full || paths.some((path) => path.startsWith("scripts/pdf/") || /^(store\/(db|migration)\/|store\/migrator\.go$|server\/server\.go$)/.test(path) ||
       ["scripts/Dockerfile", "scripts/entrypoint.sh", "scripts/release_smoke_test.sh", ".github/workflows/upgrade-smoke.yml"].includes(path)),
     workflow,
   };

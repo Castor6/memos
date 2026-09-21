@@ -98,7 +98,7 @@ const TagsSection = (props: Props) => {
                       isActive ? "text-primary" : "text-muted-foreground",
                     )}
                     onClick={() => handleTagClick(tag)}
-                    data-tag={tag}
+                    data-sidebar-tag={tag}
                     style={getTagStyle(metadata)}
                   >
                     {emoji ? <span>{emoji}</span> : <HashIcon className="w-4 h-auto shrink-0" />}

@@ -1,3 +1,10 @@
+FROM --platform=$BUILDPLATFORM node:22.23.2-alpine3.23 AS pdf
+WORKDIR /pdf
+COPY scripts/pdf/package.json scripts/pdf/package-lock.json ./
+RUN npm ci --omit=dev --ignore-scripts
+COPY scripts/pdf/render.mjs ./
+COPY scripts/pdf/fonts ./fonts
+
 FROM --platform=$BUILDPLATFORM golang:1.26.2-alpine AS backend
 WORKDIR /backend-build
 
@@ -25,8 +32,8 @@ RUN --mount=type=cache,target=/go/pkg/mod \
       -o memos \
       ./cmd/memos
 
-# Use minimal Alpine with security updates
-FROM alpine:3.21 AS monolithic
+# Include Node for PDF generation; this tag also supports arm/v7.
+FROM node:22.23.2-alpine3.23 AS monolithic
 
 # Install runtime dependencies and create non-root user in single layer
 RUN apk add --no-cache tzdata ca-certificates su-exec && \
@@ -34,6 +41,8 @@ RUN apk add --no-cache tzdata ca-certificates su-exec && \
     adduser -u 10001 -S -G nonroot -h /var/opt/memos nonroot && \
     mkdir -p /var/opt/memos /usr/local/memos && \
     chown -R nonroot:nonroot /var/opt/memos
+
+COPY --from=pdf /pdf /usr/local/memos/pdf
 
 # Copy binary and entrypoint to /usr/local/memos
 COPY --from=backend /backend-build/memos /usr/local/memos/memos

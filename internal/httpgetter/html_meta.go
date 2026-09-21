@@ -155,11 +155,16 @@ func setWeChatArticleHeaders(req *http.Request) {
 }
 
 func GetHTMLMeta(urlStr string) (*HTMLMeta, error) {
+	return GetHTMLMetaWithContext(context.Background(), urlStr)
+}
+
+// GetHTMLMetaWithContext fetches metadata with cancellation and the same network restrictions.
+func GetHTMLMetaWithContext(ctx context.Context, urlStr string) (*HTMLMeta, error) {
 	if err := validateURL(urlStr); err != nil {
 		return nil, err
 	}
 
-	req, err := http.NewRequest(http.MethodGet, urlStr, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, urlStr, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "create link metadata request")
 	}

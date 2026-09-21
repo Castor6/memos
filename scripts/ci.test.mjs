@@ -13,6 +13,9 @@ test("docs skip heavy jobs; workflow and version PRs check the application", () 
   assert.ok(classify(["store/db/sqlite/migration/0.31/00__change.sql"]).backend);
   assert.equal(classify(["web/README.md"]).frontend, false);
   assert.ok(classify(["web/tests/editor.test.tsx"]).frontend);
+  assert.ok(classify(["scripts/pdf/render.mjs"]).frontend);
+  assert.ok(classify(["scripts/pdf/render.mjs"]).upgrade);
+  assert.ok(isReleasable("scripts/pdf/render.mjs"));
 });
 
 test("release notes are needed for shipped behavior, not docs and tests", () => {

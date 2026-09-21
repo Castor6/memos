@@ -1355,6 +1355,38 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /api/v1/memos/{memo}:exportPdf:
+        post:
+            tags:
+                - MemoService
+            description: ExportMemoPdf generates a PDF using the full saved memo content.
+            operationId: MemoService_ExportMemoPdf
+            parameters:
+                - name: memo
+                  in: path
+                  description: The memo id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/ExportMemoPdfRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ExportMemoPdfResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /api/v1/shares/{shareToken}/memo:
         get:
             tags:
@@ -1377,6 +1409,37 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Memo'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /api/v1/shares/{shareToken}/memo:exportPdf:
+        post:
+            tags:
+                - MemoService
+            description: ExportSharedMemoPdf exports only the memo authorized by an active share token.
+            operationId: MemoService_ExportSharedMemoPdf
+            parameters:
+                - name: shareToken
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/ExportSharedMemoPdfRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ExportMemoPdfResponse'
                 default:
                     description: Default error response
                     content:
@@ -2769,6 +2832,31 @@ components:
                     description: |-
                         The actual token value - only returned on creation.
                          This is the only time the token value will be visible.
+        ExportMemoPdfRequest:
+            required:
+                - name
+            type: object
+            properties:
+                name:
+                    type: string
+                origin:
+                    type: string
+                    description: Browser origin used only to make document links absolute when InstanceURL is unset.
+        ExportMemoPdfResponse:
+            type: object
+            properties:
+                content:
+                    type: string
+                    format: bytes
+        ExportSharedMemoPdfRequest:
+            required:
+                - shareToken
+            type: object
+            properties:
+                shareToken:
+                    type: string
+                origin:
+                    type: string
         FieldMapping:
             type: object
             properties:
@@ -3413,6 +3501,12 @@ components:
                 explicitTags:
                     type: boolean
                     description: True when tags are managed separately from Markdown.
+                linkMetadata:
+                    readOnly: true
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/LinkMetadata'
+                    description: Persisted link previews, available without fetching the source page again.
         MemoRelation:
             required:
                 - memo

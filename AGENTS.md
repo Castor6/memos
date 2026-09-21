@@ -163,4 +163,4 @@ cd proto && buf format -w          # Format proto files
 - Backend CI: Go 1.26.2, `go mod tidy -go=1.26.2`, golangci-lint v2.11.3, test groups `store`, `server`, `internal`, `other`.
 - Frontend CI: Node 24, pnpm 11.0.1, `pnpm lint`, `pnpm test`, `pnpm build`.
 - Proto CI: `buf lint` and `buf format` check.
-- Docker: `scripts/Dockerfile`, Alpine 3.21 runtime, non-root user, port 5230, multi-arch amd64/arm64/arm/v7.
+- Docker: `scripts/Dockerfile`, Node 22.23.2 / Alpine 3.23 runtime（含服务端 PDF 排版组件）, non-root user, port 5230, multi-arch amd64/arm64/arm/v7.

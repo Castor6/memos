@@ -101,3 +101,24 @@ func TestBatchGetLinkMetadataTooManyURLs(t *testing.T) {
 	require.Error(t, err)
 	require.Equal(t, codes.InvalidArgument, status.Code(err))
 }
+
+func TestLinkMetadataUsesPersistentSnapshot(t *testing.T) {
+	service := newIntegrationService(t)
+	original := fetchHTMLMeta
+	t.Cleanup(func() { fetchHTMLMeta = original })
+	calls := 0
+	fetchHTMLMeta = func(_ string) (*httpgetter.HTMLMeta, error) {
+		calls++
+		return &httpgetter.HTMLMeta{Title: "历史标题", Description: "历史摘要"}, nil
+	}
+	request := &v1pb.GetLinkMetadataRequest{Url: "https://example.com/persistent"}
+	first, err := service.GetLinkMetadata(context.Background(), request)
+	require.NoError(t, err)
+	// A new API service has no query cache from the first request.
+	fresh := NewAPIV1Service(service.Secret, service.Profile, service.Store)
+	second, err := fresh.GetLinkMetadata(context.Background(), request)
+	require.NoError(t, err)
+	require.Equal(t, first.Title, second.Title)
+	require.Equal(t, first.Description, second.Description)
+	require.Equal(t, 1, calls)
+}

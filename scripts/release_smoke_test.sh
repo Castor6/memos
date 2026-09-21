@@ -301,6 +301,16 @@ create_memo() {
   jq -e --arg name "memos/$memo_id" --arg content "$content" '.name == $name and .content == $content' <<<"$response" >/dev/null
 }
 
+assert_pdf() {
+  local token="$1"
+  local memo_id="$2"
+  curl --fail --silent --show-error --max-time 120 \
+    -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
+    -d "$(jq -nc --arg name "memos/$memo_id" '{name:$name}')" \
+    "$current_base_url/memos.api.v1.MemoService/ExportMemoPdf" |
+    jq -e '.content | startswith("JVBERi0")' >/dev/null
+}
+
 assert_memo() {
   local token="$1"
   local memo_id="$2"
@@ -333,6 +343,7 @@ assert_frontend_assets
 create_admin
 fresh_token="$(sign_in)"
 create_memo "$fresh_token" "release-smoke" "fresh install smoke sentinel"
+assert_pdf "$fresh_token" "release-smoke"
 
 docker restart "$fresh_container" >/dev/null
 set_current_base_url "$fresh_container"
@@ -355,5 +366,6 @@ upgrade_token="$(sign_in)"
 assert_memo "$upgrade_token" "pre-upgrade-smoke" "created before release upgrade"
 create_memo "$upgrade_token" "post-upgrade-smoke" "created after release upgrade"
 assert_memo "$upgrade_token" "post-upgrade-smoke" "created after release upgrade"
+assert_pdf "$upgrade_token" "post-upgrade-smoke"
 
 log "Release smoke tests passed"

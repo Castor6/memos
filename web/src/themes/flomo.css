@@ -97,3 +97,14 @@ html[data-theme="flomo"] [data-editor-shell] button.bg-primary {
 html[data-theme="flomo"] a[id^="header-"][aria-current="page"] {
   border-radius: 8px;
 }
+
+/* Sidebar tags retain their compact, neutral navigation appearance. */
+html[data-theme="flomo"] [data-sidebar-tag] {
+  color: var(--muted-foreground) !important;
+  background-color: transparent !important;
+  border-color: transparent !important;
+}
+html[data-theme="flomo"] .rich-editor a {
+  color: var(--theme-tag-fg);
+  text-decoration-color: var(--theme-tag-fg);
+}

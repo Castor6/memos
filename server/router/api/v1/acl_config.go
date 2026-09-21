@@ -35,6 +35,7 @@ var PublicMethods = map[string]struct{}{
 	"/memos.api.v1.IdentityProviderService/ListIdentityProviders": {},
 
 	// Memo Service - public memos (visibility filtering done in service layer)
+	"/memos.api.v1.MemoService/ExportMemoPdf":        {},
 	"/memos.api.v1.MemoService/GetMemo":              {},
 	"/memos.api.v1.MemoService/ListMemos":            {},
 	"/memos.api.v1.MemoService/ListMemoComments":     {},
@@ -42,7 +43,8 @@ var PublicMethods = map[string]struct{}{
 	"/memos.api.v1.MemoService/BatchGetLinkMetadata": {},
 
 	// Memo sharing - share-token endpoints require no authentication
-	"/memos.api.v1.MemoService/GetSharedMemo": {},
+	"/memos.api.v1.MemoService/GetSharedMemo":       {},
+	"/memos.api.v1.MemoService/ExportSharedMemoPdf": {},
 }
 
 // IsPublicMethod checks if a procedure path is public (no authentication required).
@@ -75,7 +77,8 @@ var AuthBootstrapMethods = map[string]struct{}{
 	"/memos.api.v1.UserService/CreateUser": {},
 
 	// Memo sharing - share-token access stays public even on a private instance.
-	"/memos.api.v1.MemoService/GetSharedMemo": {},
+	"/memos.api.v1.MemoService/GetSharedMemo":       {},
+	"/memos.api.v1.MemoService/ExportSharedMemoPdf": {},
 }
 
 // IsAuthBootstrapMethod reports whether an anonymous request to procedure is one

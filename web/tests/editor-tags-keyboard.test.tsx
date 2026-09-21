@@ -51,3 +51,11 @@ describe("editor tag keyboard selection", () => {
     expect(screen.queryByRole("button", { name: "移除标签 生活" })).toBeNull();
   });
 });
+
+it("focuses the tag search without scrolling the document", async () => {
+  const focus = vi.spyOn(HTMLElement.prototype, "focus");
+  const input = await open();
+  await waitFor(() => expect(input).toHaveFocus());
+  expect(focus.mock.calls.some(([options]) => options?.preventScroll === true)).toBe(true);
+  focus.mockRestore();
+});

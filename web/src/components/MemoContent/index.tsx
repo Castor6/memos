@@ -35,6 +35,7 @@ const MemoContent = (props: MemoContentProps) => {
       >
         <MemoMarkdownRenderer
           content={content}
+          linkMetadata={props.linkMetadata}
           explicitTags={props.explicitTags}
           displayedTags={props.displayedTags}
           maxCharacters={props.maxCharacters}
