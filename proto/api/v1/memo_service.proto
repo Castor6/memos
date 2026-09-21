@@ -275,6 +275,9 @@ message Memo {
   // True when tags are managed separately from Markdown.
   bool explicit_tags = 21 [(google.api.field_behavior) = OPTIONAL];
 
+  // Persisted link previews, available without fetching the source page again.
+  repeated LinkMetadata link_metadata = 22 [(google.api.field_behavior) = OUTPUT_ONLY];
+
   // Computed properties of a memo.
   message Property {
     bool has_link = 1;

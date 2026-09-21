@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/usememos/memos/internal/linkmetadata"
 	v1pb "github.com/usememos/memos/proto/gen/api/v1"
 	storepb "github.com/usememos/memos/proto/gen/store"
 	"github.com/usememos/memos/store"
@@ -51,6 +52,16 @@ func (s *APIV1Service) convertMemoFromStoreWithCreators(ctx context.Context, mem
 		memoMessage.ExplicitTags = memo.Payload.ExplicitTags
 		memoMessage.Property = convertMemoPropertyFromStore(memo.Payload.Property)
 		memoMessage.Location = convertLocationFromStore(memo.Payload.Location)
+	}
+
+	for _, url := range linkmetadata.URLs(memo.Content) {
+		cached, err := s.Store.GetLinkMetadata(ctx, url)
+		if err != nil {
+			return nil, errors.Wrap(err, "read memo link previews")
+		}
+		if cached != nil {
+			memoMessage.LinkMetadata = append(memoMessage.LinkMetadata, linkMetadataFromStore(cached))
+		}
 	}
 
 	if memo.ParentUID != nil {

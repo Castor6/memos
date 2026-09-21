@@ -3413,6 +3413,12 @@ components:
                 explicitTags:
                     type: boolean
                     description: True when tags are managed separately from Markdown.
+                linkMetadata:
+                    readOnly: true
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/LinkMetadata'
+                    description: Persisted link previews, available without fetching the source page again.
         MemoRelation:
             required:
                 - memo

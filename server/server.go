@@ -23,6 +23,7 @@ import (
 	"github.com/usememos/memos/server/router/frontend"
 	"github.com/usememos/memos/server/router/mcp"
 	"github.com/usememos/memos/server/router/rss"
+	"github.com/usememos/memos/server/runner/linkmetadata"
 	"github.com/usememos/memos/server/runner/s3presign"
 	kfrunner "github.com/usememos/memos/server/runner/wechatkf"
 	"github.com/usememos/memos/store"
@@ -159,6 +160,11 @@ func (s *Server) Shutdown(ctx context.Context) {
 }
 
 func (s *Server) startBackgroundRunners(ctx context.Context) {
+	linkContext, cancelLinks := context.WithCancel(ctx)
+	s.backgroundRunnerCancels = append(s.backgroundRunnerCancels, cancelLinks)
+	s.backgroundRunnerWG.Add(1)
+	go func() { defer s.backgroundRunnerWG.Done(); linkmetadata.Run(linkContext, s.Store) }()
+
 	if s.wechatRunner != nil {
 		wechatContext, cancel := context.WithCancel(ctx)
 		s.backgroundRunnerCancels = append(s.backgroundRunnerCancels, cancel)

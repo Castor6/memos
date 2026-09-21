@@ -1,6 +1,7 @@
 import type React from "react";
 import { useLinkMetadata } from "@/hooks/useMemoQueries";
 import { cn } from "@/lib/utils";
+import { useMarkdownRenderContext } from "./MarkdownRenderContext";
 
 interface LinkMetadataCardProps {
   url: string;
@@ -17,12 +18,24 @@ function getHostname(url: string): string {
 }
 
 const LinkMetadataCard = ({ url, fallback, enabled = true }: LinkMetadataCardProps) => {
-  const { data: metadata, isSuccess } = useLinkMetadata(url, { enabled });
+  const { linkMetadata } = useMarkdownRenderContext();
+  const saved = linkMetadata?.find((item) => item.url === url);
+  const query = useLinkMetadata(url, { enabled: enabled && !saved });
+  const metadata = saved ?? query.data;
+  const isSuccess = Boolean(saved) || query.isSuccess;
 
   const title = metadata?.title.trim() ?? "";
   const description = metadata?.description.trim() ?? "";
   const hostname = getHostname(metadata?.url || url);
 
+  if (!saved && (query.isLoading || !enabled)) {
+    return (
+      <div className="my-0 mb-2 min-h-20 w-full rounded-md border border-border bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+        <span>正在读取链接预览…</span>
+        {fallback}
+      </div>
+    );
+  }
   if (!isSuccess || title === "") {
     return fallback;
   }

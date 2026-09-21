@@ -191,3 +191,11 @@ CREATE TABLE wechat_kf_events (
   received_at BIGINT NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 CREATE INDEX wechat_kf_events_retention ON wechat_kf_events(received_at);
+
+CREATE TABLE link_metadata (
+  url_hash VARCHAR(64) PRIMARY KEY,
+  url TEXT NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT NOT NULL,
+  image TEXT NOT NULL
+);

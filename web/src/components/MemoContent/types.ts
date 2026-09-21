@@ -1,7 +1,9 @@
 import type React from "react";
+import type { LinkMetadata } from "@/types/proto/api/v1/memo_service_pb";
 
 export interface MemoContentProps {
   content: string;
+  linkMetadata?: LinkMetadata[];
   explicitTags?: boolean;
   displayedTags?: readonly string[];
   maxCharacters?: number;

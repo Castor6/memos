@@ -20,6 +20,8 @@ export default function EditorTags({ editing, ready = true }: { editing: boolean
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const listId = useId();
+  const searchRef = useRef<HTMLInputElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const selectedFilter = filters.filter((filter) => filter.factor === "tagSearch").map((filter) => filter.value);
   const filterKey = selectedFilter.join("\u0000");
@@ -53,7 +55,14 @@ export default function EditorTags({ editing, ready = true }: { editing: boolean
   if (query && !known.includes(query) && !tags.includes(query)) candidates.push({ tag: query, create: true });
   const selectedIndex = Math.min(activeIndex, candidates.length - 1);
   useEffect(() => {
-    if (open) listRef.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView?.({ block: "nearest" });
+    if (!open) return;
+    const list = listRef.current;
+    const selected = list?.querySelector<HTMLElement>('[aria-selected="true"]');
+    if (!list || !selected) return;
+    const itemRect = selected.getBoundingClientRect();
+    const listRect = list.getBoundingClientRect();
+    if (itemRect.top < listRect.top) list.scrollTop -= listRect.top - itemRect.top;
+    else if (itemRect.bottom > listRect.bottom) list.scrollTop += itemRect.bottom - listRect.bottom;
   }, [open, selectedIndex, search]);
   return (
     <div className="w-full flex flex-wrap items-center gap-2 border-b pb-2" aria-label="标签管理">
@@ -77,10 +86,23 @@ export default function EditorTags({ editing, ready = true }: { editing: boolean
           setActiveIndex(0);
         }}
       >
-        <PopoverTrigger className="px-2 py-1 text-sm text-muted-foreground rounded-md hover:bg-muted">＋ 添加标签</PopoverTrigger>
-        <PopoverContent align="start" className="p-3 w-64">
+        <PopoverTrigger ref={triggerRef} className="px-2 py-1 text-sm text-muted-foreground rounded-md hover:bg-muted">
+          ＋ 添加标签
+        </PopoverTrigger>
+        <PopoverContent
+          align="start"
+          className="p-3 w-64"
+          initialFocus={() => {
+            searchRef.current?.focus({ preventScroll: true });
+            return false;
+          }}
+          finalFocus={() => {
+            triggerRef.current?.focus({ preventScroll: true });
+            return false;
+          }}
+        >
           <Input
-            autoFocus
+            ref={searchRef}
             aria-label="搜索或新建标签"
             role="combobox"
             aria-expanded={open}

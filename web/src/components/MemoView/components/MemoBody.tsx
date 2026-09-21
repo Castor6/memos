@@ -69,6 +69,7 @@ ${fileMarkdown(getAttachmentUrl(file), FILE_TITLE + file.type, file.filename)}`,
                 </div>
               )}
               <MemoContent
+                linkMetadata={memo.linkMetadata}
                 memoName={memo.name}
                 content={content}
                 explicitTags={memo.explicitTags}
