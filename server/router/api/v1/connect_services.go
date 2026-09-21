@@ -638,3 +638,19 @@ func (s *ConnectServiceHandler) DeleteIdentityProvider(ctx context.Context, req 
 	}
 	return connect.NewResponse(resp), nil
 }
+
+func (s *ConnectServiceHandler) ExportMemoPdf(ctx context.Context, req *connect.Request[v1pb.ExportMemoPdfRequest]) (*connect.Response[v1pb.ExportMemoPdfResponse], error) {
+	resp, err := s.APIV1Service.ExportMemoPdf(ctx, req.Msg)
+	if err != nil {
+		return nil, convertGRPCError(err)
+	}
+	return connect.NewResponse(resp), nil
+}
+
+func (s *ConnectServiceHandler) ExportSharedMemoPdf(ctx context.Context, req *connect.Request[v1pb.ExportSharedMemoPdfRequest]) (*connect.Response[v1pb.ExportMemoPdfResponse], error) {
+	resp, err := s.APIV1Service.ExportSharedMemoPdf(ctx, req.Msg)
+	if err != nil {
+		return nil, convertGRPCError(err)
+	}
+	return connect.NewResponse(resp), nil
+}

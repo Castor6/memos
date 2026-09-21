@@ -40,7 +40,9 @@ type APIV1Service struct {
 	SSEHub                  *SSEHub
 	NotificationEmailSender notification.EmailSender
 
-	// thumbnailSemaphore limits concurrent thumbnail generation to prevent memory exhaustion
+	// pdfSemaphore limits concurrent PDF generation.
+	pdfSemaphore *semaphore.Weighted
+	// thumbnailSemaphore limits concurrent thumbnail generation to prevent memory exhaustion.
 	thumbnailSemaphore       *semaphore.Weighted
 	imageProcessingSemaphore *semaphore.Weighted
 
@@ -60,6 +62,7 @@ func NewAPIV1Service(secret string, profile *profile.Profile, store *store.Store
 		MarkdownService:          markdownService,
 		SSEHub:                   NewSSEHub(),
 		NotificationEmailSender:  nil,
+		pdfSemaphore:             semaphore.NewWeighted(1),
 		thumbnailSemaphore:       semaphore.NewWeighted(3), // Limit to 3 concurrent thumbnail generations
 		imageProcessingSemaphore: semaphore.NewWeighted(2),
 	}

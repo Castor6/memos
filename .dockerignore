@@ -11,3 +11,4 @@ memos
 .dockerignore
 docs/
 .DS_Store
+scripts/pdf/node_modules

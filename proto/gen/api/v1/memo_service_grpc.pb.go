@@ -22,6 +22,8 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	MemoService_CreateMemo_FullMethodName           = "/memos.api.v1.MemoService/CreateMemo"
 	MemoService_ListMemos_FullMethodName            = "/memos.api.v1.MemoService/ListMemos"
+	MemoService_ExportMemoPdf_FullMethodName        = "/memos.api.v1.MemoService/ExportMemoPdf"
+	MemoService_ExportSharedMemoPdf_FullMethodName  = "/memos.api.v1.MemoService/ExportSharedMemoPdf"
 	MemoService_GetMemo_FullMethodName              = "/memos.api.v1.MemoService/GetMemo"
 	MemoService_UpdateMemo_FullMethodName           = "/memos.api.v1.MemoService/UpdateMemo"
 	MemoService_DeleteMemo_FullMethodName           = "/memos.api.v1.MemoService/DeleteMemo"
@@ -52,6 +54,10 @@ type MemoServiceClient interface {
 	CreateMemo(ctx context.Context, in *CreateMemoRequest, opts ...grpc.CallOption) (*Memo, error)
 	// ListMemos lists memos with pagination and filter.
 	ListMemos(ctx context.Context, in *ListMemosRequest, opts ...grpc.CallOption) (*ListMemosResponse, error)
+	// ExportMemoPdf generates a PDF using the full saved memo content.
+	ExportMemoPdf(ctx context.Context, in *ExportMemoPdfRequest, opts ...grpc.CallOption) (*ExportMemoPdfResponse, error)
+	// ExportSharedMemoPdf exports only the memo authorized by an active share token.
+	ExportSharedMemoPdf(ctx context.Context, in *ExportSharedMemoPdfRequest, opts ...grpc.CallOption) (*ExportMemoPdfResponse, error)
 	// GetMemo gets a memo.
 	GetMemo(ctx context.Context, in *GetMemoRequest, opts ...grpc.CallOption) (*Memo, error)
 	// UpdateMemo updates a memo.
@@ -118,6 +124,26 @@ func (c *memoServiceClient) ListMemos(ctx context.Context, in *ListMemosRequest,
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListMemosResponse)
 	err := c.cc.Invoke(ctx, MemoService_ListMemos_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *memoServiceClient) ExportMemoPdf(ctx context.Context, in *ExportMemoPdfRequest, opts ...grpc.CallOption) (*ExportMemoPdfResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ExportMemoPdfResponse)
+	err := c.cc.Invoke(ctx, MemoService_ExportMemoPdf_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *memoServiceClient) ExportSharedMemoPdf(ctx context.Context, in *ExportSharedMemoPdfRequest, opts ...grpc.CallOption) (*ExportMemoPdfResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ExportMemoPdfResponse)
+	err := c.cc.Invoke(ctx, MemoService_ExportSharedMemoPdf_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -314,6 +340,10 @@ type MemoServiceServer interface {
 	CreateMemo(context.Context, *CreateMemoRequest) (*Memo, error)
 	// ListMemos lists memos with pagination and filter.
 	ListMemos(context.Context, *ListMemosRequest) (*ListMemosResponse, error)
+	// ExportMemoPdf generates a PDF using the full saved memo content.
+	ExportMemoPdf(context.Context, *ExportMemoPdfRequest) (*ExportMemoPdfResponse, error)
+	// ExportSharedMemoPdf exports only the memo authorized by an active share token.
+	ExportSharedMemoPdf(context.Context, *ExportSharedMemoPdfRequest) (*ExportMemoPdfResponse, error)
 	// GetMemo gets a memo.
 	GetMemo(context.Context, *GetMemoRequest) (*Memo, error)
 	// UpdateMemo updates a memo.
@@ -371,6 +401,12 @@ func (UnimplementedMemoServiceServer) CreateMemo(context.Context, *CreateMemoReq
 }
 func (UnimplementedMemoServiceServer) ListMemos(context.Context, *ListMemosRequest) (*ListMemosResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListMemos not implemented")
+}
+func (UnimplementedMemoServiceServer) ExportMemoPdf(context.Context, *ExportMemoPdfRequest) (*ExportMemoPdfResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ExportMemoPdf not implemented")
+}
+func (UnimplementedMemoServiceServer) ExportSharedMemoPdf(context.Context, *ExportSharedMemoPdfRequest) (*ExportMemoPdfResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ExportSharedMemoPdf not implemented")
 }
 func (UnimplementedMemoServiceServer) GetMemo(context.Context, *GetMemoRequest) (*Memo, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetMemo not implemented")
@@ -479,6 +515,42 @@ func _MemoService_ListMemos_Handler(srv interface{}, ctx context.Context, dec fu
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(MemoServiceServer).ListMemos(ctx, req.(*ListMemosRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MemoService_ExportMemoPdf_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ExportMemoPdfRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MemoServiceServer).ExportMemoPdf(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MemoService_ExportMemoPdf_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MemoServiceServer).ExportMemoPdf(ctx, req.(*ExportMemoPdfRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MemoService_ExportSharedMemoPdf_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ExportSharedMemoPdfRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MemoServiceServer).ExportSharedMemoPdf(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MemoService_ExportSharedMemoPdf_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MemoServiceServer).ExportSharedMemoPdf(ctx, req.(*ExportSharedMemoPdfRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -821,6 +893,14 @@ var MemoService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListMemos",
 			Handler:    _MemoService_ListMemos_Handler,
+		},
+		{
+			MethodName: "ExportMemoPdf",
+			Handler:    _MemoService_ExportMemoPdf_Handler,
+		},
+		{
+			MethodName: "ExportSharedMemoPdf",
+			Handler:    _MemoService_ExportSharedMemoPdf_Handler,
 		},
 		{
 			MethodName: "GetMemo",

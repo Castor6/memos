@@ -225,6 +225,7 @@ def setup():
     run(["node", "--version"])
     run(["go", "version"])
     pnpm("install", "--frozen-lockfile")
+    run(["npm", "ci", "--ignore-scripts"], cwd=ROOT / "scripts/pdf")
     run(["go", "mod", "download"])
 
 
@@ -234,6 +235,7 @@ def check(surface):
         pnpm("test")
         pnpm("build")
     if surface in ("backend", "all"):
+        run(["npm", "test"], cwd=ROOT / "scripts/pdf")
         run(["go", "test", "-race", "./server/...", "./internal/..."], env=local_env())
         run(["go", "test", "./store/..."], env=local_env() | {"DRIVER": "sqlite"})
     run(["git", "diff", "--check"])

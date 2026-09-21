@@ -34,6 +34,9 @@ jobs:
         working-directory: web
         run: pnpm install --frozen-lockfile
 
+      - name: Test server PDF renderer
+        run: npm ci --prefix scripts/pdf --ignore-scripts && npm test --prefix scripts/pdf
+
       - name: Run lint
         working-directory: web
         run: pnpm lint
