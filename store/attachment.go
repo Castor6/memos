@@ -301,6 +301,8 @@ func AttachmentNeedsInstanceStorageSetting(attachment *Attachment) bool {
 
 func (s *Store) deleteAttachmentDerivedCaches(attachment *Attachment) {
 	for _, cachePath := range []string{
+		filepath.Join(s.profile.Data, thumbnailCacheFolder, attachment.UID+".v2.jpeg"),
+		filepath.Join(s.profile.Data, thumbnailCacheFolder, attachment.UID+".v2.jpeg.failed"),
 		filepath.Join(s.profile.Data, thumbnailCacheFolder, attachment.UID+".jpeg"),
 		filepath.Join(s.profile.Data, motionCacheFolder, attachment.UID+".mp4"),
 	} {

@@ -3,13 +3,14 @@ package v1
 import (
 	"bytes"
 	"context"
-	"image"
+	"net/http"
 
 	"github.com/disintegration/imaging"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/usememos/memos/internal/imagelimit"
 	"github.com/usememos/memos/internal/motionphoto"
 	v1pb "github.com/usememos/memos/proto/gen/api/v1"
 	storepb "github.com/usememos/memos/proto/gen/store"
@@ -39,7 +40,7 @@ func validateClientMotionMedia(motion *v1pb.MotionMedia, attachmentUID string) (
 }
 
 func detectAndroidMotionMedia(blob []byte, mimeType, attachmentUID string) *storepb.MotionMedia {
-	if mimeType != "image/jpeg" && mimeType != "image/jpg" {
+	if mimeType != "image/jpeg" && mimeType != "image/jpg" && http.DetectContentType(blob) != "image/jpeg" {
 		return nil
 	}
 
@@ -64,6 +65,15 @@ func shouldStripExif(mimeType string) bool {
 	return exifCapableImageTypes[mimeType]
 }
 
+// shouldStripExifContent checks the bytes as well as the client-declared type.
+func shouldStripExifContent(content []byte, declaredType string) bool {
+	if shouldStripExif(declaredType) {
+		return true
+	}
+	sniffed, ok := normalizeMimeType(http.DetectContentType(content))
+	return ok && shouldStripExif(sniffed)
+}
+
 func (s *APIV1Service) acquireImageProcessingSlot(ctx context.Context) (func(), error) {
 	if s.imageProcessingSemaphore == nil {
 		return func() {}, nil
@@ -77,19 +87,7 @@ func (s *APIV1Service) acquireImageProcessingSlot(ctx context.Context) (func(), 
 }
 
 func validateImagePixelCount(imageData []byte) error {
-	config, _, err := image.DecodeConfig(bytes.NewReader(imageData))
-	if err != nil {
-		// Some formats supported by imaging do not expose dimensions through
-		// the standard image registry. Let the full decoder handle those.
-		return nil //nolint:nilerr
-	}
-	if config.Width <= 0 || config.Height <= 0 {
-		return errors.New("invalid image dimensions")
-	}
-	if config.Width > maxImagePixels/config.Height {
-		return errors.Errorf("image dimensions exceed maximum of %d pixels", maxImagePixels)
-	}
-	return nil
+	return imagelimit.CheckReader(bytes.NewReader(imageData))
 }
 
 // stripImageExif removes EXIF metadata from image files by decoding and re-encoding them.

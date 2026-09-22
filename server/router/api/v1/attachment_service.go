@@ -33,7 +33,6 @@ const (
 	// Quality 95 maintains visual quality while ensuring metadata is removed.
 	defaultJPEGQuality        = 95
 	maxBatchDeleteAttachments = 100
-	maxImagePixels            = 50_000_000
 )
 
 var SupportedThumbnailMimeTypes = []string{
@@ -158,7 +157,7 @@ func (s *APIV1Service) CreateAttachment(ctx context.Context, request *v1pb.Creat
 
 	// Strip EXIF metadata from images for privacy protection.
 	// This removes sensitive information like GPS location, device details, etc.
-	if shouldStripExif(create.Type) && !isAndroidMotionContainer(create.Payload.GetMotionMedia()) {
+	if shouldStripExifContent(create.Blob, create.Type) && !isAndroidMotionContainer(create.Payload.GetMotionMedia()) {
 		release, err := s.acquireImageProcessingSlot(ctx)
 		if err != nil {
 			return nil, status.Errorf(codes.ResourceExhausted, "too many image processing requests")
@@ -205,7 +204,7 @@ func (s *APIV1Service) ListAttachments(ctx context.Context, request *v1pb.ListAt
 	if request.PageToken != "" {
 		// Simple implementation: page token is the offset as string
 		// In production, you might want to use encrypted tokens
-		if parsed, err := fmt.Sscanf(request.PageToken, "%d", &offset); err != nil || parsed != 1 {
+		if parsed, err := fmt.Sscanf(request.PageToken, "%d", &offset); err != nil || parsed != 1 || offset < 0 {
 			return nil, status.Errorf(codes.InvalidArgument, "invalid page token")
 		}
 	}
