@@ -207,6 +207,7 @@ export type MemoSummary = CreatedMemo & {
   createTime: string;
   state?: "NORMAL" | "ARCHIVED";
   capture?: CaptureData;
+  attachments?: Array<{ name: string }>;
 };
 
 function parseMemo(value: unknown): MemoSummary {
@@ -225,6 +226,12 @@ function parseMemo(value: unknown): MemoSummary {
     return badResponse();
   const capture = memo.capture === undefined ? undefined : parseCaptureData(memo.capture);
   if (memo.capture !== undefined && !capture) return badResponse();
+  if (
+    memo.attachments !== undefined &&
+    (!Array.isArray(memo.attachments) ||
+      !memo.attachments.every((attachment) => attachment && typeof attachment === "object" && typeof attachment.name === "string"))
+  )
+    return badResponse();
   return {
     name: memo.name,
     creator: memo.creator,
@@ -234,6 +241,7 @@ function parseMemo(value: unknown): MemoSummary {
     ...(typeof memo.uid === "string" && memo.uid ? { uid: memo.uid } : {}),
     ...(memo.state === "NORMAL" || memo.state === "ARCHIVED" ? { state: memo.state } : {}),
     ...(capture ? { capture } : {}),
+    ...(Array.isArray(memo.attachments) ? { attachments: memo.attachments.map((attachment) => ({ name: String(attachment.name) })) } : {}),
   };
 }
 

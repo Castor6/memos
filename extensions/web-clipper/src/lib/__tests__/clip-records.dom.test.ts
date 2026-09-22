@@ -1,6 +1,14 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { browserMock } from "@/test/browser-mock";
-import { type ClipConnection, findLatestClipStatus, listClipRecords, normalizeClipSourceUrl, recordSuccessfulClip } from "../clip-records";
+import { jsonResponse } from "@/test/fixtures";
+import {
+  type ClipConnection,
+  findLatestClipStatus,
+  findServerClipStatus,
+  listClipRecords,
+  normalizeClipSourceUrl,
+  recordSuccessfulClip,
+} from "../clip-records";
 
 const connection: ClipConnection = {
   source: "direct",
@@ -24,6 +32,34 @@ describe("clip records", () => {
     expect(normalizeClipSourceUrl("https://example.com/post?id=7&utm_source=email#comments")).toBe("https://example.com/post?id=7");
     expect(normalizeClipSourceUrl("https://example.com/app#/notes/42")).toBe("https://example.com/app#/notes/42");
     expect(normalizeClipSourceUrl("https://example.com/search?q=web+clipper")).toBe("https://example.com/search?q=web+clipper");
+  });
+
+  it("queries separate capture kinds with meaningful URL parameters and each device's current token", async () => {
+    const fetchMock = vi.fn((value: unknown, _init?: RequestInit) =>
+      Promise.resolve(
+        String(value).includes("/instance/profile")
+          ? jsonResponse({ version: "dev", webClipperSupported: true })
+          : jsonResponse({ memos: [] }),
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    await findServerClipStatus(connection, "https://example.org/post?id=7&utm_source=mail#comments", "STAR");
+    await findServerClipStatus(
+      { ...connection, connectionId: "another-device", credentials: { ...connection.credentials, accessToken: "different-token" } },
+      "https://example.org/post?id=7",
+      "PICK_UP",
+    );
+    const queries = fetchMock.mock.calls.filter(([value]) => String(value).includes("/memos?"));
+    expect(queries).toHaveLength(4);
+    expect(new URL(String(queries[0]?.[0])).searchParams.get("filter")).toBe(
+      'has_capture == true && capture_source_url == "https://example.org/post?id=7" && capture_kind == "STAR"',
+    );
+    expect(new URL(String(queries[2]?.[0])).searchParams.get("filter")).toBe(
+      'has_capture == true && capture_source_url == "https://example.org/post?id=7" && capture_kind == "PICK_UP"',
+    );
+    expect(queries[0]?.[1]?.headers).toMatchObject({ Authorization: "Bearer secret" });
+    expect(queries[2]?.[1]?.headers).toMatchObject({ Authorization: "Bearer different-token" });
+    vi.unstubAllGlobals();
   });
 
   it("keeps every save and returns the newest matching record", async () => {

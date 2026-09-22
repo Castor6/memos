@@ -105,6 +105,179 @@ describe("background — storage isolation", () => {
 describe("background — SAVE_MEMO message", () => {
   beforeEach(ready);
 
+  const starCapture = {
+    kind: "STAR",
+    platform: "WEB",
+    sourceUrl: "https://example.org/",
+    sourceId: "",
+    comment: "My thought",
+    context: "A reason",
+    posts: [],
+  };
+  const captureRequest = (id: string, images: string[] = []) => ({
+    type: "SAVE_MEMO",
+    content: "body",
+    visibility: "PRIVATE",
+    ...expected,
+    saveRequestId: id,
+    saveStartedAt: Date.now(),
+    images,
+    clip: { sourceUrl: starCapture.sourceUrl, sourceTitle: "Title", imageCount: images.length, capture: starCapture },
+  });
+
+  it("rejects an existing id with changed thoughts instead of accepting a matching source alone", async () => {
+    const fetchMock = vi.fn((value: unknown, _init?: RequestInit) => {
+      const url = String(value);
+      if (url.endsWith("/instance/profile")) return Promise.resolve(jsonResponse({ version: "dev", webClipperSupported: true }));
+      if (url.endsWith("/auth/me")) return Promise.resolve(jsonResponse({ user: { name: "users/steven" } }));
+      return Promise.resolve(
+        jsonResponse({
+          name: "memos/snapshot_mismatch",
+          creator: "users/steven",
+          createTime: new Date().toISOString(),
+          content: "body",
+          visibility: "PRIVATE",
+          capture: { ...starCapture, comment: "Different thought" },
+        }),
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await emitRuntime(captureRequest("snapshot_mismatch"))).toMatchObject({ ok: false, errorKind: "invalid-content" });
+    expect(fetchMock.mock.calls.every(([, init]) => (init as RequestInit | undefined)?.method !== "POST")).toBe(true);
+    vi.unstubAllGlobals();
+  });
+
+  it("reconciles a partial image save after local retry state is cleared without creating or uploading again", async () => {
+    let saved: Record<string, unknown> | null = null;
+    let attachmentPosts = 0;
+    let memoPosts = 0;
+    const fetchMock = vi.fn((value: unknown, init?: RequestInit) => {
+      const url = String(value);
+      if (url.endsWith("/instance/profile")) return Promise.resolve(jsonResponse({ version: "dev", webClipperSupported: true }));
+      if (url.endsWith("/auth/me")) return Promise.resolve(jsonResponse({ user: { name: "users/steven" } }));
+      if (url === "https://cdn.example.org/image.png")
+        return Promise.resolve(new Response(new Uint8Array([1, 2, 3]), { headers: { "content-type": "image/png" } }));
+      if (url.endsWith("/attachments")) {
+        attachmentPosts += 1;
+        return Promise.reject(Object.assign(new Error("upload response lost"), { name: "TimeoutError" }));
+      }
+      if (init?.method === "POST") {
+        memoPosts += 1;
+        saved = {
+          ...JSON.parse(String(init.body)),
+          name: "memos/forgotten_attempt",
+          creator: "users/steven",
+          createTime: new Date().toISOString(),
+        };
+        return Promise.reject(Object.assign(new Error("memo response lost"), { name: "TimeoutError" }));
+      }
+      return Promise.resolve(saved ? jsonResponse(saved) : jsonResponse({}, 404));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const request = captureRequest("forgotten_attempt", ["https://cdn.example.org/image.png"]);
+    expect(await emitRuntime(request)).toEqual({ ok: false, errorKind: "timeout" });
+    await browserMock.storage.local.remove(SAVE_ATTEMPTS_KEY);
+    expect(await emitRuntime(request)).toEqual({ ok: true, webUrl: "https://memos.example.com/memos/forgotten_attempt", failedImages: 1 });
+    expect(attachmentPosts).toBe(1);
+    expect(memoPosts).toBe(1);
+    vi.unstubAllGlobals();
+  });
+
+  it("separates in-flight saves across accounts even when request ids collide", async () => {
+    let finishFirst: ((response: Response) => void) | undefined;
+    const fetchMock = vi.fn((_value: unknown, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body));
+      if (body.content === "first")
+        return new Promise<Response>((resolve) => {
+          finishFirst = resolve;
+        });
+      return Promise.resolve(jsonResponse({ name: "memos/second" }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const first = emitRuntime({
+      type: "SAVE_MEMO",
+      content: "first",
+      visibility: "PRIVATE",
+      saveRequestId: "shared_request_id",
+      ...expected,
+    });
+    await vi.waitFor(() => expect(finishFirst).toBeDefined());
+    mockUser = { id: "second-account", unsafeMetadata: memos({ accessToken: "second-token" }) };
+    expect(
+      await emitRuntime({
+        type: "SAVE_MEMO",
+        content: "second",
+        visibility: "PRIVATE",
+        saveRequestId: "shared_request_id",
+        ...expected,
+        expectedConnectionId: "second-account",
+      }),
+    ).toEqual({ ok: true, webUrl: "https://memos.example.com/memos/second" });
+    finishFirst?.(jsonResponse({ name: "memos/first" }));
+    expect(await first).toEqual({ ok: false, errorKind: "auth-changed" });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    vi.unstubAllGlobals();
+  });
+
+  it("checks the account again after image download before writing attachments or a memo", async () => {
+    let finishImage: ((response: Response) => void) | undefined;
+    const fetchMock = vi.fn(
+      () =>
+        new Promise<Response>((resolve) => {
+          finishImage = resolve;
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const saving = emitRuntime({
+      type: "SAVE_MEMO",
+      content: "body",
+      visibility: "PRIVATE",
+      images: ["https://cdn.example.org/image.png"],
+      ...expected,
+    });
+    await vi.waitFor(() => expect(finishImage).toBeDefined());
+    mockUser = { id: "second-account", unsafeMetadata: memos({ accessToken: "second-token" }) };
+    finishImage?.(new Response(new Uint8Array([1, 2, 3]), { headers: { "content-type": "image/png" } }));
+    expect(await saving).toEqual({ ok: false, errorKind: "auth-changed" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    vi.unstubAllGlobals();
+  });
+
+  it("drops a delayed saved-status reply after the active account changes", async () => {
+    let finishPage: ((response: Response) => void) | undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((value: unknown) => {
+        const url = new URL(String(value));
+        if (url.pathname.endsWith("/instance/profile")) return Promise.resolve(jsonResponse({ version: "dev", webClipperSupported: true }));
+        if (url.searchParams.get("state") === "NORMAL")
+          return new Promise<Response>((resolve) => {
+            finishPage = resolve;
+          });
+        return Promise.resolve(jsonResponse({ memos: [] }));
+      }),
+    );
+    const status = emitRuntime({ type: "GET_CLIP_STATUS", sourceUrl: starCapture.sourceUrl, kind: "STAR", ...expected });
+    await vi.waitFor(() => expect(finishPage).toBeDefined());
+    mockUser = { id: "second-account", unsafeMetadata: memos() };
+    finishPage?.(
+      jsonResponse({
+        memos: [
+          {
+            name: "memos/private_old",
+            creator: "users/steven",
+            content: "body",
+            visibility: "PRIVATE",
+            createTime: new Date().toISOString(),
+            capture: starCapture,
+          },
+        ],
+      }),
+    );
+    expect(await status).toBeNull();
+    vi.unstubAllGlobals();
+  });
+
   it("blocks unsupported sync and UTF-8 overflow before uploads or creates", async () => {
     const capture = { kind: "STAR", platform: "WEB", sourceUrl: "https://example.org/", sourceId: "", comment: "", context: "", posts: [] };
     const request = {

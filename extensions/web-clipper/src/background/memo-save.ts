@@ -1,6 +1,7 @@
 import browser from "webextension-polyfill";
 import { OAuthUnavailableError } from "@/auth/oauth-session";
 import { resolveActiveConnection } from "@/background/connection-source";
+import { parseCaptureData } from "@/lib/capture-data";
 import {
   type CaptureData,
   type ClipCaptureInput,
@@ -33,41 +34,50 @@ const RECONCILIATION_CLOCK_SKEW_MS = 5_000;
 type AttemptRecord = {
   fingerprint: string;
   startedAt: number;
+  updatedAt?: number;
   attachmentNames?: string[];
   failedImages?: number;
   result?: Extract<SaveResult, { ok: true }>;
 };
 
 type AttemptStore = Record<string, AttemptRecord>;
-const inFlight = new Map<string, Promise<SaveResult>>();
+const inFlight = new Map<string, { fingerprint: string; promise: Promise<SaveResult> }>();
+let attemptMutation = Promise.resolve();
+
+function mutateAttempts<T>(operation: () => Promise<T>): Promise<T> {
+  const result = attemptMutation.then(operation, operation);
+  attemptMutation = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  return result;
+}
 
 export async function clearMemoSaveAttempts(): Promise<void> {
   inFlight.clear();
-  await browser.storage.local.remove(SAVE_ATTEMPTS_KEY);
+  await mutateAttempts(() => browser.storage.local.remove(SAVE_ATTEMPTS_KEY));
 }
 
-function saveFingerprint(
+async function saveFingerprint(
   content: string,
   visibility: Visibility,
   expected: SaveExpectation,
   images: string[],
+  accessToken: string,
   capture?: CaptureData,
-): string {
-  const value = [
+): Promise<string> {
+  const value = JSON.stringify([
     content,
     visibility,
     expected.source,
     expected.connectionId,
     expected.instanceUrl,
-    ...images,
-    JSON.stringify(capture),
-  ].join("\u0000");
-  let hash = 0x811c9dc5;
-  for (let index = 0; index < value.length; index += 1) {
-    hash ^= value.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return `${value.length.toString(36)}_${(hash >>> 0).toString(36)}`;
+    images,
+    accessToken,
+    capture,
+  ]);
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 async function readAttempts(): Promise<AttemptStore> {
@@ -76,15 +86,35 @@ async function readAttempts(): Promise<AttemptStore> {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
   const now = Date.now();
   return Object.fromEntries(
-    Object.entries(raw as AttemptStore).filter(([, attempt]) => attempt && now - attempt.startedAt <= ATTEMPT_TTL_MS),
+    Object.entries(raw as AttemptStore).filter(
+      ([, attempt]) => attempt && now - (attempt.updatedAt ?? attempt.startedAt) <= ATTEMPT_TTL_MS,
+    ),
   );
 }
 
 async function writeAttempt(requestId: string, attempt: AttemptRecord | null): Promise<void> {
-  const attempts = await readAttempts();
-  if (attempt) attempts[requestId] = attempt;
-  else delete attempts[requestId];
-  await browser.storage.local.set({ [SAVE_ATTEMPTS_KEY]: attempts });
+  await mutateAttempts(async () => {
+    const attempts = await readAttempts();
+    if (attempt) attempts[requestId] = { ...attempt, updatedAt: Date.now() };
+    else delete attempts[requestId];
+    await browser.storage.local.set({ [SAVE_ATTEMPTS_KEY]: attempts });
+  });
+}
+
+async function connectionStillMatches(expected: SaveExpectation, credentials: MemosCredentials): Promise<boolean> {
+  const current = await resolveActiveConnection();
+  return Boolean(
+    current &&
+      current.source === expected.source &&
+      current.connectionId === expected.connectionId &&
+      current.credentials.instanceUrl === expected.instanceUrl &&
+      current.credentials.accessToken === credentials.accessToken,
+  );
+}
+
+function sameCapture(actual: CaptureData | undefined, expected: CaptureData): boolean {
+  const parsed = parseCaptureData(actual);
+  return parsed !== null && JSON.stringify(parsed) === JSON.stringify(parseCaptureData(expected));
 }
 
 /** Source fresh credentials and reject stale optimistic identity before any external write. */
@@ -124,19 +154,15 @@ export async function savePopupMemo(
       return { ok: false, errorKind: toSaveErrorKind(error) };
     }
   }
-  const currentConnection = await resolveActiveConnection();
-  if (
-    !currentConnection ||
-    currentConnection.source !== expected.source ||
-    currentConnection.connectionId !== expected.connectionId ||
-    currentConnection.credentials.instanceUrl !== expected.instanceUrl
-  )
-    return { ok: false, errorKind: "auth-changed" };
-  const running = inFlight.get(operation.requestId);
-  if (running) return running;
+  if (!(await connectionStillMatches(expected, credentials))) return { ok: false, errorKind: "auth-changed" };
+  const attemptKey = JSON.stringify([expected.source, expected.connectionId, expected.instanceUrl, operation.requestId]);
+  const fingerprint = await saveFingerprint(content, visibility, expected, images, credentials.accessToken, capture);
+  const running = inFlight.get(attemptKey);
+  if (running) return running.fingerprint === fingerprint ? running.promise : { ok: false, errorKind: "invalid-content" };
 
-  const save = savePopupMemoOnce(content, visibility, images, expected, operation, credentials, capture)
+  const save = savePopupMemoOnce(content, visibility, images, expected, operation, credentials, attemptKey, fingerprint, capture)
     .then(async (result) => {
+      if (!(await connectionStillMatches(expected, credentials))) return { ok: false, errorKind: "auth-changed" } as const;
       if (result.ok && clip && !clip.capture) {
         try {
           await recordSuccessfulClip({
@@ -154,10 +180,16 @@ export async function savePopupMemo(
       }
       return result;
     })
+    .catch(
+      (error): SaveResult => ({
+        ok: false,
+        errorKind: error instanceof OAuthUnavailableError ? "auth-unavailable" : toSaveErrorKind(error),
+      }),
+    )
     .finally(() => {
-      inFlight.delete(operation.requestId);
+      if (inFlight.get(attemptKey)?.promise === save) inFlight.delete(attemptKey);
     });
-  inFlight.set(operation.requestId, save);
+  inFlight.set(attemptKey, { fingerprint, promise: save });
   return save;
 }
 
@@ -168,38 +200,38 @@ async function savePopupMemoOnce(
   expected: SaveExpectation,
   operation: SaveOperation,
   credentials: MemosCredentials,
+  attemptKey: string,
+  fingerprint: string,
   capture?: CaptureData,
 ): Promise<SaveResult> {
-  const fingerprint = saveFingerprint(content, visibility, expected, images, capture);
-  const previous = (await readAttempts())[operation.requestId];
+  const previous = (await readAttempts())[attemptKey];
   if (previous && previous.fingerprint !== fingerprint) return { ok: false, errorKind: "bad-response" };
   if (previous?.result && !operation.serverMemoId) return previous.result;
 
-  // An existing unfinished record means an earlier POST may have succeeded without its response
-  // reaching the popup (or the MV3 worker may have stopped immediately afterward). Reconcile first.
-  if (previous) {
+  // Stable capture IDs must be checked even after local retry state expires or is cleared.
+  // This also avoids uploading attachments again for a previously completed remote save.
+  if (previous || (capture && operation.serverMemoId)) {
     try {
-      const currentUser = await getCurrentUser(credentials);
       const exact = operation.serverMemoId ? await getMemo(credentials, operation.serverMemoId) : null;
-      if (operation.serverMemoId && previous.result && !exact) return { ok: false, errorKind: "not-found" };
-      const recent = operation.serverMemoId ? (exact ? [exact] : []) : await listRecentMemos(credentials, 20, currentUser.name);
+      if (operation.serverMemoId && previous?.result && !exact) return { ok: false, errorKind: "not-found" };
+      const currentUser = exact || !operation.serverMemoId ? await getCurrentUser(credentials) : null;
+      const recent = operation.serverMemoId ? (exact ? [exact] : []) : await listRecentMemos(credentials, 20, currentUser?.name);
       const match = recent.find(
         (memo) =>
-          memo.creator === currentUser.name &&
+          memo.creator === currentUser?.name &&
           (capture
-            ? memo.capture?.kind === capture.kind &&
-              memo.capture.sourceUrl === capture.sourceUrl &&
-              memo.capture.sourceId === capture.sourceId
+            ? sameCapture(memo.capture, capture) && (previous?.result || (memo.content === content && memo.visibility === visibility))
             : memo.content === content && memo.visibility === visibility) &&
           (operation.serverMemoId || Date.parse(memo.createTime) >= operation.startedAt - RECONCILIATION_CLOCK_SKEW_MS),
       );
       if (match) {
+        const failedImages = previous?.failedImages ?? Math.max(0, images.length - (match.attachments?.length ?? 0));
         const result: Extract<SaveResult, { ok: true }> = {
           ok: true,
           webUrl: memoWebUrl(credentials.instanceUrl, match),
-          ...(previous.failedImages ? { failedImages: previous.failedImages } : {}),
+          ...(failedImages ? { failedImages } : {}),
         };
-        await writeAttempt(operation.requestId, { ...previous, result });
+        await writeAttempt(attemptKey, { fingerprint, startedAt: operation.startedAt, ...previous, result });
         return result;
       }
       if (exact) return { ok: false, errorKind: "invalid-content", message: "保存标识已对应其他内容，请重新发起保存。" };
@@ -210,29 +242,30 @@ async function savePopupMemoOnce(
   }
 
   let attempt: AttemptRecord = previous ?? { fingerprint, startedAt: operation.startedAt };
-  await writeAttempt(operation.requestId, attempt);
+  await writeAttempt(attemptKey, attempt);
 
   let names = attempt.attachmentNames;
   let failed = attempt.failedImages ?? 0;
   if (!names) {
-    const uploaded = await uploadImages(images, credentials);
+    const uploaded = await uploadImages(images, credentials, () => connectionStillMatches(expected, credentials));
     names = uploaded.names;
     failed = uploaded.failed;
     attempt = { ...attempt, attachmentNames: names, failedImages: failed };
-    await writeAttempt(operation.requestId, attempt);
+    await writeAttempt(attemptKey, attempt);
   }
 
+  if (!(await connectionStillMatches(expected, credentials))) return { ok: false, errorKind: "auth-changed" };
   const result = await createMemoWithAttachments(content, names, credentials, visibility, operation.serverMemoId, capture);
   if (result.ok) {
     const success = failed > 0 ? { ...result, failedImages: failed } : result;
-    await writeAttempt(operation.requestId, { ...attempt, result: success });
+    await writeAttempt(attemptKey, { ...attempt, result: success });
     return success;
   }
 
   // Keep only outcomes where the POST may have reached the server. Definite precondition/auth
   // failures start a clean operation on the next attempt.
   if (!new Set(["timeout", "cors", "unreachable", "bad-response"]).has(result.errorKind)) {
-    await writeAttempt(operation.requestId, null);
+    await writeAttempt(attemptKey, null);
   }
   return result;
 }
@@ -326,12 +359,17 @@ async function readImageBytes(response: Response): Promise<{ bytes: Uint8Array; 
   return { bytes, type };
 }
 
-async function uploadImages(images: string[], credentials: MemosCredentials): Promise<{ names: string[]; failed: number }> {
+async function uploadImages(
+  images: string[],
+  credentials: MemosCredentials,
+  stillCurrent?: () => Promise<boolean>,
+): Promise<{ names: string[]; failed: number }> {
   const capped = images.slice(0, MAX_IMAGES_PER_CLIP);
   const names: string[] = [];
   // Sequential downloads keep the peak memory bounded to one decoded/base64 image.
   for (const src of capped) {
-    const name = await uploadImageAttachment(src, credentials);
+    if (stillCurrent && !(await stillCurrent())) break;
+    const name = await uploadImageAttachment(src, credentials, stillCurrent);
     if (name) names.push(name);
   }
   return { names, failed: images.length - names.length };
@@ -355,7 +393,11 @@ function imageFilename(srcUrl: string, type: string): string {
   return `clip.${ext}`;
 }
 
-async function uploadImageAttachment(srcUrl: string, credentials: MemosCredentials): Promise<string | null> {
+async function uploadImageAttachment(
+  srcUrl: string,
+  credentials: MemosCredentials,
+  stillCurrent?: () => Promise<boolean>,
+): Promise<string | null> {
   const source = validImageSource(srcUrl);
   if (!source) return null;
   try {
@@ -368,6 +410,7 @@ async function uploadImageAttachment(srcUrl: string, credentials: MemosCredentia
     if (!res.ok) return null;
     const image = await readImageBytes(res);
     if (!image) return null;
+    if (stillCurrent && !(await stillCurrent())) return null;
     const content = bytesToBase64(image.bytes);
     const attachment = await createAttachment(credentials, {
       filename: imageFilename(source.toString(), image.type),

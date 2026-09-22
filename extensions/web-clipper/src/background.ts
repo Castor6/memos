@@ -102,7 +102,8 @@ browser.runtime.onMessage.addListener((message: unknown, sender: RuntimeSender) 
           !current ||
           current.source !== connection.source ||
           current.connectionId !== connection.connectionId ||
-          current.credentials.instanceUrl !== connection.credentials.instanceUrl
+          current.credentials.instanceUrl !== connection.credentials.instanceUrl ||
+          current.credentials.accessToken !== connection.credentials.accessToken
         )
           return { ok: false, errorKind: "auth-changed" };
         return { ok: true, records };
@@ -139,7 +140,17 @@ browser.runtime.onMessage.addListener((message: unknown, sender: RuntimeSender) 
         ) {
           return null;
         }
-        return await findServerClipStatus(connection, req.sourceUrl, req.kind);
+        const status = await findServerClipStatus(connection, req.sourceUrl, req.kind);
+        const current = await resolveActiveConnection();
+        if (
+          !current ||
+          current.source !== connection.source ||
+          current.connectionId !== connection.connectionId ||
+          current.credentials.instanceUrl !== connection.credentials.instanceUrl ||
+          current.credentials.accessToken !== connection.credentials.accessToken
+        )
+          return null;
+        return status;
       } catch {
         // History lookup is an enhancement; a failed lookup must not block clipping.
         return null;
