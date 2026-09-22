@@ -16,6 +16,48 @@ import (
 	"github.com/usememos/memos/store/db"
 )
 
+func TestLinkMetadataRejectsInvalidURLsBeforeQueueing(t *testing.T) {
+	ctx := context.Background()
+	s := NewTestingStore(ctx, t)
+	t.Cleanup(func() { s.Close() })
+	for _, url := range []string{"file:///tmp/article", "http://", "https://%", "http://127.0.0.1/article", "https://[::1]/"} {
+		t.Run(url, func(t *testing.T) {
+			_, err := s.FetchLinkMetadata(ctx, url, func(context.Context, string) (*store.LinkMetadata, error) {
+				t.Fatal("invalid URLs must not be fetched")
+				return nil, nil
+			})
+			require.Error(t, err)
+		})
+	}
+	var jobs int
+	require.NoError(t, s.GetDriver().GetDB().QueryRowContext(ctx, "SELECT COUNT(*) FROM link_metadata_job").Scan(&jobs))
+	require.Zero(t, jobs, "invalid URLs must not persist as retry jobs")
+}
+
+func TestLinkMetadataSkipsInvalidMemoLinksWithoutBlockingWrites(t *testing.T) {
+	ctx := context.Background()
+	s := NewTestingStore(ctx, t)
+	t.Cleanup(func() { s.Close() })
+	user, err := createTestingHostUser(ctx, s)
+	require.NoError(t, err)
+	content := "http://127.0.0.1/article\n\nhttps://[::1]/\n\nhttps://missing.invalid/article"
+	memo, err := s.CreateMemo(ctx, &store.Memo{UID: "invalid-preview-links", CreatorID: user.ID, Content: content, Visibility: store.Private})
+	require.NoError(t, err)
+	require.Equal(t, content, memo.Content)
+	urls, err := s.ListDueLinkMetadata(ctx, 10)
+	require.NoError(t, err)
+	require.Equal(t, []string{"https://missing.invalid/article"}, urls)
+	// Historical discovery follows the same validation while preserving memo contents.
+	_, err = s.GetDriver().GetDB().ExecContext(ctx, "DELETE FROM link_metadata_job")
+	require.NoError(t, err)
+	done, err := s.BackfillLinkMetadata(ctx, 100)
+	require.NoError(t, err)
+	require.True(t, done)
+	urls, err = s.ListDueLinkMetadata(ctx, 10)
+	require.NoError(t, err)
+	require.Equal(t, []string{"https://missing.invalid/article"}, urls)
+}
+
 func TestLinkMetadataMemoWritesAreAtomic(t *testing.T) {
 	ctx := context.Background()
 	s := NewTestingStore(ctx, t)

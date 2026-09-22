@@ -10,6 +10,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/usememos/memos/internal/httpgetter"
 	"github.com/usememos/memos/internal/linkmetadata"
 )
 
@@ -52,6 +53,10 @@ func linkMetadataSQL(dialect, query string) string {
 // EnqueueMemoLinks registers content links in the same transaction as the memo write.
 func EnqueueMemoLinks(ctx context.Context, tx *sql.Tx, dialect, content string) error {
 	for _, url := range linkmetadata.URLs(content) {
+		// Unpreviewable links must not prevent saving the memo or enter the retry queue.
+		if err := httpgetter.ValidateURL(url); err != nil {
+			continue
+		}
 		if err := enqueueLinkMetadata(ctx, tx, dialect, url); err != nil {
 			return err
 		}
@@ -95,6 +100,9 @@ func (s *Store) FetchLinkMetadata(ctx context.Context, url string, fetch func(co
 	url = strings.TrimSpace(url)
 	if url == "" {
 		return nil, errors.New("url is required")
+	}
+	if err := httpgetter.ValidateURL(url); err != nil {
+		return nil, err
 	}
 	cached, err := s.GetLinkMetadata(ctx, url)
 	if err != nil || cached != nil {

@@ -18,6 +18,23 @@ func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 	return f(req)
 }
 
+func TestValidateURLWithoutNetwork(t *testing.T) {
+	originalLookup := lookupIPAddr
+	t.Cleanup(func() { lookupIPAddr = originalLookup })
+	lookupIPAddr = func(context.Context, string) ([]net.IPAddr, error) {
+		t.Fatal("URL validation must not resolve DNS")
+		return nil, nil
+	}
+	for _, address := range []string{"https://missing.invalid/article", "http://93.184.216.34/article"} {
+		require.NoError(t, ValidateURL(address))
+	}
+	for _, address := range []string{"file:///tmp/article", "http://", "https://%", "http://127.0.0.1/article", "https://[::1]/"} {
+		t.Run(address, func(t *testing.T) {
+			require.Error(t, ValidateURL(address))
+		})
+	}
+}
+
 func TestGetHTMLMeta(t *testing.T) {
 	originalHTTPClient := httpClient
 	t.Cleanup(func() {

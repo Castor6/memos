@@ -55,6 +55,28 @@ func TestGetLinkMetadataInternalURL(t *testing.T) {
 	require.Equal(t, codes.InvalidArgument, status.Code(err))
 }
 
+func TestLinkMetadataInvalidURLsAreNotQueued(t *testing.T) {
+	service := newIntegrationService(t)
+	original := fetchHTMLMetaWithContext
+	t.Cleanup(func() { fetchHTMLMetaWithContext = original })
+	fetchHTMLMetaWithContext = func(context.Context, string) (*httpgetter.HTMLMeta, error) {
+		t.Fatal("invalid URLs must be rejected before fetching")
+		return nil, nil
+	}
+	ctx := context.Background()
+	for _, url := range []string{"file:///tmp/article", "http://", "https://%", "http://127.0.0.1/article", "https://[::1]/"} {
+		t.Run(url, func(t *testing.T) {
+			_, err := service.GetLinkMetadata(ctx, &v1pb.GetLinkMetadataRequest{Url: url})
+			require.Equal(t, codes.InvalidArgument, status.Code(err))
+			_, err = service.BatchGetLinkMetadata(ctx, &v1pb.BatchGetLinkMetadataRequest{Urls: []string{url}})
+			require.Equal(t, codes.InvalidArgument, status.Code(err))
+		})
+	}
+	var jobs int
+	require.NoError(t, service.Store.GetDriver().GetDB().QueryRowContext(ctx, "SELECT COUNT(*) FROM link_metadata_job").Scan(&jobs))
+	require.Zero(t, jobs)
+}
+
 func TestBatchGetLinkMetadata(t *testing.T) {
 	originalFetchHTMLMeta := fetchHTMLMeta
 	t.Cleanup(func() {

@@ -65,6 +65,9 @@ func (s *APIV1Service) cachedLinkMetadata(ctx context.Context, input string) (*v
 	if url == "" {
 		return nil, status.Error(codes.InvalidArgument, "url is required")
 	}
+	if err := httpgetter.ValidateURL(url); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid link URL: %v", err)
+	}
 	if s.Store == nil {
 		return getLinkMetadata(url)
 	}
