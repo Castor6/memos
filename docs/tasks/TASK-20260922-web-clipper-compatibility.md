@@ -259,7 +259,7 @@ OCR 资源核查与建议（尚未部署或压测）：
 - 再次使用用户给出的真实 X 回复只读验证，发现并修复 `role=link` 时间锚点被误判引用卡、`aria-labelledby` 对话名称遗漏两处实际兼容问题；补充回归夹具。最终取得本人、swyx、最初原帖三条记录，作者、时间、来源对应正确，isOwnPost=true。临时自建标签已关闭，未在 X 产生写操作。
 - 本地一次性服务器实际 REST 验证：公开能力/8 KiB 限制、创建 Star 和 Pick up、同账号两枚不同 PAT 查询同一历史、稳定 ID 冲突、正文修改保留快照、归档后可查、删除后 404、中文 UTF-8 超限被拒、匿名历史拒绝。
 - Codex 内置浏览器检查 420×600 扩展内容区：Star 思考优先、Pick up 评论只读/身份确认/背景居中、折叠展开、固定保存栏和重新打开后恢复草稿。此 UI 验证使用本地浏览器 API 样例；不冒充已安装扩展的端到端验证，也没有修改用户原扩展连接。
-- 扩展全量单测、TypeScript、Biome、语言表与 Vite 构建通过；Memos Web 307 项单测、TypeScript 与生产构建通过。完整 Web lint 被本机既有 CRLF 检出阻断，未为此改写无关文件。根版本工具 7 项中 5 项通过，2 项因 Windows 下测试直接执行无扩展名 changeset shim 报 ENOENT；未修改无关发布工具。
+- 扩展 330 项单测、TypeScript、Biome、语言表与 Vite 构建通过；Memos Web 321 项单测、TypeScript 与生产构建通过。完整 Web lint 被本机既有 CRLF 检出阻断，未为此改写无关文件。根版本工具 7 项中 5 项通过，2 项因 Windows 下测试直接执行无扩展名 changeset shim 报 ENOENT；未修改无关发布工具。
 - 完整 API/过滤包测试及新 SQLite Store 测试通过，三驱动过滤 SQL 已覆盖编译测试；Buf 生成、lint、修改文件格式检查通过。完整 server/internal/store 检查存在既有 Windows SQLite 文件占用清理与 legacy 路径失败；本机无 GCC/CGO，无法运行 race；无 Docker，未执行真实 MySQL/Postgres 容器测试，需由 Linux CI 补充。
 
 未覆盖与交付边界：未部署服务器、未发布扩展商店、未切换用户已加载的扩展副本。尚未真实验证所有 X 长文/引用/媒体/删除/受限父帖样例，DOM 结构变化可能需要后续适配。图片上传超时可能产生未关联附件，现有附件接口没有幂等键；回滚旧服务端后编辑可能丢失其不认识的 capture 字段。当前扩展只用个人空间，新入口文案以中文为主。

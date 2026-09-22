@@ -49,7 +49,7 @@ func TestValidateMemoCapture(t *testing.T) {
 		"missing source": func(c *v1pb.MemoCapture) { c.Posts[0].Id = "123"; c.Posts[0].Url = "https://x.com/user/status/123" },
 	} {
 		t.Run(name, func(t *testing.T) {
-			capture := proto.Clone(valid).(*v1pb.MemoCapture)
+			capture := proto.CloneOf(valid)
 			mutate(capture)
 			require.Equal(t, codes.InvalidArgument, status.Code(validateMemoCapture(capture)))
 		})
@@ -59,7 +59,7 @@ func TestValidateMemoCapture(t *testing.T) {
 	}
 	storeCapture := convertMemoCaptureToStore(valid)
 	require.True(t, proto.Equal(valid, convertMemoCaptureFromStore(storeCapture)))
-	withHandle := proto.Clone(valid).(*v1pb.MemoCapture)
+	withHandle := proto.CloneOf(valid)
 	withHandle.Posts[0].Author = "@Canlantiancai"
 	require.NoError(t, validateMemoCapture(withHandle))
 	for _, source := range []string{"https://x.com/i/status/2102063913437376776", "https://x.com/i/web/status/2102063913437376776"} {
@@ -67,7 +67,7 @@ func TestValidateMemoCapture(t *testing.T) {
 		withHandle.Posts[0].Url = source
 		require.NoError(t, validateMemoCapture(withHandle))
 	}
-	tooLarge := proto.Clone(valid).(*v1pb.MemoCapture)
+	tooLarge := proto.CloneOf(valid)
 	for i := range 9 {
 		id := strconv.Itoa(i + 1)
 		tooLarge.Posts = append(tooLarge.Posts, &v1pb.MemoCapture_Post{Id: id, Url: "https://x.com/reader/status/" + id, Content: strings.Repeat("x", 128*1024)})

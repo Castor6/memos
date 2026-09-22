@@ -129,7 +129,7 @@ describe("App — manual capture workspace", () => {
     const pickup = await screen.findByRole("button", { name: "Pick up" });
     await waitFor(() => expect(pickup).toBeEnabled());
     await user.click(pickup);
-    expect(await screen.findByRole("alert")).toHaveTextContent(/X.*详情页/);
+    expect(await screen.findByText(/X.*详情页.*Pick up/)).toBeInTheDocument();
     expect(browserMock.scripting.executeScript).not.toHaveBeenCalled();
   });
 

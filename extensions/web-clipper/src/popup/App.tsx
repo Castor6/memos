@@ -281,7 +281,7 @@ function SignedInView({ c, state, blocked }: { c: ClipperState; state: ReadyPopu
           </p>
         ) : null}
         {c.notice ? (
-          <p role="alert" className="text-sm text-destructive">
+          <p role="status" className="text-sm text-muted-foreground">
             {c.notice}
           </p>
         ) : null}
