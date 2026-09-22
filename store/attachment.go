@@ -100,7 +100,7 @@ func (s *Store) CreateAttachment(ctx context.Context, create *Attachment) (*Atta
 
 func (s *Store) ListAttachments(ctx context.Context, find *FindAttachment) ([]*Attachment, error) {
 	// Set default limits to prevent loading too many attachments at once
-	shouldApplyDefaultLimit := find.Limit == nil && len(find.MemoIDList) == 0
+	shouldApplyDefaultLimit := find.Limit == nil && len(find.MemoIDList) == 0 && (find.GetBlob || find.MemoID == nil)
 	if shouldApplyDefaultLimit && find.GetBlob {
 		// When fetching blobs, we should be especially careful with limits
 		defaultLimit := 10

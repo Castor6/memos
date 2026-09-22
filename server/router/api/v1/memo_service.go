@@ -424,6 +424,9 @@ func (s *APIV1Service) GetMemo(ctx context.Context, request *v1pb.GetMemoRequest
 
 // UpdateMemo updates an existing memo.
 func (s *APIV1Service) UpdateMemo(ctx context.Context, request *v1pb.UpdateMemoRequest) (*v1pb.Memo, error) {
+	if request.Memo == nil {
+		return nil, status.Errorf(codes.InvalidArgument, "memo is required")
+	}
 	memoUID, err := ExtractMemoUIDFromName(request.Memo.Name)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid memo name: %v", err)
@@ -455,6 +458,7 @@ func (s *APIV1Service) UpdateMemo(ctx context.Context, request *v1pb.UpdateMemoR
 	update := &store.UpdateMemo{
 		ID: memo.ID,
 	}
+	mutation := &store.MemoMutation{Update: update, ActorID: user.ID, AllowForeignAttachments: isSuperUser(user)}
 	var previousContent string
 	contentUpdated := false
 	for _, path := range request.UpdateMask.Paths {
@@ -502,11 +506,17 @@ func (s *APIV1Service) UpdateMemo(ctx context.Context, request *v1pb.UpdateMemoR
 			rowStatus := convertStateToStore(request.Memo.State)
 			update.RowStatus = &rowStatus
 		} else if path == "create_time" {
+			if request.Memo.CreateTime == nil || !request.Memo.CreateTime.IsValid() {
+				return nil, status.Errorf(codes.InvalidArgument, "valid create_time is required")
+			}
 			createdTs := request.Memo.CreateTime.AsTime().Unix()
 			update.CreatedTs = &createdTs
 		} else if path == "update_time" {
 			updatedTimeSec := time.Now().Unix()
 			if request.Memo.UpdateTime != nil {
+				if !request.Memo.UpdateTime.IsValid() {
+					return nil, status.Errorf(codes.InvalidArgument, "valid update_time is required")
+				}
 				updatedTimeSec = request.Memo.UpdateTime.AsTime().Unix()
 			}
 			update.UpdatedTs = &updatedTimeSec
@@ -517,25 +527,24 @@ func (s *APIV1Service) UpdateMemo(ctx context.Context, request *v1pb.UpdateMemoR
 			payload.Location = convertLocationToStore(request.Memo.Location)
 			update.Payload = payload
 		} else if path == "attachments" {
-			if err := s.setMemoAttachmentsInternal(ctx, user, memo, request.Memo.Attachments); err != nil {
-				return nil, errors.Wrap(err, "failed to set memo attachments")
+			attachmentIDs, err := s.prepareMemoAttachmentIDs(ctx, user, memo, request.Memo.Attachments)
+			if err != nil {
+				return nil, err
 			}
+			mutation.AttachmentIDs = &attachmentIDs
 		} else if path == "relations" {
-			if err := s.setMemoRelationsInternal(ctx, memo, request.Memo.Relations); err != nil {
-				return nil, errors.Wrap(err, "failed to set memo relations")
+			relations, err := s.prepareMemoRelations(ctx, memo, request.Memo.Relations)
+			if err != nil {
+				return nil, err
 			}
+			mutation.Relations = &relations
+		} else {
+			return nil, status.Errorf(codes.InvalidArgument, "unsupported update field: %s", path)
 		}
 	}
 
-	if err = s.Store.UpdateMemo(ctx, update); err != nil {
+	if err = s.Store.ApplyMemoMutation(ctx, mutation); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to update memo")
-	}
-
-	memo, err = s.Store.GetMemo(ctx, &store.FindMemo{
-		ID: &memo.ID,
-	})
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get memo")
 	}
 	memo, parentMemo, memoMessage, err := s.buildUpdatedMemoState(ctx, memo.ID)
 	if err != nil {
