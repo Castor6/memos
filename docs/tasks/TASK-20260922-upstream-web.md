@@ -46,3 +46,11 @@
 - 实现：普通账号设置新增“导入与导出”；React Query mutation 复用既有鉴权/当前空间 transport，请求中禁用导入导出，禁止自动重试。导入完成后刷新笔记、附件、用户查询与空间设置。下载及时移除 DOM 链接并延后释放对象 URL，mutation 完成后清理大文件结果缓存。
 - 2026-09-22 验证：`corepack pnpm --dir web lint` 通过；`corepack pnpm --dir web test` 共 83 文件、377 条测试通过；`corepack pnpm --dir web build` 成功，告警与第一阶段相同。新增 9 条测试覆盖显式导入、文件限制、部分成功、逐条失败、导入重试、导出错误、ZIP 下载/URL 释放、缓存刷新和英简繁键覆盖。
 - 边界：编译使用主任务已生成的 `memo_transfer_service_pb.ts`，生成物不纳入本分支提交；真实后端 ZIP 互操作和浏览器下载需在主分支集成后验证。
+
+## 第三阶段：集成后本地 HTTP 验收
+
+- 2026-09-22：主任务集成后，以 Go 1.26.2 构建本地服务，API 监听 `127.0.0.1:8081`，Vite 监听 `127.0.0.1:3001`；使用 `tmp/local-dev/upstream-ui-20260922/` 独立 SQLite 数据及开发文档中的公开测试账号，不访问历史或线上数据。Windows 无 `fcntl`，按开发脚本相同请求初始化 4 条笔记和图片样例。
+- ZIP：通过真实 HTTP 导出 4 条笔记与 3 个关联附件，生成 5000 字节 ZIP，压缩包 CRC 检查通过；在同账号重导入得到成功 0、跳过 4、附件 0，无警告或错误，符合 UID 去重不覆盖规则。样例保存在 `tmp/local-dev/evidence/upstream-ui-export.zip`。
+- 上传与容量：713 字节 PNG 分两段传输，首段 40 字节重试不会重复写入，查询进度仍为 40；续传完成后重发末段返回同一个附件，空 MIME 元数据识别为 `image/png`，下载 SHA-256 与原文件一致。容量从 1426 增至 2139 字节，等于附件列表持久化大小之和。
+- SSE：两个独立鉴权 HTTP 连接均立即收到连接注释，并按序收到同一测试笔记的创建、更新、删除事件；测试笔记随后删除。未登录访问 SSE 与 ZIP 导出均返回 401。详细响应记录在 `tmp/local-dev/evidence/http-verification.json` 与 `http-sse-verification.json`，不包含访问令牌。
+- 边界：本阶段证明本地 SQLite、HTTP 服务与文件内容互操作；不代替跨数据库、容器、真实 Safari 或大文件压力检查。子会话没有可用 IAB，桌面与 430px 界面、浏览器下载、搜索高亮及跨窗口共享连接的界面验收交由主任务使用 Codex IAB 完成，未使用常用 Chrome。
