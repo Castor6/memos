@@ -1,6 +1,18 @@
 import browser from "webextension-polyfill";
+import type { CaptureData, CaptureKind } from "./capture-data";
 import type { VerifiedMemosUser } from "./connection-config";
-import { type MemosCredentials, normalizeInstanceUrl, type Visibility } from "./memos-client";
+import { InstanceError } from "./errors";
+import {
+  getInstanceProfile,
+  listCapturedMemos,
+  type MemoSummary,
+  type MemosCredentials,
+  memoWebUrl,
+  normalizeInstanceUrl,
+  type Visibility,
+} from "./memos-client";
+
+export type { CaptureData, CapturedPost, CaptureKind } from "./capture-data";
 
 export const CLIP_RECORDS_KEY = "clipRecordsV1";
 
@@ -22,6 +34,8 @@ export type ClipRecord = {
   memoName: string;
   memoUrl: string;
   savedAt: number;
+  capture?: CaptureData;
+  state?: "NORMAL" | "ARCHIVED";
 };
 
 export type ClipSaveStatus = Pick<ClipRecord, "memoUrl" | "savedAt">;
@@ -31,6 +45,7 @@ export type ClipCaptureInput = {
   sourceTitle: string;
   selectionMarkdown?: string;
   imageCount: number;
+  capture?: CaptureData;
 };
 
 export type ClipConnection =
@@ -149,6 +164,66 @@ export async function findLatestClipStatus(connection: ClipConnection, sourceUrl
   if (!records.length) return null;
   const dedupeKey = await clipDedupeKey(connection, sourceUrl);
   const record = records.find((candidate) => candidate.dedupeKey === dedupeKey);
+  return record ? { memoUrl: record.memoUrl, savedAt: record.savedAt } : null;
+}
+
+export async function captureCapabilities(connection: ClipConnection): Promise<{ supported: boolean; contentMaxBytes: number }> {
+  const profile = await getInstanceProfile(connection.credentials);
+  return { supported: profile.webClipperSupported === true, contentMaxBytes: profile.memoContentMaxBytes ?? 8192 };
+}
+
+function serverRecord(connection: ClipConnection, memo: MemoSummary): ClipRecord {
+  const capture = memo.capture;
+  if (!capture) throw new InstanceError("bad-response");
+  return {
+    schemaVersion: 1,
+    id: memo.name,
+    dedupeKey: `server:${memo.name}`,
+    instanceUrl: normalizeInstanceUrl(connection.credentials.instanceUrl),
+    sourceUrl: capture.sourceUrl,
+    sourceTitle: capture.posts.find((post) => post.id === capture.sourceId)?.content.slice(0, 120) || capture.sourceUrl,
+    memoContent: memo.content,
+    visibility: memo.visibility,
+    memoName: memo.name,
+    memoUrl: memoWebUrl(connection.credentials.instanceUrl, memo),
+    savedAt: Date.parse(memo.createTime),
+    capture,
+    state: memo.state ?? "NORMAL",
+  };
+}
+
+/** Reads current server data; legacy local records never masquerade as synchronized history. */
+export async function listServerClipRecords(connection: ClipConnection): Promise<ClipRecord[]> {
+  if (!(await captureCapabilities(connection)).supported) throw new InstanceError("capture-unsupported");
+  const states = await Promise.all(
+    ["NORMAL", "ARCHIVED"].map((state) => listCapturedMemos(connection.credentials, { state: state as "NORMAL" | "ARCHIVED" })),
+  );
+  return [...new Map(states.flat().map((memo) => [memo.name, memo])).values()]
+    .map((memo) => serverRecord(connection, memo))
+    .sort((left, right) => right.savedAt - left.savedAt);
+}
+
+export async function findServerClipStatus(
+  connection: ClipConnection,
+  sourceUrl: string,
+  kind?: CaptureKind,
+): Promise<ClipSaveStatus | null> {
+  if (!sourceUrl.trim()) return null;
+  if (!(await captureCapabilities(connection)).supported) throw new InstanceError("capture-unsupported");
+  const states = await Promise.all(
+    ["NORMAL", "ARCHIVED"].map((state) =>
+      listCapturedMemos(connection.credentials, {
+        state: state as "NORMAL" | "ARCHIVED",
+        sourceUrl: normalizeClipSourceUrl(sourceUrl),
+        kind,
+        firstOnly: true,
+      }),
+    ),
+  );
+  const record = states
+    .flat()
+    .map((memo) => serverRecord(connection, memo))
+    .sort((left, right) => right.savedAt - left.savedAt)[0];
   return record ? { memoUrl: record.memoUrl, savedAt: record.savedAt } : null;
 }
 

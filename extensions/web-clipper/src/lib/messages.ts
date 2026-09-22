@@ -1,5 +1,5 @@
 import type { OAuthIdentity } from "@/auth/oauth-session";
-import type { ClipCaptureInput } from "./clip-records";
+import type { CaptureKind, ClipCaptureInput, ClipRecord } from "./clip-records";
 import type { ConnectionSource } from "./connection-config";
 import type { SaveErrorKind } from "./errors";
 import type { Visibility } from "./memos-client";
@@ -38,9 +38,11 @@ export type Request =
   | { type: "GET_AUTH_USER" }
   | { type: "GET_CONNECTION_STATE"; refresh?: boolean; source?: "active" | "usememos" }
   | { type: "GET_POPUP_STATE" }
+  | { type: "GET_CAPTURE_CAPABILITIES"; expectedSource: ConnectionSource; expectedConnectionId: string; expectedInstanceUrl: string }
   | {
       type: "GET_CLIP_STATUS";
       sourceUrl: string;
+      kind?: CaptureKind;
       expectedSource: ConnectionSource;
       expectedConnectionId: string;
       expectedInstanceUrl: string;
@@ -56,7 +58,7 @@ export type Request =
       expectedSource: ConnectionSource;
       expectedConnectionId: string;
       expectedInstanceUrl: string;
-      /** Page metadata saved locally after a successful popup clip. */
+      /** Source metadata and an optional structured snapshot saved atomically with the memo. */
       clip?: ClipCaptureInput;
       /** Stable across retries of one logical save; lets the worker reconcile an ambiguous POST. */
       saveRequestId?: string;
@@ -85,4 +87,7 @@ export type ConnectionActionResult = { ok: true; state: ConnectionStateResult } 
 
 export type SaveResult =
   // failedImages: how many captured images could not be uploaded — surfaced so success is never silently partial.
-  { ok: true; webUrl: string; failedImages?: number } | { ok: false; errorKind: SaveErrorKind };
+  { ok: true; webUrl: string; failedImages?: number } | { ok: false; errorKind: SaveErrorKind; message?: string; contentMaxBytes?: number };
+
+export type CaptureCapabilitiesResult = { ok: true; supported: boolean; contentMaxBytes: number } | { ok: false; errorKind: SaveErrorKind };
+export type ClipRecordsResult = { ok: true; records: ClipRecord[] } | { ok: false; errorKind: SaveErrorKind };

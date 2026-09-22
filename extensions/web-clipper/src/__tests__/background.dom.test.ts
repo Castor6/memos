@@ -105,6 +105,67 @@ describe("background — storage isolation", () => {
 describe("background — SAVE_MEMO message", () => {
   beforeEach(ready);
 
+  it("blocks unsupported sync and UTF-8 overflow before uploads or creates", async () => {
+    const capture = { kind: "STAR", platform: "WEB", sourceUrl: "https://example.org/", sourceId: "", comment: "", context: "", posts: [] };
+    const request = {
+      type: "SAVE_MEMO",
+      content: "中文",
+      visibility: "PRIVATE",
+      images: ["https://cdn.example.org/image.png"],
+      ...expected,
+      clip: { sourceUrl: capture.sourceUrl, sourceTitle: "Title", imageCount: 1, capture },
+    };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ version: "0.29.1" }));
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await emitRuntime(request)).toEqual({ ok: false, errorKind: "capture-unsupported" });
+    fetchMock.mockResolvedValue(jsonResponse({ version: "dev", webClipperSupported: true, memoContentMaxBytes: 5 }));
+    expect(await emitRuntime(request)).toEqual({ ok: false, errorKind: "content-too-large", contentMaxBytes: 5 });
+    expect(fetchMock.mock.calls.every(([url]) => String(url).endsWith("/instance/profile"))).toBe(true);
+    vi.unstubAllGlobals();
+  });
+
+  it("allows a custom version only when the server advertises capture support", async () => {
+    seedStorage({ [VERSION_CACHE_KEY]: undefined });
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ version: "dev", webClipperSupported: true }));
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await emitRuntime({ type: "GET_POPUP_STATE" })).toMatchObject({ status: "ready", version: "dev" });
+    expect(await emitRuntime({ type: "GET_POPUP_STATE" })).toMatchObject({ status: "ready", version: "dev" });
+    expect(fetchMock).toHaveBeenCalledOnce();
+    vi.unstubAllGlobals();
+  });
+
+  it("does not recreate a saved memo deleted on the server when an old save is retried", async () => {
+    const capture = { kind: "STAR", platform: "WEB", sourceUrl: "https://example.org/", sourceId: "", comment: "", context: "", posts: [] };
+    const request = {
+      type: "SAVE_MEMO",
+      content: "body",
+      visibility: "PRIVATE",
+      ...expected,
+      saveRequestId: "saved_then_deleted",
+      saveStartedAt: Date.now(),
+      clip: { sourceUrl: capture.sourceUrl, sourceTitle: "Title", imageCount: 0, capture },
+    };
+    let posts = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((value: unknown, init?: RequestInit) => {
+        const url = String(value);
+        if (url.endsWith("/instance/profile"))
+          return Promise.resolve(jsonResponse({ version: "dev", webClipperSupported: true, memoContentMaxBytes: 8192 }));
+        if (url.endsWith("/auth/me")) return Promise.resolve(jsonResponse({ user: { name: "users/steven" } }));
+        if (init?.method === "POST") {
+          posts += 1;
+          return Promise.resolve(jsonResponse({ name: "memos/saved_then_deleted" }));
+        }
+        return Promise.resolve(jsonResponse({}, 404));
+      }),
+    );
+    expect(await emitRuntime(request)).toMatchObject({ ok: true });
+    expect(await emitRuntime(request)).toEqual({ ok: false, errorKind: "not-found" });
+    expect(posts).toBe(1);
+    vi.unstubAllGlobals();
+  });
+
   it("creates a memo and returns its web url when permitted", async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ name: "memos/42", uid: "abc" }));
     vi.stubGlobal("fetch", fetchMock);
@@ -121,9 +182,39 @@ describe("background — SAVE_MEMO message", () => {
     vi.unstubAllGlobals();
   });
 
-  it("stores the captured save for popup lookup and the complete local history", async () => {
+  it("saves structured capture and reads current cloud history including archive and deletion", async () => {
     seedDirectConnection();
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({ name: "memos/42", uid: "abc" })));
+    let memo: Record<string, unknown> | null = null;
+    const capture = {
+      kind: "STAR",
+      platform: "WEB",
+      sourceUrl: "https://example.com/post",
+      sourceId: "",
+      comment: "My thought",
+      context: "",
+      posts: [],
+    };
+    const fetchMock = vi.fn((value: unknown, init?: RequestInit) => {
+      const url = new URL(String(value));
+      if (url.pathname.endsWith("/instance/profile"))
+        return Promise.resolve(jsonResponse({ version: "dev", webClipperSupported: true, memoContentMaxBytes: 8192 }));
+      if (init?.method === "POST") {
+        const body = JSON.parse(String(init.body));
+        memo = {
+          name: "memos/clip_record_123",
+          uid: "abc",
+          creator: "users/steven",
+          createTime: new Date().toISOString(),
+          state: "NORMAL",
+          ...body,
+        };
+        return Promise.resolve(jsonResponse(memo));
+      }
+      if (url.pathname === "/api/v1/memos")
+        return Promise.resolve(jsonResponse({ memos: memo && memo.state === url.searchParams.get("state") ? [memo] : [] }));
+      return Promise.resolve(jsonResponse({}, 404));
+    });
+    vi.stubGlobal("fetch", fetchMock);
     const directExpected = {
       expectedSource: "direct" as const,
       expectedConnectionId: "direct_123",
@@ -141,9 +232,11 @@ describe("background — SAVE_MEMO message", () => {
         sourceTitle: "A useful post",
         selectionMarkdown: "The selected paragraph",
         imageCount: 1,
+        capture,
       },
       ...directExpected,
     });
+    expect(memo).toMatchObject({ capture });
 
     const status = await emitRuntime({
       type: "GET_CLIP_STATUS",
@@ -156,18 +249,27 @@ describe("background — SAVE_MEMO message", () => {
     });
 
     const history = await emitRuntime({ type: "LIST_CLIP_RECORDS" }, optionsSender);
-    expect(history).toEqual([
-      expect.objectContaining({
-        schemaVersion: 1,
-        id: "clip_record_123",
-        sourceTitle: "A useful post",
-        selection: { markdown: "The selected paragraph", imageCount: 1 },
-        memoContent: "The final memo content",
-        visibility: "PROTECTED",
-        memoName: "memos/clip_record_123",
-        memoUrl: "https://memos.example.com/memos/abc",
-      }),
-    ]);
+    expect(history).toEqual({
+      ok: true,
+      records: [
+        expect.objectContaining({
+          schemaVersion: 1,
+          id: "memos/clip_record_123",
+          memoContent: "The final memo content",
+          visibility: "PROTECTED",
+          memoName: "memos/clip_record_123",
+          memoUrl: "https://memos.example.com/memos/abc",
+        }),
+      ],
+    });
+    memo = Object.assign({}, memo, { content: "Edited on the server", state: "ARCHIVED" });
+    expect(await emitRuntime({ type: "LIST_CLIP_RECORDS" }, optionsSender)).toMatchObject({
+      ok: true,
+      records: [{ memoContent: "Edited on the server", state: "ARCHIVED" }],
+    });
+    memo = null;
+    expect(await emitRuntime({ type: "LIST_CLIP_RECORDS" }, optionsSender)).toEqual({ ok: true, records: [] });
+    expect(await emitRuntime({ type: "GET_CLIP_STATUS", sourceUrl: capture.sourceUrl, ...directExpected })).toBeNull();
     vi.unstubAllGlobals();
   });
 
@@ -350,26 +452,22 @@ describe("background — SAVE_MEMO message", () => {
     vi.unstubAllGlobals();
   });
 
-  it("reconciles an exact recent memo before retrying an ambiguous create", async () => {
+  it("reconciles the stable memo id before retrying an ambiguous create", async () => {
     const startedAt = Date.now();
     let postCount = 0;
     const fetchMock = vi.fn((url: unknown, init?: RequestInit) => {
       if (init?.method === "GET" && String(url).endsWith("/api/v1/auth/me")) {
         return Promise.resolve(jsonResponse({ user: { name: "users/steven" } }));
       }
-      if (init?.method === "GET" && String(url).includes("/api/v1/memos?")) {
+      if (init?.method === "GET" && String(url).endsWith("/api/v1/memos/clip_retry_123")) {
         return Promise.resolve(
           jsonResponse({
-            memos: [
-              {
-                name: "memos/42",
-                uid: "abc",
-                creator: "users/steven",
-                content: "hello",
-                visibility: "PRIVATE",
-                createTime: new Date(startedAt).toISOString(),
-              },
-            ],
+            name: "memos/clip_retry_123",
+            uid: "abc",
+            creator: "users/steven",
+            content: "hello",
+            visibility: "PRIVATE",
+            createTime: new Date(startedAt).toISOString(),
           }),
         );
       }

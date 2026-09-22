@@ -1,14 +1,21 @@
 import browser from "webextension-polyfill";
 import { OAuthUnavailableError } from "@/auth/oauth-session";
 import { resolveActiveConnection } from "@/background/connection-source";
-import { type ClipCaptureInput, recordSuccessfulClip } from "@/lib/clip-records";
+import {
+  type CaptureData,
+  type ClipCaptureInput,
+  captureCapabilities,
+  normalizeClipSourceUrl,
+  recordSuccessfulClip,
+} from "@/lib/clip-records";
 import type { ConnectionSource } from "@/lib/connection-config";
-import { toSaveErrorKind } from "@/lib/errors";
+import { InstanceError, toSaveErrorKind } from "@/lib/errors";
 import { composeMemoContent, toQuotedMarkdown } from "@/lib/format";
 import {
   createAttachment,
   createMemo,
   getCurrentUser,
+  getMemo,
   listRecentMemos,
   type MemosCredentials,
   memoWebUrl,
@@ -39,8 +46,22 @@ export async function clearMemoSaveAttempts(): Promise<void> {
   await browser.storage.local.remove(SAVE_ATTEMPTS_KEY);
 }
 
-function saveFingerprint(content: string, visibility: Visibility, expected: SaveExpectation, images: string[]): string {
-  const value = [content, visibility, expected.source, expected.connectionId, expected.instanceUrl, ...images].join("\u0000");
+function saveFingerprint(
+  content: string,
+  visibility: Visibility,
+  expected: SaveExpectation,
+  images: string[],
+  capture?: CaptureData,
+): string {
+  const value = [
+    content,
+    visibility,
+    expected.source,
+    expected.connectionId,
+    expected.instanceUrl,
+    ...images,
+    JSON.stringify(capture),
+  ].join("\u0000");
   let hash = 0x811c9dc5;
   for (let index = 0; index < value.length; index += 1) {
     hash ^= value.charCodeAt(index);
@@ -91,12 +112,32 @@ export async function savePopupMemo(
   ) {
     return { ok: false, errorKind: "auth-changed" };
   }
+  let capture = clip?.capture;
+  if (capture) {
+    capture = { ...capture, sourceUrl: normalizeClipSourceUrl(capture.sourceUrl) };
+    try {
+      const capabilities = await captureCapabilities(connection);
+      if (!capabilities.supported) return { ok: false, errorKind: "capture-unsupported" };
+      if (new TextEncoder().encode(content).byteLength > capabilities.contentMaxBytes)
+        return { ok: false, errorKind: "content-too-large", contentMaxBytes: capabilities.contentMaxBytes };
+    } catch (error) {
+      return { ok: false, errorKind: toSaveErrorKind(error) };
+    }
+  }
+  const currentConnection = await resolveActiveConnection();
+  if (
+    !currentConnection ||
+    currentConnection.source !== expected.source ||
+    currentConnection.connectionId !== expected.connectionId ||
+    currentConnection.credentials.instanceUrl !== expected.instanceUrl
+  )
+    return { ok: false, errorKind: "auth-changed" };
   const running = inFlight.get(operation.requestId);
   if (running) return running;
 
-  const save = savePopupMemoOnce(content, visibility, images, expected, operation, credentials)
+  const save = savePopupMemoOnce(content, visibility, images, expected, operation, credentials, capture)
     .then(async (result) => {
-      if (result.ok && clip) {
+      if (result.ok && clip && !clip.capture) {
         try {
           await recordSuccessfulClip({
             connection,
@@ -127,23 +168,30 @@ async function savePopupMemoOnce(
   expected: SaveExpectation,
   operation: SaveOperation,
   credentials: MemosCredentials,
+  capture?: CaptureData,
 ): Promise<SaveResult> {
-  const fingerprint = saveFingerprint(content, visibility, expected, images);
+  const fingerprint = saveFingerprint(content, visibility, expected, images, capture);
   const previous = (await readAttempts())[operation.requestId];
   if (previous && previous.fingerprint !== fingerprint) return { ok: false, errorKind: "bad-response" };
-  if (previous?.result) return previous.result;
+  if (previous?.result && !operation.serverMemoId) return previous.result;
 
   // An existing unfinished record means an earlier POST may have succeeded without its response
   // reaching the popup (or the MV3 worker may have stopped immediately afterward). Reconcile first.
   if (previous) {
     try {
       const currentUser = await getCurrentUser(credentials);
-      const recent = await listRecentMemos(credentials, 20, currentUser.name);
+      const exact = operation.serverMemoId ? await getMemo(credentials, operation.serverMemoId) : null;
+      if (operation.serverMemoId && previous.result && !exact) return { ok: false, errorKind: "not-found" };
+      const recent = operation.serverMemoId ? (exact ? [exact] : []) : await listRecentMemos(credentials, 20, currentUser.name);
       const match = recent.find(
         (memo) =>
-          memo.content === content &&
-          memo.visibility === visibility &&
-          Date.parse(memo.createTime) >= operation.startedAt - RECONCILIATION_CLOCK_SKEW_MS,
+          memo.creator === currentUser.name &&
+          (capture
+            ? memo.capture?.kind === capture.kind &&
+              memo.capture.sourceUrl === capture.sourceUrl &&
+              memo.capture.sourceId === capture.sourceId
+            : memo.content === content && memo.visibility === visibility) &&
+          (operation.serverMemoId || Date.parse(memo.createTime) >= operation.startedAt - RECONCILIATION_CLOCK_SKEW_MS),
       );
       if (match) {
         const result: Extract<SaveResult, { ok: true }> = {
@@ -154,6 +202,7 @@ async function savePopupMemoOnce(
         await writeAttempt(operation.requestId, { ...previous, result });
         return result;
       }
+      if (exact) return { ok: false, errorKind: "invalid-content", message: "保存标识已对应其他内容，请重新发起保存。" };
     } catch (error) {
       // Do not issue another create while reconciliation itself is unavailable.
       return { ok: false, errorKind: toSaveErrorKind(error) };
@@ -173,7 +222,7 @@ async function savePopupMemoOnce(
     await writeAttempt(operation.requestId, attempt);
   }
 
-  const result = await createMemoWithAttachments(content, names, credentials, visibility, operation.serverMemoId);
+  const result = await createMemoWithAttachments(content, names, credentials, visibility, operation.serverMemoId, capture);
   if (result.ok) {
     const success = failed > 0 ? { ...result, failedImages: failed } : result;
     await writeAttempt(operation.requestId, { ...attempt, result: success });
@@ -359,11 +408,13 @@ async function createMemoWithAttachments(
   credentials: MemosCredentials,
   visibility: Visibility,
   memoId?: string,
+  capture?: CaptureData,
 ): Promise<SaveResult> {
   try {
     const memo = await createMemo(credentials, {
       content,
       visibility,
+      ...(capture ? { capture } : {}),
       ...(memoId ? { memoId } : {}),
       ...(attachmentNames.length ? { attachments: attachmentNames.map((name) => ({ name })) } : {}),
     });
@@ -372,6 +423,6 @@ async function createMemoWithAttachments(
     const errorKind = toSaveErrorKind(error);
     const errorName = typeof error === "object" && error !== null && "name" in error ? String(error.name) : "Error";
     console.error("[memos-web-clipper] save failed", { errorKind, errorName });
-    return { ok: false, errorKind };
+    return { ok: false, errorKind, ...(error instanceof InstanceError && error.message !== error.kind ? { message: error.message } : {}) };
   }
 }

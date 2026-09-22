@@ -1,3 +1,4 @@
+import { parseCaptureData } from "./capture-data";
 import type { ClipCaptureInput } from "./clip-records";
 import type { ConnectionSource } from "./connection-config";
 import type { Visibility } from "./memos-client";
@@ -8,6 +9,7 @@ export type BackgroundRequest = Extract<
   {
     type:
       | "GET_POPUP_STATE"
+      | "GET_CAPTURE_CAPABILITIES"
       | "OPEN_SIGN_IN"
       | "SIGN_OUT"
       | "SELECT_USEMEMOS_SOURCE"
@@ -60,11 +62,14 @@ function parseClipCapture(value: unknown): ClipCaptureInput | null {
   if (typeof clip.imageCount !== "number" || !Number.isInteger(clip.imageCount) || clip.imageCount < 0 || clip.imageCount > 100) {
     return null;
   }
+  const capture = clip.capture === undefined ? undefined : parseCaptureData(clip.capture);
+  if (clip.capture !== undefined && !capture) return null;
   return {
     sourceUrl: clip.sourceUrl,
     sourceTitle: clip.sourceTitle,
     ...(selectionMarkdown !== undefined ? { selectionMarkdown } : {}),
     imageCount: clip.imageCount,
+    ...(capture ? { capture } : {}),
   };
 }
 
@@ -104,13 +109,19 @@ export function parseBackgroundRequest(value: unknown): BackgroundRequest | null
       ...(request.source !== undefined ? { source: request.source } : {}),
     };
   }
+  if (request.type === "GET_CAPTURE_CAPABILITIES") {
+    const expected = parseExpectedConnection(request);
+    return expected ? { type: "GET_CAPTURE_CAPABILITIES", ...expected } : null;
+  }
   if (request.type === "GET_CLIP_STATUS") {
     if (typeof request.sourceUrl !== "string" || request.sourceUrl.length > MAX_CLIP_SOURCE_URL_CHARS) return null;
     const expected = parseExpectedConnection(request);
     if (!expected) return null;
+    if (request.kind !== undefined && request.kind !== "STAR" && request.kind !== "PICK_UP") return null;
     return {
       type: "GET_CLIP_STATUS",
       sourceUrl: request.sourceUrl,
+      ...(request.kind ? { kind: request.kind } : {}),
       ...expected,
     };
   }

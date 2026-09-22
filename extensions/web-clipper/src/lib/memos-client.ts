@@ -1,3 +1,4 @@
+import { type CaptureData, type CaptureKind, parseCaptureData } from "./capture-data";
 import { InstanceError } from "./errors";
 
 export type MemosCredentials = { instanceUrl: string; accessToken: string };
@@ -118,6 +119,14 @@ async function instanceFetchJson(
       type: response.type,
     });
     if (response.status === 401 || response.status === 403) throw new InstanceError("unauthorized");
+    if (response.status === 404) throw new InstanceError("not-found");
+    if (response.status === 400 || response.status === 413) {
+      const errorBody = (await response.json().catch(() => null)) as { message?: unknown } | null;
+      const message = typeof errorBody?.message === "string" ? errorBody.message.slice(0, 1024) : "";
+      if (response.status === 413 || /content.*(length|size|limit|exceed)/i.test(message))
+        throw new InstanceError("content-too-large", message);
+      throw new InstanceError("invalid-content", message);
+    }
     throw new InstanceError("bad-response");
   }
   const text = await response.text();
@@ -130,7 +139,7 @@ async function instanceFetchJson(
   }
 }
 
-export type InstanceProfile = { version: string };
+export type InstanceProfile = { version: string; webClipperSupported?: boolean; memoContentMaxBytes?: number };
 export type CurrentMemosUser = { name: string; displayName?: string; username?: string };
 
 /** Human-readable name for a Memos user, falling back to the id in the `users/<id>` resource name. */
@@ -150,7 +159,16 @@ export async function getInstanceProfile(creds: MemosCredentials, deps?: Instanc
   }
   const version = (raw as { version: string }).version.trim();
   if (!version) return badResponse();
-  return { version };
+  const profile = raw as Record<string, unknown>;
+  return {
+    version,
+    ...(profile.webClipperSupported === true ? { webClipperSupported: true } : {}),
+    ...(typeof profile.memoContentMaxBytes === "number" &&
+    Number.isSafeInteger(profile.memoContentMaxBytes) &&
+    profile.memoContentMaxBytes > 0
+      ? { memoContentMaxBytes: profile.memoContentMaxBytes }
+      : {}),
+  };
 }
 
 /** Validates the access token and returns the authenticated Memos resource identity. */
@@ -170,7 +188,7 @@ export type CreatedMemo = { name: string; uid?: string };
 
 export async function createMemo(
   creds: MemosCredentials,
-  input: { content: string; visibility: Visibility; memoId?: string; attachments?: Array<{ name: string }> },
+  input: { content: string; visibility: Visibility; memoId?: string; attachments?: Array<{ name: string }>; capture?: CaptureData },
   deps?: InstanceFetchDeps,
 ): Promise<CreatedMemo> {
   const { memoId, ...body } = input;
@@ -187,7 +205,82 @@ export type MemoSummary = CreatedMemo & {
   content: string;
   visibility: Visibility;
   createTime: string;
+  state?: "NORMAL" | "ARCHIVED";
+  capture?: CaptureData;
 };
+
+function parseMemo(value: unknown): MemoSummary {
+  if (!value || typeof value !== "object") return badResponse();
+  const memo = value as Record<string, unknown>;
+  if (
+    typeof memo.name !== "string" ||
+    !memo.name ||
+    typeof memo.creator !== "string" ||
+    !memo.creator ||
+    (memo.content !== undefined && typeof memo.content !== "string") ||
+    !CLIPPER_VISIBILITIES.has(String(memo.visibility)) ||
+    typeof memo.createTime !== "string" ||
+    !Number.isFinite(Date.parse(memo.createTime))
+  )
+    return badResponse();
+  const capture = memo.capture === undefined ? undefined : parseCaptureData(memo.capture);
+  if (memo.capture !== undefined && !capture) return badResponse();
+  return {
+    name: memo.name,
+    creator: memo.creator,
+    content: String(memo.content ?? ""),
+    visibility: memo.visibility as Visibility,
+    createTime: memo.createTime,
+    ...(typeof memo.uid === "string" && memo.uid ? { uid: memo.uid } : {}),
+    ...(memo.state === "NORMAL" || memo.state === "ARCHIVED" ? { state: memo.state } : {}),
+    ...(capture ? { capture } : {}),
+  };
+}
+
+/** Retrieves an exact resource for retry reconciliation, including archived records. */
+export async function getMemo(creds: MemosCredentials, memoId: string, deps?: InstanceFetchDeps): Promise<MemoSummary | null> {
+  try {
+    return parseMemo(await instanceFetchJson(creds, `/api/v1/memos/${encodeURIComponent(memoId)}`, { method: "GET" }, deps));
+  } catch (error) {
+    if (error instanceof InstanceError && error.kind === "not-found") return null;
+    throw error;
+  }
+}
+
+/** Server capture history is scoped to the authenticated owner and personal space. */
+export async function listCapturedMemos(
+  creds: MemosCredentials,
+  options: { state: "NORMAL" | "ARCHIVED"; sourceUrl?: string; kind?: CaptureKind; firstOnly?: boolean },
+  deps?: InstanceFetchDeps,
+): Promise<MemoSummary[]> {
+  const terms = ["has_capture == true"];
+  if (options.sourceUrl) terms.push(`capture_source_url == ${JSON.stringify(options.sourceUrl)}`);
+  if (options.kind) terms.push(`capture_kind == ${JSON.stringify(options.kind)}`);
+  const params = new URLSearchParams({
+    pageSize: options.firstOnly ? "1" : "100",
+    orderBy: "create_time desc",
+    state: options.state,
+    filter: terms.join(" && "),
+  });
+  const memos: MemoSummary[] = [];
+  const seenTokens = new Set<string>();
+  for (;;) {
+    const raw = await instanceFetchJson(creds, `/api/v1/memos?${params}`, { method: "GET" }, deps);
+    if (!raw || typeof raw !== "object") return badResponse();
+    const page = raw as { memos?: unknown; nextPageToken?: unknown };
+    if (page.memos !== undefined && !Array.isArray(page.memos)) return badResponse();
+    for (const value of (page.memos ?? []) as unknown[]) {
+      const memo = parseMemo(value);
+      if (!memo.capture) return badResponse();
+      memos.push(memo);
+    }
+    if (!page.nextPageToken || options.firstOnly) break;
+    if (typeof page.nextPageToken !== "string" || seenTokens.has(page.nextPageToken)) return badResponse();
+    seenTokens.add(page.nextPageToken);
+    params.set("pageToken", page.nextPageToken);
+  }
+  return memos;
+}
 
 const CLIPPER_VISIBILITIES = new Set<string>(["PRIVATE", "PROTECTED", "PUBLIC"]);
 

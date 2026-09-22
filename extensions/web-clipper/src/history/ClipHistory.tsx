@@ -5,6 +5,7 @@ import { AppBrand } from "@/components/app-brand";
 import { buttonVariants } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import type { ClipRecord } from "@/lib/clip-records";
+import { describeSaveError, type SaveErrorKind } from "@/lib/errors";
 import { formatDateTime, t, tp } from "@/lib/i18n";
 import { sendBackgroundRequest } from "@/lib/runtime-client";
 
@@ -58,6 +59,10 @@ function ClipDetail({ record }: { record: ClipRecord }) {
         <header className="flex flex-col gap-4 border-b pb-5 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <p className="truncate font-mono text-[12px] leading-4 text-muted-foreground">{host(record.sourceUrl)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {record.capture?.kind === "PICK_UP" ? "Pick up" : "Star"}
+              {record.state === "ARCHIVED" ? " · 已归档" : ""}
+            </p>
             <h2 className="mt-1.5 text-[22px] font-semibold leading-7 tracking-[-0.025em]">{record.sourceTitle || record.sourceUrl}</h2>
           </div>
           <div className="flex shrink-0 flex-wrap gap-1.5">
@@ -94,6 +99,20 @@ function ClipDetail({ record }: { record: ClipRecord }) {
                 {record.memoContent}
               </pre>
             </section>
+            {record.capture ? (
+              <details className="rounded-md border p-3">
+                <summary className="cursor-pointer text-xs text-muted-foreground">保存时的互动与背景</summary>
+                <p className="mt-3 text-xs text-muted-foreground">上方显示服务器当前正文；以下保留首次保存时的互动信息。</p>
+                <p className="mt-3 text-xs font-medium">{record.capture.kind === "PICK_UP" ? "我的评论" : "我的思考"}</p>
+                <pre className="mt-1 whitespace-pre-wrap font-sans text-sm">{record.capture.comment || "（未填写）"}</pre>
+                {record.capture.context ? (
+                  <>
+                    <p className="mt-3 text-xs font-medium">补充背景</p>
+                    <pre className="mt-1 whitespace-pre-wrap font-sans text-sm">{record.capture.context}</pre>
+                  </>
+                ) : null}
+              </details>
+            ) : null}
           </div>
 
           <aside className="border-t pt-5 xl:border-t-0 xl:border-s xl:ps-6 xl:pt-0">
@@ -130,20 +149,34 @@ export function ClipHistory() {
   const [query, setQuery] = useState("");
   const [destination, setDestination] = useState("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [error, setError] = useState<SaveErrorKind | null>(null);
+  const [refresh, setRefresh] = useState(0);
 
   useEffect(() => {
     let active = true;
+    setRecords(null);
+    setError(null);
     void sendBackgroundRequest({ type: "LIST_CLIP_RECORDS" })
       .then((next) => {
         if (!active) return;
-        setRecords(next);
+        if (next.ok) setRecords(next.records);
+        else setError(next.errorKind);
       })
       .catch(() => {
-        if (active) setRecords([]);
+        if (active) setError("extension-error");
       });
     return () => {
       active = false;
     };
+  }, [refresh]);
+
+  useEffect(() => {
+    const onMessage = (message: unknown) => {
+      if (message && typeof message === "object" && "type" in message && message.type === "AUTH_CHANGED") setRefresh((value) => value + 1);
+      return undefined;
+    };
+    browser.runtime.onMessage.addListener(onMessage);
+    return () => browser.runtime.onMessage.removeListener(onMessage);
   }, []);
 
   const destinations = useMemo(() => Array.from(new Set((records ?? []).map((record) => record.instanceUrl))).sort(), [records]);
@@ -158,7 +191,7 @@ export function ClipHistory() {
   return (
     <div className="mx-auto flex min-h-screen max-w-7xl flex-col px-4 py-5 sm:px-6 sm:py-6">
       <header className="mb-5 flex items-center justify-between gap-4">
-        <AppBrand size="md" sub={t("historyStoredLocally")} />
+        <AppBrand size="md" sub="当前账户 · 服务器同步" />
         <a className={buttonVariants({ variant: "ghost", size: "sm" })} href={browser.runtime.getURL("src/options/index.html")}>
           <ArrowLeftIcon />
           {t("historySettings")}
@@ -171,6 +204,13 @@ export function ClipHistory() {
           {records ? <p className="text-[12px] text-muted-foreground">{tp("historyCount", records.length)}</p> : null}
         </div>
         <div className="flex flex-col gap-1.5 sm:flex-row">
+          <button
+            type="button"
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+            onClick={() => setRefresh((value) => value + 1)}
+          >
+            刷新
+          </button>
           <label className="relative block">
             <SearchIcon aria-hidden="true" className="absolute start-2.5 top-2 size-3.5 text-muted-foreground" />
             <span className="sr-only">{t("historySearch")}</span>
@@ -200,7 +240,20 @@ export function ClipHistory() {
         </div>
       </div>
 
-      {records === null ? (
+      {error ? (
+        <div role="alert" className="rounded-lg border border-destructive/40 p-5 text-sm">
+          <p className="font-medium">{describeSaveError(error).title}</p>
+          <p className="mt-2 text-muted-foreground">{describeSaveError(error).why}</p>
+          <p className="mt-2 text-muted-foreground">{describeSaveError(error).howToFix[0]}</p>
+          <button
+            type="button"
+            className={`${buttonVariants({ variant: "outline", size: "sm" })} mt-3`}
+            onClick={() => setRefresh((value) => value + 1)}
+          >
+            重试
+          </button>
+        </div>
+      ) : records === null ? (
         <div className="flex min-h-72 flex-1 items-center justify-center gap-2 text-[13px] text-muted-foreground">
           <Spinner />
           {t("commonLoading")}
@@ -211,7 +264,9 @@ export function ClipHistory() {
             <FileTextIcon className="size-5" />
           </span>
           <p className="text-[14px] font-medium">{t("historyEmptyTitle")}</p>
-          <p className="mt-1 max-w-sm text-[13px] text-muted-foreground">{t("historyEmptyDescription")}</p>
+          <p className="mt-1 max-w-sm text-[13px] text-muted-foreground">
+            保存一条 Star 或 Pick up 后，会在当前账户的各台设备显示。旧版仅存本地的历史不会自动导入。
+          </p>
         </div>
       ) : filtered.length === 0 ? (
         <div className="flex min-h-72 flex-1 items-center justify-center rounded-xl border border-dashed text-[13px] text-muted-foreground">

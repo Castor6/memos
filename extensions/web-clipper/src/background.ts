@@ -11,10 +11,10 @@ import {
 } from "@/background/connection-source";
 import { clearMemoSaveAttempts, savePopupMemo, saveSelectionClip } from "@/background/memo-save";
 import { isTrustedBackgroundRequest, parseBackgroundRequest, type RuntimeSender } from "@/lib/background-protocol";
-import { findLatestClipStatus, listClipRecords } from "@/lib/clip-records";
+import { captureCapabilities, findServerClipStatus, listServerClipRecords } from "@/lib/clip-records";
 import { describeSaveError, type SaveErrorKind, toSaveErrorKind } from "@/lib/errors";
 import { applyLocalePreference, getTextDirection, initializeLocalePreference, LOCALE_PREFERENCE_KEY, t, tp } from "@/lib/i18n";
-import { clearCachedVersion, resolveVersion } from "@/lib/instance-version";
+import { checkVersion, clearCachedVersion } from "@/lib/instance-version";
 import { memosUserDisplayName } from "@/lib/memos-client";
 import type { ConnectionStateResult, Request, SaveResult, SelectionClip } from "@/lib/messages";
 import { clearPopupState } from "@/lib/popup-state";
@@ -91,7 +91,42 @@ browser.runtime.onMessage.addListener((message: unknown, sender: RuntimeSender) 
   const req = parseBackgroundRequest(message);
   if (!req || !isTrustedBackgroundRequest(req, sender, browser.runtime.id)) return undefined;
   if (req.type === "GET_POPUP_STATE") return reconcilePopupState();
-  if (req.type === "LIST_CLIP_RECORDS") return listClipRecords();
+  if (req.type === "LIST_CLIP_RECORDS")
+    return (async () => {
+      try {
+        const connection = await resolveActiveConnection();
+        if (!connection) return { ok: false, errorKind: "not-configured" };
+        const records = await listServerClipRecords(connection);
+        const current = await resolveActiveConnection();
+        if (
+          !current ||
+          current.source !== connection.source ||
+          current.connectionId !== connection.connectionId ||
+          current.credentials.instanceUrl !== connection.credentials.instanceUrl
+        )
+          return { ok: false, errorKind: "auth-changed" };
+        return { ok: true, records };
+      } catch (error) {
+        return { ok: false, errorKind: toSaveErrorKind(error) };
+      }
+    })();
+  if (req.type === "GET_CAPTURE_CAPABILITIES")
+    return (async () => {
+      try {
+        const connection = await resolveActiveConnection();
+        const matches = (value: typeof connection) =>
+          value &&
+          value.source === req.expectedSource &&
+          value.connectionId === req.expectedConnectionId &&
+          value.credentials.instanceUrl === req.expectedInstanceUrl;
+        if (!connection || !matches(connection)) return { ok: false, errorKind: "auth-changed" };
+        const capabilities = await captureCapabilities(connection);
+        if (!matches(await resolveActiveConnection())) return { ok: false, errorKind: "auth-changed" };
+        return { ok: true, ...capabilities };
+      } catch (error) {
+        return { ok: false, errorKind: toSaveErrorKind(error) };
+      }
+    })();
   if (req.type === "GET_CLIP_STATUS") {
     return (async () => {
       try {
@@ -104,7 +139,7 @@ browser.runtime.onMessage.addListener((message: unknown, sender: RuntimeSender) 
         ) {
           return null;
         }
-        return await findLatestClipStatus(connection, req.sourceUrl);
+        return await findServerClipStatus(connection, req.sourceUrl, req.kind);
       } catch {
         // History lookup is an enhancement; a failed lookup must not block clipping.
         return null;
@@ -281,8 +316,8 @@ browser.contextMenus.onClicked.addListener(async (info, tab) => {
   const { credentials } = connection;
   // Version is a per-device cache (see instance-version.ts); resolve it, self-populating on a
   // device that connected on another machine but never verified here.
-  const version = credentials ? await resolveVersion(credentials) : null;
-  if (!version || !isSupportedVersion(version)) {
+  const version = await checkVersion(credentials);
+  if (!version.version || (!version.webClipperSupported && !isSupportedVersion(version.version))) {
     await browser.runtime.openOptionsPage();
     return;
   }

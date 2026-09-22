@@ -11,7 +11,13 @@ import { getInstanceProfile, type InstanceFetchDeps, type MemosCredentials } fro
 
 /** Exported so tests seed the cache through the same contract the code reads. */
 export const VERSION_CACHE_KEY = "memosInstanceVersion";
-type CachedVersion = { instanceUrl: string; version: string };
+type CachedVersion = { instanceUrl: string; version: string; webClipperSupported?: boolean };
+
+async function cachedCapability(instanceUrl: string): Promise<boolean> {
+  const stored = await browser.storage.local.get(VERSION_CACHE_KEY);
+  const record = stored[VERSION_CACHE_KEY] as CachedVersion | undefined;
+  return record?.instanceUrl === instanceUrl && record.webClipperSupported === true;
+}
 
 /** The cached version for this instance URL, or null when absent or recorded for a different URL. */
 export async function readCachedVersion(instanceUrl: string): Promise<string | null> {
@@ -21,8 +27,8 @@ export async function readCachedVersion(instanceUrl: string): Promise<string | n
 }
 
 /** Records a version already fetched elsewhere (e.g. connect's verification) without re-fetching. */
-export async function writeCachedVersion(instanceUrl: string, version: string): Promise<void> {
-  const rec: CachedVersion = { instanceUrl, version };
+export async function writeCachedVersion(instanceUrl: string, version: string, webClipperSupported?: boolean): Promise<void> {
+  const rec: CachedVersion = { instanceUrl, version, ...(webClipperSupported ? { webClipperSupported: true } : {}) };
   await browser.storage.local.set({ [VERSION_CACHE_KEY]: rec });
 }
 
@@ -49,6 +55,7 @@ export type VersionCheckResult = {
   /** Set when the live check failed. A cached version may still be present. */
   errorKind: InstanceErrorKind | null;
   fromCache: boolean;
+  webClipperSupported?: boolean;
 };
 
 /**
@@ -63,18 +70,25 @@ export async function checkVersion(
 ): Promise<VersionCheckResult> {
   if (!opts.refresh) {
     const cached = await readCachedVersion(creds.instanceUrl);
-    if (cached) return { version: cached, errorKind: null, fromCache: true };
+    if (cached)
+      return {
+        version: cached,
+        errorKind: null,
+        fromCache: true,
+        ...((await cachedCapability(creds.instanceUrl)) ? { webClipperSupported: true } : {}),
+      };
   }
   try {
-    const { version } = await getInstanceProfile(creds, deps);
-    if (version) await writeCachedVersion(creds.instanceUrl, version);
-    return { version: version || null, errorKind: null, fromCache: false };
+    const { version, webClipperSupported } = await getInstanceProfile(creds, deps);
+    if (version) await writeCachedVersion(creds.instanceUrl, version, webClipperSupported);
+    return { version: version || null, errorKind: null, fromCache: false, ...(webClipperSupported ? { webClipperSupported: true } : {}) };
   } catch (error) {
     const cached = await readCachedVersion(creds.instanceUrl);
     return {
       version: cached,
       errorKind: error instanceof InstanceError ? error.kind : "bad-response",
       fromCache: Boolean(cached),
+      ...((await cachedCapability(creds.instanceUrl)) ? { webClipperSupported: true } : {}),
     };
   }
 }

@@ -3,7 +3,7 @@ import { getActiveConnectionContext, type ResolvedConnection } from "@/backgroun
 import { readCredentials, readMemosObject } from "@/lib/connection";
 import type { ConnectionSource } from "@/lib/connection-config";
 import { type SaveErrorKind, toSaveErrorKind } from "@/lib/errors";
-import { checkVersion, resolveVersion } from "@/lib/instance-version";
+import { checkVersion } from "@/lib/instance-version";
 import { getCurrentUser, memosUserDisplayName } from "@/lib/memos-client";
 import type { ConnectionStateResult, PopupStateResult } from "@/lib/messages";
 import { writePopupState } from "@/lib/popup-state";
@@ -60,9 +60,10 @@ async function getPopupState(signedInUser?: OAuthUser): Promise<PopupStateResult
     return state;
   }
 
-  const version = await resolveVersion(credentials);
+  const versionResult = await checkVersion(credentials);
+  const version = versionResult.version;
   const state: PopupStateResult =
-    version && isSupportedVersion(version)
+    version && (versionResult.webClipperSupported || isSupportedVersion(version))
       ? { status: "ready", source, identity, template, instanceUrl: credentials.instanceUrl, version, updatedAt }
       : { status: "unsupported", source, identity, template, instanceUrl: credentials.instanceUrl, version, updatedAt };
   await writePopupState(state);
@@ -113,14 +114,15 @@ export async function getOptionsConnectionState(
 
   const result = await checkVersion(credentials, { refresh });
   let verificationError: SaveErrorKind | null = result.errorKind;
-  if (source === "direct" && refresh && !verificationError && result.version && isSupportedVersion(result.version)) {
+  const supported = result.version && (result.webClipperSupported || isSupportedVersion(result.version));
+  if (source === "direct" && refresh && !verificationError && supported) {
     try {
       displayName = memosUserDisplayName(await getCurrentUser(credentials));
     } catch (error) {
       verificationError = toSaveErrorKind(error);
     }
   }
-  const status = result.version && isSupportedVersion(result.version) ? "ready" : verificationError ? "error" : "unsupported";
+  const status = supported ? "ready" : verificationError ? "error" : "unsupported";
   return {
     source,
     instanceUrl: credentials.instanceUrl,

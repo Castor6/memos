@@ -55,6 +55,7 @@ async function commitVerifiedConnection(
   config: StoredConnectionConfig,
   instanceUrl: string,
   version: string,
+  webClipperSupported?: boolean,
 ): Promise<void> {
   await mutateConnection(async () => {
     if (generation !== activationGeneration) throw new ClientError("auth-changed");
@@ -63,7 +64,7 @@ async function commitVerifiedConnection(
       // queue ensures a later disconnect/source switch is always the final writer.
       await browser.storage.local.set({
         [CONNECTION_CONFIG_KEY]: config,
-        [VERSION_CACHE_KEY]: { instanceUrl, version },
+        [VERSION_CACHE_KEY]: { instanceUrl, version, ...(webClipperSupported ? { webClipperSupported: true } : {}) },
       });
     } catch {
       throw new ClientError("storage-error");
@@ -118,11 +119,13 @@ export async function resolveActiveConnection(): Promise<ResolvedConnection | nu
   return context.source ? context.connection : null;
 }
 
-async function verifyCredentials(credentials: MemosCredentials): Promise<{ version: string; user: VerifiedMemosUser }> {
+async function verifyCredentials(
+  credentials: MemosCredentials,
+): Promise<{ version: string; user: VerifiedMemosUser; webClipperSupported?: boolean }> {
   const profile = await getInstanceProfile(credentials);
-  if (!isSupportedVersion(profile.version)) throw new InstanceError("unsupported-version");
+  if (!profile.webClipperSupported && !isSupportedVersion(profile.version)) throw new InstanceError("unsupported-version");
   const user = await getCurrentUser(credentials);
-  return { version: profile.version, user };
+  return { version: profile.version, user, webClipperSupported: profile.webClipperSupported };
 }
 
 export async function verifyAndActivateDirectConnection(input: {
@@ -148,7 +151,13 @@ export async function verifyAndActivateDirectConnection(input: {
     verifiedAt: Date.now(),
   };
 
-  await commitVerifiedConnection(generation, { schemaVersion: 1, activeSource: "direct", direct }, instanceUrl, verified.version);
+  await commitVerifiedConnection(
+    generation,
+    { schemaVersion: 1, activeSource: "direct", direct },
+    instanceUrl,
+    verified.version,
+    verified.webClipperSupported,
+  );
   return {
     source: "direct",
     connectionId: direct.connectionId,
@@ -169,6 +178,7 @@ export async function verifyAndActivateUseMemosConnection(): Promise<VerifiedCon
     { schemaVersion: 1, activeSource: "usememos" },
     connection.credentials.instanceUrl,
     verified.version,
+    verified.webClipperSupported,
   );
   return { ...connection, version: verified.version };
 }

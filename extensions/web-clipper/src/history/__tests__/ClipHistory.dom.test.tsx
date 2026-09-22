@@ -37,14 +37,14 @@ const records: ClipRecord[] = [
 describe("ClipHistory", () => {
   beforeEach(() => {
     window.history.replaceState(null, "", "/src/options/index.html?view=history");
-    browserMock.runtime.sendMessage.mockResolvedValue(records);
+    browserMock.runtime.sendMessage.mockResolvedValue({ ok: true, records });
   });
 
   it("shows saved clips in a searchable master-detail history", async () => {
     const { user } = renderWithUser(<ClipHistory />);
 
     expect(await screen.findByRole("heading", { name: "Saved clips" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "A practical guide to web clipping" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "A practical guide to web clipping" })).toBeInTheDocument();
     expect(screen.getAllByText("Keep the thing the user deliberately selected.")).toHaveLength(2);
     expect(screen.getByText(/2 selected images/i)).toBeInTheDocument();
     expect(screen.getByText((content) => content.includes("[A practical guide](https://example.com)"))).toBeInTheDocument();
@@ -54,5 +54,15 @@ describe("ClipHistory", () => {
     await user.type(screen.getByRole("searchbox"), "Reference notes");
     expect(await screen.findByRole("heading", { name: "Reference notes" })).toBeInTheDocument();
     expect(screen.getAllByText("A plain page save")).toHaveLength(2);
+  });
+
+  it("shows sync failures instead of an empty or stale local history", async () => {
+    browserMock.runtime.sendMessage.mockResolvedValue({ ok: false, errorKind: "capture-unsupported" });
+    const { user } = renderWithUser(<ClipHistory />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("服务器尚不支持同步");
+    expect(screen.queryByRole("heading", { name: "A practical guide to web clipping" })).not.toBeInTheDocument();
+    browserMock.runtime.sendMessage.mockResolvedValue({ ok: true, records: [] });
+    await user.click(screen.getByRole("button", { name: "重试" }));
+    expect(await screen.findByText(/旧版仅存本地的历史不会自动导入/)).toBeInTheDocument();
   });
 });
