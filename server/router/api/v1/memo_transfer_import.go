@@ -81,7 +81,7 @@ func (s *APIV1Service) ImportMemoArchive(ctx context.Context, request *v1pb.Impo
 		cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Minute)
 		defer cancel()
 		for _, attachment := range journal.attachments {
-			if err := s.Store.DeleteAttachment(store.WithoutSpace(cleanup), &store.DeleteAttachment{ID: attachment.ID}); err != nil {
+			if err := s.Store.DeleteAttachmentWithCleanup(store.WithoutSpace(cleanup), &store.DeleteAttachment{ID: attachment.ID}); err != nil {
 				response.Errors = append(response.Errors, attachment.UID+": attachment rollback failed; inspect before retry")
 			}
 		}

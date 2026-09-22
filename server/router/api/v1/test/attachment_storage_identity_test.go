@@ -89,14 +89,25 @@ func TestAttachmentStorageIdentitySurvivesUIDReuseAndCleanupReplay(t *testing.T)
 				require.NotEqual(t, old.Payload.GetS3Object().Key, fresh.Payload.GetS3Object().Key)
 				require.True(t, strings.HasPrefix(filepath.ToSlash(fresh.Payload.GetS3Object().Key), "custom/folder/"))
 			}
-			cache := filepath.Join(ts.Profile.Data, ".thumbnail_cache", uid+".jpeg")
-			require.NoError(t, os.MkdirAll(filepath.Dir(cache), 0700))
-			require.NoError(t, os.WriteFile(cache, []byte("new thumbnail"), 0600))
+			caches := []string{
+				filepath.Join(ts.Profile.Data, ".thumbnail_cache", uid+".jpeg"),
+				filepath.Join(ts.Profile.Data, ".thumbnail_cache", uid+".v2.jpeg"),
+				filepath.Join(ts.Profile.Data, ".thumbnail_cache", uid+".v2.jpeg.failed"),
+				filepath.Join(ts.Profile.Data, ".motion_cache", uid+".mp4"),
+			}
+			for _, cache := range caches {
+				require.NoError(t, os.MkdirAll(filepath.Dir(cache), 0700))
+				require.NoError(t, os.WriteFile(cache, []byte("new cached content"), 0600))
+			}
 			require.NoError(t, ts.Store.ProcessAttachmentCleanup(ctx, time.Now().Unix(), 100))
 			blob, err := ts.Service.GetAttachmentBlob(fresh)
 			require.NoError(t, err)
 			require.Equal(t, []byte("second"), blob)
-			require.FileExists(t, cache)
+			for _, cache := range caches {
+				cached, err := os.ReadFile(cache)
+				require.NoError(t, err)
+				require.Equal(t, []byte("new cached content"), cached)
+			}
 			var jobs int
 			require.NoError(t, ts.Store.GetDriver().GetDB().QueryRow("SELECT COUNT(*) FROM attachment_cleanup").Scan(&jobs))
 			require.Zero(t, jobs)

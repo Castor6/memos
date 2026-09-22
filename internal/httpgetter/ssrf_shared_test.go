@@ -14,7 +14,7 @@ func TestSharedAddressSpaceBlockedAcrossFetchPaths(t *testing.T) {
 		t.Run(address, func(t *testing.T) {
 			url := "http://" + net.JoinHostPort(address, "80") + "/image.png"
 			require.True(t, isInternalIP(net.ParseIP(address)))
-			require.ErrorIs(t, validateURL(url), ErrInternalIP)
+			require.ErrorIs(t, ValidateURL(url), ErrInternalIP)
 			_, err := GetPDFImage(context.Background(), url)
 			require.ErrorIs(t, err, ErrInternalIP)
 			req, err := http.NewRequest(http.MethodGet, url, nil)

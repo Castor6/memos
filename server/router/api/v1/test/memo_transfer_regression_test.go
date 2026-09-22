@@ -22,7 +22,7 @@ import (
 	"github.com/usememos/memos/store"
 )
 
-func archiveRegressionAssertEmpty(t *testing.T, ts *TestService, ctx context.Context, user *store.User) {
+func archiveRegressionAssertEmpty(ctx context.Context, t *testing.T, ts *TestService, user *store.User) {
 	t.Helper()
 	ctx = store.WithoutSpace(ctx)
 	memos, err := ts.Store.ListMemos(ctx, &store.FindMemo{CreatorID: &user.ID})
@@ -34,6 +34,8 @@ func archiveRegressionAssertEmpty(t *testing.T, ts *TestService, ctx context.Con
 	var relations int
 	require.NoError(t, ts.Store.GetDriver().GetDB().QueryRowContext(ctx, "SELECT COUNT(*) FROM memo_relation").Scan(&relations))
 	require.Zero(t, relations, "rollback must not leave dangling references or parent relations")
+	// File cleanup is durable and asynchronous, just like ordinary memo deletion.
+	require.NoError(t, ts.Store.ProcessAttachmentCleanup(ctx, time.Now().Unix(), 100))
 	assets := filepath.Join(ts.Store.GetDataDir(), "assets")
 	if _, err := os.Stat(assets); os.IsNotExist(err) {
 		return
@@ -43,6 +45,57 @@ func archiveRegressionAssertEmpty(t *testing.T, ts *TestService, ctx context.Con
 		require.True(t, entry.IsDir(), "failed imports must remove stored files: %s", path)
 		return nil
 	}))
+}
+
+func TestMemoArchiveRegressionRollbackCleanupRetries(t *testing.T) {
+	_, _, exported := archiveFixture(t)
+	for _, test := range []struct {
+		name    string
+		trigger string
+	}{
+		{"unbound_attachment", `CREATE TRIGGER archive_regression_failure BEFORE UPDATE OF memo_id ON attachment
+WHEN NEW.memo_id IS NOT NULL BEGIN SELECT RAISE(ABORT, 'injected binding failure'); END`},
+		{"bound_attachment", `CREATE TRIGGER archive_regression_failure BEFORE UPDATE OF row_status ON memo
+WHEN NEW.uid = 'archive-todo' BEGIN SELECT RAISE(ABORT, 'injected state failure'); END`},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			destination, ctx, user := archiveDestination(t)
+			db := destination.Store.GetDriver().GetDB()
+			_, err := db.ExecContext(ctx, test.trigger)
+			require.NoError(t, err)
+			result, err := destination.Service.ImportMemoArchive(ctx, &v1pb.ImportMemoArchiveRequest{Content: exported.Content})
+			require.NoError(t, err)
+			require.NotEmpty(t, result.Errors)
+			require.Zero(t, result.Imported)
+			require.Zero(t, result.Attachments)
+			for _, table := range []string{"memo", "attachment", "memo_relation"} {
+				var count int
+				require.NoError(t, db.QueryRowContext(ctx, "SELECT COUNT(*) FROM "+table).Scan(&count))
+				require.Zero(t, count, "database records must be rolled back before file cleanup: %s", table)
+			}
+			var jobs int
+			require.NoError(t, db.QueryRowContext(ctx, "SELECT COUNT(*) FROM attachment_cleanup").Scan(&jobs))
+			require.Equal(t, 1, jobs)
+			now := time.Now().Unix()
+			require.NoError(t, destination.Store.ProcessAttachmentCleanup(store.WithDeleteAttachmentStorageFailpoint(ctx), now, 100))
+			var attempts int
+			var nextAt int64
+			require.NoError(t, db.QueryRowContext(ctx, "SELECT attempts, next_at FROM attachment_cleanup").Scan(&attempts, &nextAt))
+			require.Equal(t, 1, attempts)
+			require.Greater(t, nextAt, now)
+			require.NoError(t, destination.Store.ProcessAttachmentCleanup(ctx, nextAt, 100))
+			require.NoError(t, db.QueryRowContext(ctx, "SELECT COUNT(*) FROM attachment_cleanup").Scan(&jobs))
+			require.Zero(t, jobs)
+			archiveRegressionAssertEmpty(ctx, t, destination, user)
+			_, err = db.ExecContext(ctx, "DROP TRIGGER archive_regression_failure")
+			require.NoError(t, err)
+			retried, err := destination.Service.ImportMemoArchive(ctx, &v1pb.ImportMemoArchiveRequest{Content: exported.Content})
+			require.NoError(t, err)
+			require.Empty(t, retried.Errors)
+			require.EqualValues(t, 4, retried.Imported)
+			require.EqualValues(t, 1, retried.Attachments)
+		})
+	}
 }
 
 func TestMemoArchiveRegressionRollbackAndRetry(t *testing.T) {
@@ -72,7 +125,7 @@ WHEN NEW.type = 'COMMENT' BEGIN SELECT RAISE(ABORT, 'injected comment relation f
 			require.NotEmpty(t, failed.Errors)
 			require.Zero(t, failed.Imported)
 			require.Zero(t, failed.Attachments)
-			archiveRegressionAssertEmpty(t, destination, ctx, user)
+			archiveRegressionAssertEmpty(ctx, t, destination, user)
 			_, err = db.ExecContext(ctx, "DROP TRIGGER archive_regression_failure")
 			require.NoError(t, err)
 			retried, err := destination.Service.ImportMemoArchive(ctx, &v1pb.ImportMemoArchiveRequest{Content: exported.Content})
@@ -161,7 +214,7 @@ func TestMemoArchiveRegressionSharedEntryLogicalBudget(t *testing.T) {
 	_, err = destination.Service.ImportMemoArchive(ctx, &v1pb.ImportMemoArchiveRequest{Content: output.Bytes()})
 	require.Equal(t, codes.ResourceExhausted, status.Code(err), "unexpected rejection: %v", err)
 	require.Contains(t, status.Convert(err).Message(), "512 MiB")
-	archiveRegressionAssertEmpty(t, destination, ctx, user)
+	archiveRegressionAssertEmpty(ctx, t, destination, user)
 }
 
 func TestMemoArchiveRegressionSpaceCollisionRepeat(t *testing.T) {
@@ -213,7 +266,7 @@ WHEN NEW.uid = 'archive-todo' BEGIN SELECT RAISE(ABORT, 'injected final state fa
 		require.NotEmpty(t, failed.Errors)
 		require.Zero(t, failed.Imported)
 		require.Zero(t, failed.Attachments)
-		archiveRegressionAssertEmpty(t, destination, ctx, user)
+		archiveRegressionAssertEmpty(ctx, t, destination, user)
 		setting, err := destination.Store.GetUserSetting(ctx, &store.FindUserSetting{UserID: &user.ID, Key: storepb.UserSetting_GENERAL})
 		require.NoError(t, err)
 		if previousSpaces != nil {
