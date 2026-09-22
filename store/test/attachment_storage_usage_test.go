@@ -18,8 +18,11 @@ func TestAttachmentStorageUsageAcrossSpaces(t *testing.T) {
 	require.Zero(t, size)
 	first, err := s.CreateAttachment(store.WithSpace(ctx, ""), &store.Attachment{UID: "usage-default", CreatorID: 101, Size: 7})
 	require.NoError(t, err)
-	_, err = s.CreateAttachment(store.WithSpace(ctx, "work"), &store.Attachment{UID: "usage-work", CreatorID: 101, Size: 3000000000})
-	require.NoError(t, err)
+	// Each row fits the existing INTEGER columns while the aggregate exceeds int32.
+	for _, uid := range []string{"usage-work-first", "usage-work-second"} {
+		_, err = s.CreateAttachment(store.WithSpace(ctx, "work"), &store.Attachment{UID: uid, CreatorID: 101, Size: 1500000000})
+		require.NoError(t, err)
+	}
 	_, err = s.CreateAttachment(ctx, &store.Attachment{UID: "usage-other", CreatorID: 102, Size: 99})
 	require.NoError(t, err)
 	size, err = s.GetAttachmentStorageUsage(store.WithSpace(ctx, "work"), 101)
