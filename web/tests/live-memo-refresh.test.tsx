@@ -12,19 +12,11 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/connect", () => ({
   getRequestToken: mocks.getRequestToken,
   refreshAccessToken: mocks.refreshAccessToken,
+  memoServiceClient: {},
 }));
 
 vi.mock("@/contexts/AuthContext", () => ({
   useAuth: () => ({ currentUser: { name: mocks.userName } }),
-}));
-
-vi.mock("@/hooks/useMemoQueries", () => ({
-  memoKeys: {
-    all: ["memos"],
-    lists: () => ["memos", "list"],
-    detail: (name: string) => ["memos", "detail", name],
-    comments: (name: string) => ["memos", "comments", name],
-  },
 }));
 
 vi.mock("@/hooks/useUserQueries", () => ({
@@ -34,6 +26,8 @@ vi.mock("@/hooks/useUserQueries", () => ({
 }));
 
 import { useLiveMemoRefresh } from "@/hooks/useLiveMemoRefresh";
+import { memoKeys } from "@/hooks/useMemoQueries";
+import { scheduleQueryRefresh } from "@/lib/query-refresh";
 
 type MessageListener = (event: MessageEvent) => void;
 
@@ -251,16 +245,123 @@ describe("useLiveMemoRefresh", () => {
     await flushAsyncWork();
     first.unmount();
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["memos"], refetchType: "active" });
+    await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: ["memos"] }));
     second.unmount();
+  });
+
+  it("coalesces local writes and repeated SSE events in both the leader and follower", async () => {
+    vi.useFakeTimers();
+    installBrowserState(new TestLockManager());
+    let controller!: ReadableStreamDefaultController<Uint8Array>;
+    const fetchMock = vi.fn().mockImplementation(
+      () =>
+        new Response(
+          new ReadableStream<Uint8Array>({
+            start(stream) {
+              controller = stream;
+            },
+          }),
+          { status: 200 },
+        ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const clients = [createQueryClient(), createQueryClient()];
+    const invalidations = clients.map((client) => vi.spyOn(client, "invalidateQueries"));
+    const hooks = clients.map((client) => renderHook(() => useLiveMemoRefresh(), { wrapper: createWrapper(client) }));
+    await flushAsyncWork();
+    await act(async () => vi.advanceTimersByTimeAsync(150));
+    invalidations.forEach((invalidate) => invalidate.mockClear());
+
+    act(() => {
+      for (const client of clients) {
+        scheduleQueryRefresh(client, memoKeys.lists(), ["users", "stats"]);
+      }
+      const event = 'data: {"type":"memo.created","name":"memos/1"}\n\n';
+      controller.enqueue(new TextEncoder().encode(event.repeat(2)));
+    });
+    await flushAsyncWork();
+    invalidations.forEach((invalidate) => expect(invalidate).not.toHaveBeenCalled());
+    await act(async () => vi.advanceTimersByTimeAsync(150));
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    for (const invalidate of invalidations) {
+      expect(invalidate).toHaveBeenCalledTimes(2);
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: memoKeys.lists() });
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: ["users", "stats"] });
+    }
+    hooks.forEach((hook) => hook.unmount());
+  });
+
+  it("refreshes only matching reaction collections in each tab and deduplicates local refreshes", async () => {
+    vi.useFakeTimers();
+    installBrowserState(new TestLockManager());
+    let controller!: ReadableStreamDefaultController<Uint8Array>;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation(
+        () =>
+          new Response(
+            new ReadableStream<Uint8Array>({
+              start(stream) {
+                controller = stream;
+              },
+            }),
+            { status: 200 },
+          ),
+      ),
+    );
+    const clients = [createQueryClient(), createQueryClient()];
+    const matchingKeys = clients.map((_, index) => memoKeys.list({ filter: `tag == tab${index}` }));
+    const unrelatedKey = memoKeys.list({ filter: "tag == unrelated" });
+    const commentsKey = memoKeys.comments("memos/parent");
+    clients.forEach((client, index) => {
+      client.setQueryData(matchingKeys[index], { pages: [{ memos: [{ name: "memos/target" }] }], pageParams: [""] });
+      client.setQueryData(unrelatedKey, { pages: [{ memos: [{ name: "memos/other" }] }], pageParams: [""] });
+      client.setQueryData(commentsKey, { memos: [{ name: "memos/target" }] });
+    });
+    const invalidations = clients.map((client) => vi.spyOn(client, "invalidateQueries"));
+    const hooks = clients.map((client) => renderHook(() => useLiveMemoRefresh(), { wrapper: createWrapper(client) }));
+    await flushAsyncWork();
+    await act(async () => vi.advanceTimersByTimeAsync(150));
+    invalidations.forEach((invalidate) => invalidate.mockClear());
+
+    act(() => {
+      scheduleQueryRefresh(clients[0], memoKeys.detail("memos/target"), matchingKeys[0], commentsKey);
+      controller.enqueue(
+        new TextEncoder().encode(
+          'data: {"type":"reaction.upserted","name":"memos/target","parent":"memos/parent"}\n\n' +
+            'data: {"type":"reaction.deleted","name":"memos/target","parent":"memos/parent"}\n\n',
+        ),
+      );
+    });
+    await flushAsyncWork();
+    await act(async () => vi.advanceTimersByTimeAsync(150));
+
+    invalidations.forEach((invalidate, index) => {
+      expect(invalidate).toHaveBeenCalledTimes(3);
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: memoKeys.detail("memos/target") });
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: matchingKeys[index] });
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: commentsKey });
+      expect(invalidate).not.toHaveBeenCalledWith({ queryKey: unrelatedKey });
+      expect(invalidate).not.toHaveBeenCalledWith({ queryKey: memoKeys.lists() });
+    });
+    hooks.forEach((hook) => hook.unmount());
   });
 
   it("isolates coordination and events between authenticated users", async () => {
     installBrowserState(new TestLockManager());
     const controllers: ReadableStreamDefaultController<Uint8Array>[] = [];
-    const fetchMock = vi.fn().mockImplementation(() => new Response(new ReadableStream<Uint8Array>({
-      start(controller) { controllers.push(controller); },
-    }), { status: 200 }));
+    const fetchMock = vi.fn().mockImplementation(
+      () =>
+        new Response(
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              controllers.push(controller);
+            },
+          }),
+          { status: 200 },
+        ),
+    );
     vi.stubGlobal("fetch", fetchMock);
     const firstClient = createQueryClient();
     const first = renderHook(() => useLiveMemoRefresh(), { wrapper: createWrapper(firstClient) });
