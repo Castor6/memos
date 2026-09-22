@@ -2,6 +2,7 @@ package v1
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"log/slog"
 	"regexp"
@@ -21,6 +22,12 @@ import (
 )
 
 const maxBatchGetUsers = 100
+
+const (
+	maxAvatarImageBytes = 2 << 20
+	// Allow the base64 expansion and a MIME data URI prefix.
+	maxAvatarDataURIBytes = (maxAvatarImageBytes+2)/3*4 + 256
+)
 
 func validatePassword(password string) error {
 	if password == "" {
@@ -341,9 +348,19 @@ func (s *APIV1Service) UpdateUser(ctx context.Context, request *v1pb.UpdateUserR
 		case "avatar_url":
 			// Validate avatar MIME type to prevent XSS during upload
 			if request.User.AvatarUrl != "" {
-				imageType, _, err := extractImageInfo(request.User.AvatarUrl)
+				if len(request.User.AvatarUrl) > maxAvatarDataURIBytes {
+					return nil, status.Errorf(codes.InvalidArgument, "avatar exceeds the maximum size of %d bytes", maxAvatarImageBytes)
+				}
+				imageType, imageData, err := extractImageInfo(request.User.AvatarUrl)
 				if err != nil {
 					return nil, status.Errorf(codes.InvalidArgument, "invalid avatar format: %v", err)
+				}
+				decoded, err := base64.StdEncoding.DecodeString(imageData)
+				if err != nil {
+					return nil, status.Errorf(codes.InvalidArgument, "invalid avatar base64 data")
+				}
+				if len(decoded) > maxAvatarImageBytes {
+					return nil, status.Errorf(codes.InvalidArgument, "avatar exceeds the maximum size of %d bytes", maxAvatarImageBytes)
 				}
 				// Only allow safe image formats for avatars
 				allowedAvatarTypes := map[string]bool{

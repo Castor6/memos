@@ -19,6 +19,7 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/sync/semaphore"
 
+	"github.com/usememos/memos/internal/imagelimit"
 	"github.com/usememos/memos/internal/motionphoto"
 	"github.com/usememos/memos/internal/profile"
 	"github.com/usememos/memos/internal/storage/s3"
@@ -43,7 +44,8 @@ const (
 	thumbnailMetadataProbeSize = 1 << 20
 
 	// maxConcurrentThumbnails limits concurrent thumbnail generation to prevent memory exhaustion.
-	maxConcurrentThumbnails = 3
+	maxConcurrentThumbnails     = 3
+	thumbnailFailedMarkerSuffix = ".failed"
 
 	// cacheMaxAge is the max-age value for Cache-Control headers (1 hour).
 	cacheMaxAge = "public, max-age=3600"
@@ -94,6 +96,9 @@ var SupportedThumbnailMimeTypes = []string{
 
 var errUseOriginalForThumbnail = errors.New("serve original image instead of metadata-stripping thumbnail")
 
+// errThumbnailUnsupported marks a permanent decode failure, not a storage error.
+var errThumbnailUnsupported = errors.New("image cannot be thumbnailed")
+
 // dataURIRegex parses data URI format: data:image/png;base64,iVBORw0KGgo...
 var dataURIRegex = regexp.MustCompile(`^data:(?P<type>[^;]+);base64,(?P<base64>.+)`)
 
@@ -135,10 +140,8 @@ func (s *FileServerService) serveAttachmentFile(c *echo.Context) error {
 	wantThumbnail := c.QueryParam("thumbnail") == "true"
 	wantMotion := c.QueryParam("motion") == "true"
 
-	attachment, err := s.Store.GetAttachment(ctx, &store.FindAttachment{
-		UID:     &uid,
-		GetBlob: true,
-	})
+	// Check access using metadata before loading potentially large database blobs.
+	attachment, err := s.Store.GetAttachment(ctx, &store.FindAttachment{UID: &uid})
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get attachment").Wrap(err)
 	}
@@ -148,6 +151,15 @@ func (s *FileServerService) serveAttachmentFile(c *echo.Context) error {
 
 	if err := s.checkAttachmentPermission(ctx, c, attachment); err != nil {
 		return err
+	}
+	if attachment.StorageType != storepb.AttachmentStorageType_LOCAL && attachment.StorageType != storepb.AttachmentStorageType_S3 {
+		attachment, err = s.Store.GetAttachment(ctx, &store.FindAttachment{ID: &attachment.ID, GetBlob: true})
+		if err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to get attachment").Wrap(err)
+		}
+		if attachment == nil {
+			return echo.NewHTTPError(http.StatusNotFound, "attachment not found")
+		}
 	}
 
 	if wantMotion {
@@ -435,6 +447,9 @@ func (s *FileServerService) getOrGenerateThumbnail(ctx context.Context, attachme
 	if blob, err := s.readCachedThumbnail(thumbnailPath); err == nil {
 		return blob, nil
 	}
+	if _, err := os.Stat(thumbnailPath + thumbnailFailedMarkerSuffix); err == nil {
+		return nil, errUseOriginalForThumbnail
+	}
 
 	useOriginal, err := s.shouldUseOriginalForThumbnail(ctx, attachment)
 	if err != nil {
@@ -454,8 +469,18 @@ func (s *FileServerService) getOrGenerateThumbnail(ctx context.Context, attachme
 	if blob, err := s.readCachedThumbnail(thumbnailPath); err == nil {
 		return blob, nil
 	}
+	if _, err := os.Stat(thumbnailPath + thumbnailFailedMarkerSuffix); err == nil {
+		return nil, errUseOriginalForThumbnail
+	}
 
-	return s.generateThumbnail(ctx, attachment, thumbnailPath)
+	blob, err := s.generateThumbnail(ctx, attachment, thumbnailPath)
+	if errors.Is(err, errThumbnailUnsupported) && ctx.Err() == nil {
+		if markerErr := os.WriteFile(thumbnailPath+thumbnailFailedMarkerSuffix, nil, 0644); markerErr != nil {
+			slog.Warn("failed to record thumbnail failure", "error", markerErr)
+		}
+		return nil, errUseOriginalForThumbnail
+	}
+	return blob, err
 }
 
 // getThumbnailPath returns the file path for a cached thumbnail.
@@ -546,15 +571,22 @@ func (*FileServerService) readCachedThumbnail(path string) ([]byte, error) {
 
 // generateThumbnail creates a new thumbnail and saves it to disk.
 func (s *FileServerService) generateThumbnail(ctx context.Context, attachment *store.Attachment, thumbnailPath string) ([]byte, error) {
+	if err := s.checkThumbnailSourceBounds(ctx, attachment); err != nil {
+		return nil, err
+	}
 	reader, err := s.getAttachmentReader(ctx, attachment)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get attachment reader")
 	}
 	defer reader.Close()
 
-	img, err := imaging.Decode(reader, imaging.AutoOrientation(true))
+	source := &thumbnailReadTracker{Reader: reader}
+	img, err := imaging.Decode(source, imaging.AutoOrientation(true))
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to decode image")
+		if source.err != nil {
+			return nil, errors.Wrap(source.err, "failed to read thumbnail source")
+		}
+		return nil, errors.Wrapf(errThumbnailUnsupported, "failed to decode image: %v", err)
 	}
 
 	width, height := img.Bounds().Dx(), img.Bounds().Dy()
@@ -573,6 +605,38 @@ func (s *FileServerService) generateThumbnail(ctx context.Context, attachment *s
 	}
 
 	return s.readCachedThumbnail(thumbnailPath)
+}
+
+// checkThumbnailSourceBounds refuses oversized images before a full decode.
+func (s *FileServerService) checkThumbnailSourceBounds(ctx context.Context, attachment *store.Attachment) error {
+	reader, err := s.getAttachmentReader(ctx, attachment)
+	if err != nil {
+		return errors.Wrap(err, "failed to open image for size probe")
+	}
+	defer reader.Close()
+	source := &thumbnailReadTracker{Reader: reader}
+	err = imagelimit.CheckReader(io.LimitReader(source, thumbnailMetadataProbeSize))
+	if source.err != nil {
+		return errors.Wrap(source.err, "failed to read image size probe")
+	}
+	if err != nil {
+		return errors.Wrapf(errThumbnailUnsupported, "thumbnail source exceeds decode bounds: %v", err)
+	}
+	return nil
+}
+
+// thumbnailReadTracker distinguishes interrupted storage reads from invalid images.
+type thumbnailReadTracker struct {
+	io.Reader
+	err error
+}
+
+func (r *thumbnailReadTracker) Read(data []byte) (int, error) {
+	n, err := r.Reader.Read(data)
+	if err != nil && !errors.Is(err, io.EOF) {
+		r.err = err
+	}
+	return n, err
 }
 
 // calculateThumbnailDimensions calculates the target dimensions for a thumbnail.

@@ -14,6 +14,7 @@ import { useTranslate } from "@/utils/i18n";
 import ChangeMemberPasswordDialog from "../ChangeMemberPasswordDialog";
 import UpdateAccountDialog from "../UpdateAccountDialog";
 import UserAvatar from "../UserAvatar";
+import AttachmentStorageUsage from "./AttachmentStorageUsage";
 import LinkedIdentitySection from "./LinkedIdentitySection";
 import SettingGroup from "./SettingGroup";
 import SettingSection from "./SettingSection";
@@ -66,6 +67,8 @@ const MyAccountSection = () => {
           </div>
         </div>
       </SettingGroup>
+
+      <AttachmentStorageUsage />
 
       <LinkedIdentitySection />
 

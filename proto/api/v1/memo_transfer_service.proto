@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package memos.api.v1;
+
+import "google/api/annotations.proto";
+
+option go_package = "gen/api/v1";
+
+// MemoTransferService transfers the authenticated user's notes as portable ZIP files.
+service MemoTransferService {
+  // ExportMemoArchive exports notes and todos across every personal space.
+  rpc ExportMemoArchive(ExportMemoArchiveRequest) returns (ExportMemoArchiveResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/memoArchive:export"
+      body: "*"
+    };
+  }
+  // ImportMemoArchive validates an archive before importing its records.
+  rpc ImportMemoArchive(ImportMemoArchiveRequest) returns (ImportMemoArchiveResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/memoArchive:import"
+      body: "*"
+    };
+  }
+}
+
+message ExportMemoArchiveRequest {}
+
+message ExportMemoArchiveResponse {
+  // ZIP bytes, limited to 128 MiB.
+  bytes content = 1;
+  string filename = 2;
+  int32 memo_count = 3;
+  int32 attachment_count = 4;
+  repeated string warnings = 5;
+}
+
+message ImportMemoArchiveRequest {
+  // ZIP bytes, limited to 128 MiB.
+  bytes content = 1;
+}
+
+message ImportMemoArchiveResponse {
+  int32 imported = 1;
+  // Existing memo IDs are never overwritten.
+  int32 skipped = 2;
+  int32 attachments = 3;
+  repeated string warnings = 4;
+  // Per-record failures are returned with any completed import counts.
+  repeated string errors = 5;
+}

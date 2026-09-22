@@ -396,6 +396,9 @@
       "no-tokens-found": "未找到存取令牌"
     },
     "account": {
+      "attachment-storage": "附件用量",
+      "attachment-storage-description": "帳號全部空間的附件總量，包含未關聯附件；不含暫存上傳、縮圖和產生的 PDF。",
+      "attachment-storage-retry": "用量載入失敗，點擊重試",
       "change-password": "變更密碼",
       "danger-area": "危險區域",
       "danger-area-description": "此處為不可逆的帳號操作。請在繼續之前仔細檢閱。",
@@ -841,6 +844,30 @@
       "delivery-failed": "投递失败",
       "cancelled": "已取消",
       "sending": "发送中"
+    },
+    "memo-archive": {
+      "label": "匯入與匯出",
+      "description": "使用 ZIP 檔案遷移筆記與待辦。",
+      "export-title": "匯出 ZIP",
+      "export-description": "匯出目前帳號全部個人空間的筆記、待辦、封存、評論及其附件。",
+      "export": "下載 ZIP",
+      "exporting": "正在準備 ZIP…",
+      "export-result": "已下載 {{memos}} 筆記錄和 {{attachments}} 個附件。",
+      "export-error": "匯出失敗，請重試。",
+      "import-title": "匯入 ZIP",
+      "import-description": "匯入至目前帳號。已有相同 ID 的記錄會略過，不會覆寫。選擇不超過 128 MiB 的 ZIP 檔案後，按下匯入。",
+      "import-spaces": "保留此客製版 Memos 的個人空間；上游 Memos 的空間內容會匯入此分頁目前選擇的空間。",
+      "choose-file": "ZIP 檔案（最大 128 MiB）",
+      "invalid-file": "請選擇非空且不超過 128 MiB 的 .zip 檔案。",
+      "import": "匯入至目前帳號",
+      "importing": "正在匯入…",
+      "import-complete": "匯入完成",
+      "partial-result": "匯入已結束，存在失敗項目",
+      "import-result": "已匯入 {{imported}} 筆記錄，略過 {{skipped}} 筆已有記錄，新增 {{attachments}} 個附件。",
+      "import-error": "匯入失敗，請重試。",
+      "warnings": "提示",
+      "errors": "失敗項目",
+      "settings-refresh-error": "匯入已完成，但空間設定重新整理失敗，請重新整理頁面查看匯入的空間。"
     }
   },
   "tag": {

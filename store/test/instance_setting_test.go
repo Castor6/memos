@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	colorpb "google.golang.org/genproto/googleapis/type/color"
+	"google.golang.org/protobuf/proto"
 
 	storepb "github.com/usememos/memos/proto/gen/store"
 	"github.com/usememos/memos/store"
@@ -28,7 +29,7 @@ func TestInstanceSettingV1Store(t *testing.T) {
 		Name: storepb.InstanceSettingKey_GENERAL.String(),
 	})
 	require.NoError(t, err)
-	require.Equal(t, instanceSetting, setting)
+	require.True(t, proto.Equal(instanceSetting, setting))
 	ts.Close()
 }
 

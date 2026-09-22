@@ -5,9 +5,9 @@ import rehypeKatex from "rehype-katex";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
-import remarkMath from "remark-math";
+import { remarkCurrencySafeMath } from "@/utils/remark-plugins/remark-currency-safe-math";
 import { describe, expect, it } from "vitest";
-import { SANITIZE_SCHEMA, isTrustedIframeSrc } from "@/components/MemoContent/constants";
+import { SANITIZE_SCHEMA, isTrustedIframeSrc, memoUrlTransform } from "@/components/MemoContent/constants";
 
 type IframeProps = React.ComponentProps<"iframe">;
 
@@ -21,7 +21,8 @@ const TrustedIframe = (props: IframeProps) => {
 const renderMemoContent = (content: string): string =>
   renderToStaticMarkup(
     <ReactMarkdown
-      remarkPlugins={[remarkMath]}
+      urlTransform={memoUrlTransform}
+      remarkPlugins={[remarkCurrencySafeMath]}
       rehypePlugins={[rehypeRaw, [rehypeSanitize, SANITIZE_SCHEMA], [rehypeKatex, { throwOnError: false, strict: false }]]}
       components={{ iframe: TrustedIframe }}
     >
@@ -31,7 +32,7 @@ const renderMemoContent = (content: string): string =>
 
 const renderGfmContent = (content: string): string =>
   renderToStaticMarkup(
-    <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[[rehypeSanitize, SANITIZE_SCHEMA]]}>
+    <ReactMarkdown urlTransform={memoUrlTransform} remarkPlugins={[remarkGfm]} rehypePlugins={[[rehypeSanitize, SANITIZE_SCHEMA]]}>
       {content}
     </ReactMarkdown>,
   );
@@ -50,6 +51,22 @@ describe("memo content sanitization", () => {
 
     expect(html).toMatch(/class="katex"/);
     expect(html).toMatch(/class="katex-html"/);
+  });
+
+  it("keeps tel: and sms: link targets", () => {
+    const html = renderGfmContent("[phone me](tel:+440000000000) [text me](sms:+440000000000?body=hi)");
+
+    expect(html).toContain('href="tel:+440000000000"');
+    expect(html).toContain('href="sms:+440000000000?body=hi"');
+  });
+
+  it("still strips script-capable link targets", () => {
+    const html = renderGfmContent("[x](javascript:alert(1)) [y](data:text/html,hi) [z](vbscript:msgbox)");
+
+    expect(html).not.toMatch(/javascript:/);
+    expect(html).not.toMatch(/data:/);
+    expect(html).not.toMatch(/vbscript:/);
+    expect(html).toMatch(/<a>x<\/a>/);
   });
 
   it("preserves checked state for GFM task list items", () => {

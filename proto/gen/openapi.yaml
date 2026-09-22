@@ -224,6 +224,36 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /api/v1/attachments:upload:
+        post:
+            tags:
+                - AttachmentService
+            description: |-
+                UploadAttachment uploads a file in bounded chunks. The first call carries
+                 the spec and returns an upload_id; later calls carry that upload_id.
+                 Uploads are bound to the authenticated user, expire after 30 minutes of
+                 inactivity, and do not survive a server restart. The selected personal space
+                 must remain the same for every call in the session.
+            operationId: AttachmentService_UploadAttachment
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/UploadAttachmentRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/UploadAttachmentResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /api/v1/auth/me:
         get:
             tags:
@@ -685,6 +715,56 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/InstanceSetting'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /api/v1/memoArchive:export:
+        post:
+            tags:
+                - MemoTransferService
+            description: ExportMemoArchive exports notes and todos across every personal space.
+            operationId: MemoTransferService_ExportMemoArchive
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/ExportMemoArchiveRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ExportMemoArchiveResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /api/v1/memoArchive:import:
+        post:
+            tags:
+                - MemoTransferService
+            description: ImportMemoArchive validates an archive before importing its records.
+            operationId: MemoTransferService_ImportMemoArchive
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/ImportMemoArchiveRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ImportMemoArchiveResponse'
                 default:
                     description: Default error response
                     content:
@@ -2832,6 +2912,28 @@ components:
                     description: |-
                         The actual token value - only returned on creation.
                          This is the only time the token value will be visible.
+        ExportMemoArchiveRequest:
+            type: object
+            properties: {}
+        ExportMemoArchiveResponse:
+            type: object
+            properties:
+                content:
+                    type: string
+                    description: ZIP bytes, limited to 128 MiB.
+                    format: bytes
+                filename:
+                    type: string
+                memoCount:
+                    type: integer
+                    format: int32
+                attachmentCount:
+                    type: integer
+                    format: int32
+                warnings:
+                    type: array
+                    items:
+                        type: string
         ExportMemoPdfRequest:
             required:
                 - name
@@ -2933,6 +3035,35 @@ components:
             properties:
                 oauth2Config:
                     $ref: '#/components/schemas/OAuth2Config'
+        ImportMemoArchiveRequest:
+            type: object
+            properties:
+                content:
+                    type: string
+                    description: ZIP bytes, limited to 128 MiB.
+                    format: bytes
+        ImportMemoArchiveResponse:
+            type: object
+            properties:
+                imported:
+                    type: integer
+                    format: int32
+                skipped:
+                    type: integer
+                    description: Existing memo IDs are never overwritten.
+                    format: int32
+                attachments:
+                    type: integer
+                    format: int32
+                warnings:
+                    type: array
+                    items:
+                        type: string
+                errors:
+                    type: array
+                    items:
+                        type: string
+                    description: Per-record failures are returned with any completed import counts.
         InstanceProfile:
             type: object
             properties:
@@ -3936,6 +4067,76 @@ components:
                 setting:
                     $ref: '#/components/schemas/WechatKfSetting'
             description: Request to replace a configuration at a known revision.
+        UploadAttachmentRequest:
+            required:
+                - writeOffset
+            type: object
+            properties:
+                spec:
+                    allOf:
+                        - $ref: '#/components/schemas/UploadAttachmentSpec'
+                    description: Starts a new upload. The same call may also carry data and finish_write.
+                uploadId:
+                    type: string
+                    description: Continues the upload identified by a previous response.
+                writeOffset:
+                    type: string
+                    description: |-
+                        Required. Zero-based byte offset at which data is written. Must equal the
+                         committed size, except when retrying the most recently accepted chunk
+                         with identical bytes and offset, which is accepted without writing again.
+                data:
+                    type: string
+                    description: |-
+                        Optional. File bytes, at most max_chunk_size long. With no data and
+                         finish_write false, the call reports progress without writing, and
+                         write_offset is ignored.
+                    format: bytes
+                finishWrite:
+                    type: boolean
+                    description: |-
+                        Optional. Finalize the upload after writing data. The committed size must
+                         then equal total_size. Any later call for the same upload_id returns the
+                         created attachment.
+        UploadAttachmentResponse:
+            type: object
+            properties:
+                uploadId:
+                    type: string
+                    description: Opaque ID for subsequent calls. This is not a resource name.
+                committedSize:
+                    type: string
+                    description: Number of file bytes committed so far.
+                attachment:
+                    allOf:
+                        - $ref: '#/components/schemas/Attachment'
+                    description: Set once the upload has been finalized.
+                maxChunkSize:
+                    type: integer
+                    description: Maximum number of data bytes accepted in one call.
+                    format: int32
+        UploadAttachmentSpec:
+            required:
+                - attachment
+            type: object
+            properties:
+                attachment:
+                    allOf:
+                        - $ref: '#/components/schemas/Attachment'
+                    description: |-
+                        Required. Metadata for the attachment to create. content must be empty;
+                         file bytes are sent in data.
+                attachmentId:
+                    type: string
+                    description: |-
+                        Optional. The attachment ID to use for this attachment.
+                         If empty, a unique ID will be generated.
+                         Format: ^[a-zA-Z0-9]([a-zA-Z0-9-]{0,34}[a-zA-Z0-9])?$
+                totalSize:
+                    type: string
+                    description: |-
+                        Optional. Total size of the file in bytes before media processing.
+                         Zero represents an empty file.
         UpsertMemoReactionRequest:
             required:
                 - name
@@ -4223,6 +4424,12 @@ components:
                     type: integer
                     description: Total memo count.
                     format: int32
+                attachmentStorageBytes:
+                    readOnly: true
+                    type: string
+                    description: |-
+                        Total persisted attachment bytes across all personal spaces, including unlinked uploads.
+                         Excludes temporary uploads and derived files. Only returned for the current user.
             description: User statistics messages
         UserStats_MemoTypeStats:
             type: object
@@ -4373,5 +4580,7 @@ tags:
     - name: IdentityProviderService
     - name: InstanceService
     - name: MemoService
+    - name: MemoTransferService
+      description: MemoTransferService transfers the authenticated user's notes as portable ZIP files.
     - name: ShortcutService
     - name: UserService

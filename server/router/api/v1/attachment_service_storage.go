@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"mime"
 	"os"
 	"path/filepath"
@@ -45,6 +46,10 @@ func convertAttachmentFromStore(attachment *store.Attachment) *v1pb.Attachment {
 
 // SaveAttachmentBlob saves the blob of attachment based on the storage config.
 func SaveAttachmentBlob(ctx context.Context, profile *profile.Profile, stores *store.Store, create *store.Attachment) error {
+	return saveAttachmentContent(ctx, profile, stores, create, bytes.NewReader(create.Blob))
+}
+
+func saveAttachmentContent(ctx context.Context, profile *profile.Profile, stores *store.Store, create *store.Attachment, content io.Reader) error {
 	instanceStorageSetting, err := stores.GetInstanceStorageSetting(ctx)
 	if err != nil {
 		return errors.Wrap(err, "Failed to find instance storage setting")
@@ -83,8 +88,18 @@ func SaveAttachmentBlob(ctx context.Context, profile *profile.Profile, stores *s
 		}
 
 		// Write the blob to the file.
-		if err := os.WriteFile(osPath, create.Blob, 0644); err != nil {
-			return errors.Wrap(err, "Failed to write file")
+		file, err := os.OpenFile(osPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
+		if err != nil {
+			return errors.Wrap(err, "failed to create attachment file")
+		}
+		_, copyErr := io.Copy(file, &attachmentContextReader{ctx: ctx, reader: content})
+		closeErr := file.Close()
+		if copyErr != nil || closeErr != nil {
+			os.Remove(osPath)
+			if copyErr != nil {
+				return errors.Wrap(copyErr, "failed to write attachment file")
+			}
+			return errors.Wrap(closeErr, "failed to close attachment file")
 		}
 		create.Reference = internalPath
 		create.Blob = nil
@@ -105,13 +120,13 @@ func SaveAttachmentBlob(ctx context.Context, profile *profile.Profile, stores *s
 		}
 		filepathTemplate = replaceFilenameWithPathTemplate(filepathTemplate, create.Filename)
 		filepathTemplate = filepath.ToSlash(uniqueAttachmentStoragePath(filepathTemplate))
-		key, err := s3Client.UploadObject(ctx, filepathTemplate, create.Type, bytes.NewReader(create.Blob))
+		key, err := s3Client.UploadObject(ctx, filepathTemplate, create.Type, content)
 		if err != nil {
 			return errors.Wrap(err, "Failed to upload via s3 client")
 		}
-		presignURL, err := s3Client.PresignGetObject(ctx, key)
+		presignURL, err := presignAttachmentObject(ctx, s3Client, key)
 		if err != nil {
-			return errors.Wrap(err, "Failed to presign via s3 client")
+			return err
 		}
 
 		create.Reference = presignURL
@@ -126,9 +141,46 @@ func SaveAttachmentBlob(ctx context.Context, profile *profile.Profile, stores *s
 			},
 		}
 		create.Payload = payload
+	} else {
+		blob, err := io.ReadAll(&attachmentContextReader{ctx: ctx, reader: content})
+		if err != nil {
+			return errors.Wrap(err, "failed to read attachment content")
+		}
+		create.Blob = blob
 	}
-
 	return nil
+}
+
+type uploadedAttachmentObject interface {
+	PresignGetObject(context.Context, string) (string, error)
+	DeleteObject(context.Context, string) error
+}
+
+// presignAttachmentObject removes an uploaded object if it cannot be referenced.
+// Cleanup must survive request cancellation, but never wait indefinitely.
+func presignAttachmentObject(ctx context.Context, client uploadedAttachmentObject, key string) (string, error) {
+	url, err := client.PresignGetObject(ctx, key)
+	if err == nil {
+		return url, nil
+	}
+	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+	defer cancel()
+	if cleanupErr := client.DeleteObject(cleanupCtx, key); cleanupErr != nil {
+		slog.Warn("failed to clean up attachment after presign failure", slog.Any("error", cleanupErr))
+	}
+	return "", errors.Wrap(err, "Failed to presign via s3 client")
+}
+
+type attachmentContextReader struct {
+	ctx    context.Context
+	reader io.Reader
+}
+
+func (r *attachmentContextReader) Read(p []byte) (int, error) {
+	if err := r.ctx.Err(); err != nil {
+		return 0, err
+	}
+	return r.reader.Read(p)
 }
 
 func (s *APIV1Service) GetAttachmentBlob(attachment *store.Attachment) ([]byte, error) {

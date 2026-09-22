@@ -1,8 +1,10 @@
-import { memo } from "react";
+import { memo, useRef } from "react";
+import { useContentSearchTerms } from "@/contexts/MemoFilterContext";
 import { cn } from "@/lib/utils";
 import { MemoMarkdownRenderer } from "./MemoMarkdownRenderer";
 import { useResolvedMentionUsernames } from "./MentionResolutionContext";
 import type { MemoContentProps } from "./types";
+import { useSearchMatchHighlight } from "./useSearchMatchHighlight";
 
 // Stateless markdown renderer. Truncation is not this component's concern — compact cards
 // are bounded by ClampedSection around the whole memo body; `compact` here only informs
@@ -11,10 +13,13 @@ import type { MemoContentProps } from "./types";
 const MemoContent = (props: MemoContentProps) => {
   const { className, contentClassName, content, onClick, onDoubleClick } = props;
   const resolvedMentionUsernames = useResolvedMentionUsernames(content);
+  const contentRef = useRef<HTMLDivElement>(null);
+  useSearchMatchHighlight(contentRef, useContentSearchTerms());
 
   return (
     <div className={`w-full flex flex-col justify-start items-start text-foreground ${className || ""}`}>
       <div
+        ref={contentRef}
         data-memo-content
         className={cn(
           "relative w-full max-w-full wrap-break-word text-base leading-6",
