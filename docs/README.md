@@ -12,6 +12,7 @@
 | 提交发布说明、了解 CI 和版本 PR | [CI 与版本流程](release.md) |
 | 了解上游基线、个人差异、发布和部署方案 | [定制与部署记录](customization-and-deployment.zh-CN.md) |
 | 配置微信客服或从旧服务迁移 | [内置接入方案](wechat-kf-integration.md)、[迁移任务](tasks/TASK-20260919-wechat-kf-integration.md) |
+| 了解链接预览是否重新抓取及后台重试规则 | [链接预览缓存与后台处理](link-previews.md) |
 | 查看长期协作和代码规则 | [AGENTS.md](../AGENTS.md) |
 
 ## 记录维护方式
