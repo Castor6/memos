@@ -186,6 +186,7 @@ browser.runtime.onMessage.addListener((message: unknown, sender: RuntimeSender) 
       {
         requestId,
         startedAt: req.saveStartedAt ?? Date.now(),
+        ...(req.saveIsRetry !== undefined ? { isRetry: req.saveIsRetry } : {}),
         ...(req.saveRequestId || req.clip ? { serverMemoId: requestId } : {}),
       },
       req.clip,

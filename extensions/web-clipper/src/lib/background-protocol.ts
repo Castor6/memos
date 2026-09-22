@@ -142,6 +142,7 @@ export function parseBackgroundRequest(value: unknown): BackgroundRequest | null
   ) {
     return null;
   }
+  if (request.saveIsRetry !== undefined && typeof request.saveIsRetry !== "boolean") return null;
   if (request.images !== undefined) {
     if (!Array.isArray(request.images) || request.images.length > 100 || !request.images.every((image) => typeof image === "string")) {
       return null;
@@ -166,6 +167,7 @@ export function parseBackgroundRequest(value: unknown): BackgroundRequest | null
     ...(request.images ? { images: request.images as string[] } : {}),
     ...(request.saveRequestId ? { saveRequestId: request.saveRequestId } : {}),
     ...(request.saveStartedAt ? { saveStartedAt: request.saveStartedAt } : {}),
+    ...(request.saveIsRetry !== undefined ? { saveIsRetry: request.saveIsRetry } : {}),
   };
 }
 

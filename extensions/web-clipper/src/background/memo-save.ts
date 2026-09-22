@@ -25,7 +25,7 @@ import {
 import type { SaveResult, SelectionClip } from "@/lib/messages";
 
 export type SaveExpectation = { source: ConnectionSource; connectionId: string; instanceUrl: string };
-export type SaveOperation = { requestId: string; startedAt: number; serverMemoId?: string };
+export type SaveOperation = { requestId: string; startedAt: number; serverMemoId?: string; isRetry?: boolean };
 
 export const SAVE_ATTEMPTS_KEY = "memoSaveAttemptsV1";
 const ATTEMPT_TTL_MS = 15 * 60_000;
@@ -213,7 +213,11 @@ async function savePopupMemoOnce(
   if (previous || (capture && operation.serverMemoId)) {
     try {
       const exact = operation.serverMemoId ? await getMemo(credentials, operation.serverMemoId) : null;
-      if (operation.serverMemoId && previous?.result && !exact) return { ok: false, errorKind: "not-found" };
+      // An unknown save may already have been created and subsequently deleted. A retry
+      // may confirm an existing memo, but only an explicit new operation may create one.
+      if (operation.serverMemoId && !exact && (previous?.result || (capture && operation.isRetry))) {
+        return { ok: false, errorKind: "not-found" };
+      }
       const currentUser = exact || !operation.serverMemoId ? await getCurrentUser(credentials) : null;
       const recent = operation.serverMemoId ? (exact ? [exact] : []) : await listRecentMemos(credentials, 20, currentUser?.name);
       const match = recent.find(

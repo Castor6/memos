@@ -177,9 +177,60 @@ describe("background — SAVE_MEMO message", () => {
     const request = captureRequest("forgotten_attempt", ["https://cdn.example.org/image.png"]);
     expect(await emitRuntime(request)).toEqual({ ok: false, errorKind: "timeout" });
     await browserMock.storage.local.remove(SAVE_ATTEMPTS_KEY);
-    expect(await emitRuntime(request)).toEqual({ ok: true, webUrl: "https://memos.example.com/memos/forgotten_attempt", failedImages: 1 });
+    expect(await emitRuntime({ ...request, saveIsRetry: true })).toEqual({
+      ok: true,
+      webUrl: "https://memos.example.com/memos/forgotten_attempt",
+      failedImages: 1,
+    });
     expect(attachmentPosts).toBe(1);
     expect(memoPosts).toBe(1);
+    vi.unstubAllGlobals();
+  });
+
+  it.each([
+    "cleared",
+    "expired",
+  ])("does not resurrect a deleted memo after an unknown save's local retry state is %s", async (cacheState) => {
+    let remote: Record<string, unknown> | null = null;
+    let attachmentPosts = 0;
+    let memoPosts = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((value: unknown, init?: RequestInit) => {
+        const url = String(value);
+        if (url.endsWith("/instance/profile")) return Promise.resolve(jsonResponse({ version: "dev", webClipperSupported: true }));
+        if (url === "https://cdn.example.org/image.png")
+          return Promise.resolve(new Response(new Uint8Array([1]), { headers: { "content-type": "image/png" } }));
+        if (url.endsWith("/attachments")) {
+          attachmentPosts += 1;
+          return Promise.resolve(jsonResponse({ name: "attachments/image" }));
+        }
+        if (init?.method === "POST") {
+          memoPosts += 1;
+          remote = {
+            ...JSON.parse(String(init.body)),
+            name: "memos/deleted_unknown",
+            creator: "users/steven",
+            createTime: new Date().toISOString(),
+          };
+          return Promise.reject(Object.assign(new Error("response lost"), { name: "TimeoutError" }));
+        }
+        return Promise.resolve(remote ? jsonResponse(remote) : jsonResponse({}, 404));
+      }),
+    );
+    const request = captureRequest("deleted_unknown", ["https://cdn.example.org/image.png"]);
+    expect(await emitRuntime({ ...request, saveIsRetry: false })).toEqual({ ok: false, errorKind: "timeout" });
+    remote = null;
+    if (cacheState === "cleared") await browserMock.storage.local.remove(SAVE_ATTEMPTS_KEY);
+    else {
+      const stored = await browserMock.storage.local.get(SAVE_ATTEMPTS_KEY);
+      const attempts = stored[SAVE_ATTEMPTS_KEY] as Record<string, { updatedAt: number }>;
+      for (const attempt of Object.values(attempts)) attempt.updatedAt = Date.now() - 16 * 60_000;
+      await browserMock.storage.local.set({ [SAVE_ATTEMPTS_KEY]: attempts });
+    }
+    expect(await emitRuntime({ ...request, saveIsRetry: true })).toEqual({ ok: false, errorKind: "not-found" });
+    expect(memoPosts).toBe(1);
+    expect(attachmentPosts).toBe(1);
     vi.unstubAllGlobals();
   });
 

@@ -64,6 +64,8 @@ export type Request =
       saveRequestId?: string;
       /** Wall-clock start of the first attempt, used to identify a newly-created exact match. */
       saveStartedAt?: number;
+      /** A restored or previously attempted capture must never recreate a missing remote memo. */
+      saveIsRetry?: boolean;
     };
 
 export type PopupStateResult = PopupState;

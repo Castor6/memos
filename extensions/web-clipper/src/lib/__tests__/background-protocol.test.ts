@@ -11,6 +11,12 @@ const save = {
 } as const;
 
 describe("background protocol", () => {
+  it("preserves explicit first-save and retry flags and rejects non-boolean values", () => {
+    expect(parseBackgroundRequest({ ...save, saveIsRetry: true })).toEqual({ ...save, saveIsRetry: true });
+    expect(parseBackgroundRequest({ ...save, saveIsRetry: false })).toEqual({ ...save, saveIsRetry: false });
+    expect(parseBackgroundRequest({ ...save, saveIsRetry: "true" })).toBeNull();
+  });
+
   it("parses valid popup requests", () => {
     expect(parseBackgroundRequest({ type: "GET_POPUP_STATE" })).toEqual({ type: "GET_POPUP_STATE" });
     expect(parseBackgroundRequest({ type: "GET_CONNECTION_STATE", refresh: true })).toEqual({
