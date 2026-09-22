@@ -209,6 +209,16 @@ func (s *Store) DeleteAttachmentStorageWithInstanceSetting(ctx context.Context, 
 }
 
 func (s *Store) deleteAttachmentStorageImpl(ctx context.Context, attachment *Attachment, instanceStorageSetting *storepb.InstanceStorageSetting) error {
+	if err := s.deleteAttachmentStorageObject(ctx, attachment, instanceStorageSetting); err != nil {
+		return err
+	}
+	if attachment != nil {
+		s.deleteAttachmentDerivedCaches(attachment)
+	}
+	return nil
+}
+
+func (s *Store) deleteAttachmentStorageObject(ctx context.Context, attachment *Attachment, instanceStorageSetting *storepb.InstanceStorageSetting) error {
 	if attachment == nil {
 		return nil
 	}
@@ -264,7 +274,6 @@ func (s *Store) deleteAttachmentStorageImpl(ctx context.Context, attachment *Att
 		}
 	}
 
-	s.deleteAttachmentDerivedCaches(attachment)
 	return nil
 }
 

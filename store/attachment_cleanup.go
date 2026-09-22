@@ -19,9 +19,12 @@ type attachmentCleanupData struct {
 }
 
 type attachmentCleanupJob struct {
-	id       int32
-	payload  string
-	attempts int
+	id          int32
+	payload     string
+	attempts    int
+	attachment  *Attachment
+	identity    attachmentStorageIdentity
+	decodeError error
 }
 
 // ProcessAttachmentCleanup retries a bounded batch of committed file deletions.
@@ -32,19 +35,29 @@ func (s *Store) ProcessAttachmentCleanup(ctx context.Context, now int64, limit i
 	if err != nil {
 		return err
 	}
+	for i := range jobs {
+		var data attachmentCleanupData
+		jobs[i].decodeError = json.Unmarshal([]byte(jobs[i].payload), &data)
+		jobs[i].attachment = &Attachment{UID: data.UID, StorageType: data.StorageType, Reference: data.Reference, Payload: &storepb.AttachmentPayload{}}
+		if jobs[i].decodeError == nil {
+			jobs[i].decodeError = (protojson.UnmarshalOptions{DiscardUnknown: true}).Unmarshal(data.Payload, jobs[i].attachment.Payload)
+		}
+		if jobs[i].decodeError == nil {
+			jobs[i].identity, jobs[i].decodeError = s.attachmentStorageIdentity(jobs[i].attachment, nil)
+		}
+	}
+	references, activeUIDs, err := s.liveCleanupReferences(ctx, jobs)
+	if err != nil {
+		return err
+	}
 	for _, item := range jobs {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		var data attachmentCleanupData
-		cleanupErr := json.Unmarshal([]byte(item.payload), &data)
-		attachment := &Attachment{UID: data.UID, StorageType: data.StorageType, Reference: data.Reference, Payload: &storepb.AttachmentPayload{}}
-		if cleanupErr == nil {
-			cleanupErr = (protojson.UnmarshalOptions{DiscardUnknown: true}).Unmarshal(data.Payload, attachment.Payload)
-		}
-		if cleanupErr == nil {
+		cleanupErr := item.decodeError
+		if cleanupErr == nil && !references[item.identity] {
 			jobContext, cancel := context.WithTimeout(ctx, 30*time.Second)
-			cleanupErr = s.DeleteAttachmentStorage(jobContext, attachment)
+			cleanupErr = s.deleteAttachmentStorageObject(jobContext, item.attachment, nil)
 			cancel()
 		}
 		if cleanupErr != nil {
@@ -54,6 +67,10 @@ func (s *Store) ProcessAttachmentCleanup(ctx context.Context, now int64, limit i
 			}
 			slog.Warn("Attachment cleanup will be retried", slog.Int64("attachment_id", int64(item.id)), slog.Any("err", cleanupErr))
 			continue
+		}
+		// A reused UID belongs to a different attachment and may already have new caches.
+		if !activeUIDs[item.attachment.UID] {
+			s.deleteAttachmentDerivedCaches(item.attachment)
 		}
 		if _, err := s.driver.GetDB().ExecContext(ctx, s.memoSQL("DELETE FROM attachment_cleanup WHERE attachment_id=?"), item.id); err != nil {
 			return err
