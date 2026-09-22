@@ -12,6 +12,8 @@
 
 后台每 5 秒触发一轮，每轮最多处理 8 个待执行 URL。失败从 1 分钟开始指数退避，最大间隔 24 小时，仍保留后续重试机会；8 个是每轮工作预算，不是单个 URL 的重试次数限制。没有有效标题的响应不算成功。无效协议、无主机或明确不允许的字面地址不会进入队列；网络解析及连接仍由安全 HTTP 客户端检查。
 
+仅通过预览接口请求、尚未由笔记登记的 URL 使用同一租约协调，但失败任务只保留固定 15 分钟，不由后台自动抓取；再次调用接口也不延长该窗口。后台按索引每批回收最多 100 个到期且无有效租约的临时任务。笔记新增、修改或历史回填可将同 URL 原子提升为持续后台任务，保留已有租约和退避时间；后续接口请求不会降级它。这里的到期只针对未成功的临时任务，成功快照仍永久保留。
+
 相关实现位于 `store/link_metadata*.go`、`server/runner/linkmetadata/` 和 `server/router/api/v1/memo_service_link_metadata.go`。表结构变化须同时维护 SQLite、MySQL、PostgreSQL 的增量迁移和 `LATEST.sql`。
 
 行为约定来源见 [首次成功快照任务](tasks/TASK-20260921-export-link-cache.md) 和 [后台优化任务](tasks/TASK-20260922-project-optimization-review.md)。
