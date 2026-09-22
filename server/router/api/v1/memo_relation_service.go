@@ -164,12 +164,3 @@ func convertMemoRelationTypeFromStore(relationType store.MemoRelationType) v1pb.
 		return v1pb.MemoRelation_TYPE_UNSPECIFIED
 	}
 }
-
-func convertMemoRelationTypeToStore(relationType v1pb.MemoRelation_Type) store.MemoRelationType {
-	switch relationType {
-	case v1pb.MemoRelation_COMMENT:
-		return store.MemoRelationComment
-	default:
-		return store.MemoRelationReference
-	}
-}
