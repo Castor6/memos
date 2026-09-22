@@ -292,6 +292,9 @@ message Memo {
   // Persisted link previews, available without fetching the source page again.
   repeated LinkMetadata link_metadata = 22 [(google.api.field_behavior) = OUTPUT_ONLY];
 
+  // Optional. Immutable web capture snapshot, returned only to the creator.
+  MemoCapture capture = 23 [(google.api.field_behavior) = OPTIONAL];
+
   // Computed properties of a memo.
   message Property {
     bool has_link = 1;
@@ -358,6 +361,8 @@ message ListMemosRequest {
   //   visibility (string: PRIVATE | PROTECTED | PUBLIC),
   //   tags (list<string>; match with `"work" in tags`, not `tag == "work"`),
   //   has_task_list / has_link / has_code / has_incomplete_tasks (bool).
+  //   has_capture (bool), capture_source_id / capture_source_url / capture_kind (string).
+  // Capture filters are restricted to the authenticated user's own memos.
   // Note: the time fields here are created_ts / updated_ts, which differ from
   // the create_time / update_time names used by order_by.
   // Examples:
@@ -696,4 +701,32 @@ message ExportSharedMemoPdfRequest {
 
 message ExportMemoPdfResponse {
   bytes content = 1;
+}
+
+// Structured source material and personal observations saved by the web clipper.
+message MemoCapture {
+  // STAR or PICK_UP.
+  string kind = 1;
+  // WEB for generic pages, or X for posts. PICK_UP requires X.
+  string platform = 2;
+  string source_url = 3;
+  string source_id = 4;
+  // The user's thoughts or the original reply text.
+  string comment = 5;
+  // Optional background supplied when saving.
+  string context = 6;
+  // Source posts in reading order, including the selected post for PICK_UP.
+  // Generic web pages use the memo content and may leave this empty.
+  repeated Post posts = 7;
+
+  message Post {
+    string id = 1;
+    string url = 2;
+    string author = 3;
+    string author_name = 4;
+    string content = 5;
+    // Optional RFC 3339 publication timestamp.
+    string published_at = 6;
+    repeated string images = 7;
+  }
 }

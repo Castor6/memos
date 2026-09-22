@@ -72,6 +72,9 @@ func (s *APIV1Service) ListAllUserStats(ctx context.Context, request *v1pb.ListA
 			return nil, status.Errorf(codes.InvalidArgument, "invalid filter: %v", err)
 		}
 		memoFind.Filters = append(memoFind.Filters, request.Filter)
+		if err := scopeMemoCaptureFilter(ctx, request.Filter, memoFind, currentUser); err != nil {
+			return nil, err
+		}
 	}
 
 	if request.State == v1pb.State_ARCHIVED {

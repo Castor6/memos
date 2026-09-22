@@ -90,6 +90,12 @@ func (s *APIV1Service) CreateMemo(ctx context.Context, request *v1pb.CreateMemoR
 	if err := validateExplicitTags(request.Memo.Tags); err != nil {
 		return nil, err
 	}
+	if err := validateMemoCapture(request.Memo.Capture); err != nil {
+		return nil, err
+	}
+	if request.Memo.Capture != nil && request.Memo.IsTodo {
+		return nil, status.Errorf(codes.InvalidArgument, "captures must be notes")
+	}
 	memoUID, err := ValidateAndGenerateUID(request.MemoId)
 	if err != nil {
 		return nil, err
@@ -99,7 +105,7 @@ func (s *APIV1Service) CreateMemo(ctx context.Context, request *v1pb.CreateMemoR
 		UID:        memoUID,
 		Space:      space,
 		IsTodo:     request.Memo.IsTodo,
-		Payload:    &storepb.MemoPayload{ExplicitTags: request.Memo.ExplicitTags, Tags: request.Memo.Tags},
+		Payload:    &storepb.MemoPayload{ExplicitTags: request.Memo.ExplicitTags, Tags: request.Memo.Tags, Capture: convertMemoCaptureToStore(request.Memo.Capture)},
 		CreatorID:  user.ID,
 		Content:    request.Memo.Content,
 		Visibility: convertVisibilityToStore(request.Memo.Visibility),
@@ -238,6 +244,9 @@ func (s *APIV1Service) ListMemos(ctx context.Context, request *v1pb.ListMemosReq
 			return nil, status.Errorf(codes.InvalidArgument, "invalid filter: %v", err)
 		}
 		memoFind.Filters = append(memoFind.Filters, request.Filter)
+		if err := scopeMemoCaptureFilter(ctx, request.Filter, memoFind, currentUser); err != nil {
+			return nil, err
+		}
 	}
 
 	if currentUser == nil {
@@ -430,6 +439,11 @@ func (s *APIV1Service) UpdateMemo(ctx context.Context, request *v1pb.UpdateMemoR
 	}
 	if request.UpdateMask == nil || len(request.UpdateMask.Paths) == 0 {
 		return nil, status.Errorf(codes.InvalidArgument, "update mask is required")
+	}
+	for _, path := range request.UpdateMask.Paths {
+		if path == "capture" || strings.HasPrefix(path, "capture.") {
+			return nil, status.Errorf(codes.InvalidArgument, "capture snapshots cannot be changed")
+		}
 	}
 
 	memo, err := s.Store.GetMemo(ctx, &store.FindMemo{UID: &memoUID})
