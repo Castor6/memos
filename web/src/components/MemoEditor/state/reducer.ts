@@ -2,6 +2,10 @@ import type { EditorAction, EditorState } from "./types";
 import { createInitialState } from "./types";
 
 export function editorReducer(state: EditorState, action: EditorAction): EditorState {
+  // Portalled menus or pending callbacks must not alter the snapshot being saved.
+  if (state.ui.isLoading.saving && action.type !== "SET_LOADING" && action.type !== "RESET") {
+    return state;
+  }
   switch (action.type) {
     case "INIT_MEMO":
       return {

@@ -2,8 +2,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 import { getRequestToken, refreshAccessToken } from "@/connect";
 import { useAuth } from "@/contexts/AuthContext";
-import { memoKeys } from "@/hooks/useMemoQueries";
+import { memoCollectionQueryKeysContaining, memoKeys } from "@/hooks/useMemoQueries";
 import { userKeys } from "@/hooks/useUserQueries";
+import { scheduleQueryRefresh } from "@/lib/query-refresh";
 
 /**
  * Reconnection parameters for SSE connection.
@@ -122,8 +123,8 @@ export function useLiveMemoRefresh() {
         if (hasConnectedOnceRef.current) {
           // Resync active collaborative views after reconnect because the server may have
           // dropped events while the client was disconnected or backpressured.
-          queryClient.invalidateQueries({ queryKey: memoKeys.all, refetchType: "active" });
-          queryClient.invalidateQueries({ queryKey: userKeys.stats(), refetchType: "active" });
+          scheduleQueryRefresh(queryClient, memoKeys.all);
+          scheduleQueryRefresh(queryClient, userKeys.stats());
         }
         hasConnectedOnceRef.current = true;
 
@@ -219,35 +220,37 @@ interface SSEChangeEvent {
 function handleSSEEvent(event: SSEChangeEvent, queryClient: ReturnType<typeof useQueryClient>) {
   switch (event.type) {
     case SSE_EVENT_TYPES.memoCreated:
-      queryClient.invalidateQueries({ queryKey: memoKeys.lists() });
-      queryClient.invalidateQueries({ queryKey: userKeys.stats() });
+      scheduleQueryRefresh(queryClient, memoKeys.lists());
+      scheduleQueryRefresh(queryClient, userKeys.stats());
       break;
 
     case SSE_EVENT_TYPES.memoUpdated:
-      queryClient.invalidateQueries({ queryKey: memoKeys.detail(event.name) });
-      queryClient.invalidateQueries({ queryKey: memoKeys.lists() });
+      scheduleQueryRefresh(queryClient, memoKeys.detail(event.name));
+      scheduleQueryRefresh(queryClient, memoKeys.lists());
       if (event.parent) {
-        queryClient.invalidateQueries({ queryKey: memoKeys.comments(event.parent) });
+        scheduleQueryRefresh(queryClient, memoKeys.comments(event.parent));
       }
       break;
 
     case SSE_EVENT_TYPES.memoDeleted:
       queryClient.removeQueries({ queryKey: memoKeys.detail(event.name) });
-      queryClient.invalidateQueries({ queryKey: memoKeys.lists() });
-      queryClient.invalidateQueries({ queryKey: userKeys.stats() });
+      scheduleQueryRefresh(queryClient, memoKeys.lists());
+      scheduleQueryRefresh(queryClient, userKeys.stats());
       break;
 
     case SSE_EVENT_TYPES.memoCommentCreated:
-      queryClient.invalidateQueries({ queryKey: memoKeys.comments(event.name) });
-      queryClient.invalidateQueries({ queryKey: memoKeys.detail(event.name) });
+      scheduleQueryRefresh(queryClient, memoKeys.comments(event.name));
+      scheduleQueryRefresh(queryClient, memoKeys.detail(event.name));
       break;
 
     case SSE_EVENT_TYPES.reactionUpserted:
     case SSE_EVENT_TYPES.reactionDeleted:
-      queryClient.invalidateQueries({ queryKey: memoKeys.detail(event.name) });
-      queryClient.invalidateQueries({ queryKey: memoKeys.lists() });
+      scheduleQueryRefresh(queryClient, memoKeys.detail(event.name));
+      // Reactions do not change list membership or order; refresh only lists
+      // that already contain this memo, including loaded comment collections.
+      scheduleQueryRefresh(queryClient, ...memoCollectionQueryKeysContaining(queryClient, event.name));
       if (event.parent) {
-        queryClient.invalidateQueries({ queryKey: memoKeys.comments(event.parent) });
+        scheduleQueryRefresh(queryClient, memoKeys.comments(event.parent));
       }
       break;
   }

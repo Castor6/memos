@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import PagedMemoList from "@/components/PagedMemoList";
 import type { Memo } from "@/types/proto/api/v1/memo_service_pb";
@@ -9,6 +9,9 @@ const feed = vi.hoisted(() => ({
   memos: [] as unknown[],
   hasNextPage: false,
   isLoading: false,
+  isError: false,
+  isFetchNextPageError: false,
+  refetch: vi.fn(),
   fetchNextPage: vi.fn(async () => undefined),
 }));
 const readiness = vi.hoisted(() => ({ auth: true, instance: true }));
@@ -20,6 +23,9 @@ vi.mock("@/hooks/useMemoQueries", () => ({
     hasNextPage: feed.hasNextPage,
     isFetchingNextPage: false,
     isLoading: feed.isLoading,
+    isError: feed.isError,
+    isFetchNextPageError: feed.isFetchNextPageError,
+    refetch: feed.refetch,
   }),
 }));
 
@@ -70,6 +76,9 @@ describe("<PagedMemoList>", () => {
     feed.memos = [];
     feed.hasNextPage = false;
     feed.isLoading = false;
+    feed.isError = false;
+    feed.isFetchNextPageError = false;
+    feed.refetch.mockClear();
     feed.fetchNextPage.mockClear();
     readiness.auth = true;
     readiness.instance = true;
@@ -123,6 +132,33 @@ describe("<PagedMemoList>", () => {
 
     expect(screen.getByText("No data found.")).toBeInTheDocument();
     expect(screen.getByTestId("placeholder-sprite")).toBeInTheDocument();
+  });
+
+  it("shows a retry instead of an empty state when the first page fails", () => {
+    feed.isError = true;
+    renderList();
+    expect(screen.getByRole("alert")).toHaveTextContent("memo.load-error");
+    expect(screen.queryByText("No data found.")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "memo.retry" }));
+    expect(feed.refetch).toHaveBeenCalledOnce();
+  });
+
+  it("retains loaded notes and pauses automatic pagination until the failed page is retried", async () => {
+    vi.useFakeTimers();
+    try {
+      feed.memos = [memo];
+      feed.hasNextPage = true;
+      feed.isError = true;
+      feed.isFetchNextPageError = true;
+      renderList((m) => <div key={m.name}>{m.content}</div>);
+      expect(screen.getByText("hello")).toBeInTheDocument();
+      await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+      fireEvent.scroll(window);
+      expect(feed.fetchNextPage).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByRole("button", { name: "memo.retry" }));
+      expect(feed.fetchNextPage).toHaveBeenCalledOnce();
+      expect(feed.refetch).not.toHaveBeenCalled();
+    } finally { vi.useRealTimers(); }
   });
 
   it("shows the empty state below route-owned leading content", () => {

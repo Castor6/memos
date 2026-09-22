@@ -11,6 +11,20 @@ vi.mock("@/hooks/useUserQueries", () => ({
 }));
 
 describe("Editor", () => {
+  it("disables editing and file paste while a save is pending, then restores editing", async () => {
+    const { fireEvent } = await import("@testing-library/react");
+    const onFiles = vi.fn();
+    const props = { className: "x", initialContent: "draft", placeholder: "memo", onContentChange: vi.fn(), onFiles, onSubmit: vi.fn() };
+    const { container, rerender } = render(<Editor {...props} readOnly />);
+    const body = container.querySelector(".rich-editor")!;
+    expect(body).toHaveAttribute("contenteditable", "false");
+    fireEvent.paste(body, { clipboardData: { files: [new File(["data"], "test.txt")], getData: () => "", types: [] } });
+    expect(onFiles).not.toHaveBeenCalled();
+    rerender(<Editor {...props} readOnly={false} />);
+    expect(body).toHaveAttribute("contenteditable", "true");
+    expect(body).toHaveTextContent("draft");
+  });
+
   it("loads Markdown as rich content and preserves its structure", () => {
     const ref = createRef<EditorController>();
     render(

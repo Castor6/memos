@@ -66,6 +66,7 @@
       "unknown-date": "Unknown date",
       "unused": "Unused"
     },
+    "loaded-count": "{{count}} loaded",
     "tabs": {
       "audio": "Audio",
       "documents": "Documents",
@@ -303,6 +304,8 @@
     "link-preview": "Link preview",
     "links": "Links",
     "load-more": "Load more",
+    "load-error": "Unable to load memos. Your existing notes are still available.",
+    "retry": "Retry",
     "no-archived-memos": "No archived memos.",
     "no-memos": "No memos.",
     "new-badge": "New",

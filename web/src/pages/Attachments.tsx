@@ -81,6 +81,7 @@ const Attachments = () => {
     fetchNextPage,
     hasNextPage,
     isError,
+    isFetchNextPageError,
     isFetching,
     isFetchingNextPage,
     isLoading,
@@ -89,7 +90,8 @@ const Attachments = () => {
     refetch,
     stats,
     unusedItems,
-  } = useAttachmentLibrary(i18n.language);
+    unusedQuery,
+  } = useAttachmentLibrary(i18n.language, activeTab);
 
   const currentItemsCount = useMemo(() => TAB_COUNT_SELECTOR[activeTab](stats), [activeTab, stats]);
 
@@ -132,7 +134,7 @@ const Attachments = () => {
       return <AttachmentLibrarySkeletonGrid />;
     }
 
-    if (isError) {
+    if (isError && currentItemsCount === 0) {
       return <AttachmentLibraryErrorState error={error instanceof Error ? error : undefined} onRetry={() => refetch()} />;
     }
 
@@ -160,7 +162,15 @@ const Attachments = () => {
       {!md && <MobileHeader />}
 
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 sm:gap-6 sm:px-6">
-        <AttachmentLibraryToolbar activeTab={activeTab} onTabChange={setActiveTab} stats={stats} />
+        <AttachmentLibraryToolbar activeTab={activeTab} onTabChange={setActiveTab} />
+
+        {!isLoading && currentItemsCount > 0 && (
+          <p className="text-xs text-muted-foreground">{t("attachment-library.loaded-count", { count: currentItemsCount })}</p>
+        )}
+
+        {unusedQuery.isError && (
+          <AttachmentLibraryErrorState error={unusedQuery.error ?? undefined} onRetry={() => unusedQuery.refetch()} />
+        )}
 
         {stats.unused > 0 && (
           <AttachmentLibraryUnusedPanel
@@ -175,7 +185,11 @@ const Attachments = () => {
         <div className="min-h-[16rem] pt-1">
           {renderContent()}
 
-          {hasNextPage && (
+          {isError && currentItemsCount > 0 && (
+            <AttachmentLibraryErrorState error={error ?? undefined} onRetry={() => (isFetchNextPageError ? fetchNextPage() : refetch())} />
+          )}
+
+          {hasNextPage && !isError && (
             <div className="mt-6 flex justify-center">
               <Button variant="outline" className="rounded-full px-4" onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
                 {isFetchingNextPage ? <LoaderCircleIcon className="h-4 w-4 animate-spin" /> : null}
@@ -193,6 +207,11 @@ const Attachments = () => {
           <div className="space-y-4 pt-1">
             <div className="text-sm font-medium text-foreground">{t("attachment-library.unused.title")}</div>
             <AttachmentUnusedRows items={unusedItems} />
+            {unusedQuery.hasNextPage && (
+              <Button variant="outline" onClick={() => unusedQuery.fetchNextPage()} disabled={unusedQuery.isFetchingNextPage}>
+                {t("memo.load-more")}
+              </Button>
+            )}
           </div>
         )}
       </div>
