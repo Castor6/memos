@@ -88,6 +88,46 @@ func (s Schema) ResolveAlias(name string) (Field, bool) {
 // NewSchema constructs the memo filter schema and CEL environment.
 func NewSchema() Schema {
 	fields := map[string]Field{
+		"has_capture": {
+			Name: "has_capture", Kind: FieldKindBoolColumn, Type: FieldTypeBool,
+			Column: Column{Table: "memo", Name: "payload"},
+			Expressions: map[DialectName]string{
+				DialectSQLite:   "(JSON_EXTRACT(%s, '$.capture.kind') IS NOT NULL)",
+				DialectMySQL:    "(JSON_EXTRACT(%s, '$.capture.kind') IS NOT NULL)",
+				DialectPostgres: "(%s->'capture'->>'kind' IS NOT NULL)",
+			},
+			AllowedComparisonOps: map[ComparisonOperator]bool{CompareEq: true, CompareNeq: true},
+		},
+		"capture_source_id": {
+			Name: "capture_source_id", Kind: FieldKindScalar, Type: FieldTypeString,
+			Column: Column{Table: "memo", Name: "payload"},
+			Expressions: map[DialectName]string{
+				DialectSQLite:   "JSON_EXTRACT(%s, '$.capture.sourceId')",
+				DialectMySQL:    "JSON_UNQUOTE(JSON_EXTRACT(%s, '$.capture.sourceId'))",
+				DialectPostgres: "%s->'capture'->>'sourceId'",
+			},
+			AllowedComparisonOps: map[ComparisonOperator]bool{CompareEq: true, CompareNeq: true},
+		},
+		"capture_kind": {
+			Name: "capture_kind", Kind: FieldKindScalar, Type: FieldTypeString,
+			Column: Column{Table: "memo", Name: "payload"},
+			Expressions: map[DialectName]string{
+				DialectSQLite:   "JSON_EXTRACT(%s, '$.capture.kind')",
+				DialectMySQL:    "JSON_UNQUOTE(JSON_EXTRACT(%s, '$.capture.kind'))",
+				DialectPostgres: "%s->'capture'->>'kind'",
+			},
+			AllowedComparisonOps: map[ComparisonOperator]bool{CompareEq: true, CompareNeq: true},
+		},
+		"capture_source_url": {
+			Name: "capture_source_url", Kind: FieldKindScalar, Type: FieldTypeString,
+			Column: Column{Table: "memo", Name: "payload"},
+			Expressions: map[DialectName]string{
+				DialectSQLite:   "JSON_EXTRACT(%s, '$.capture.sourceUrl')",
+				DialectMySQL:    "JSON_UNQUOTE(JSON_EXTRACT(%s, '$.capture.sourceUrl'))",
+				DialectPostgres: "%s->'capture'->>'sourceUrl'",
+			},
+			AllowedComparisonOps: map[ComparisonOperator]bool{CompareEq: true, CompareNeq: true},
+		},
 		"content": {
 			Name:             "content",
 			Kind:             FieldKindScalar,
@@ -240,6 +280,10 @@ func NewSchema() Schema {
 	}
 
 	envOptions := []cel.EnvOption{
+		cel.Variable("has_capture", cel.BoolType),
+		cel.Variable("capture_source_id", cel.StringType),
+		cel.Variable("capture_kind", cel.StringType),
+		cel.Variable("capture_source_url", cel.StringType),
 		cel.Variable("content", cel.StringType),
 		cel.Variable("creator", cel.StringType),
 		cel.Variable("creator_id", cel.IntType),

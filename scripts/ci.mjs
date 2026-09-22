@@ -5,6 +5,13 @@ import { pathToFileURL } from "node:url";
 export function isReleasable(path) {
   if (/\.(md|test\.[cm]?[jt]sx?|spec\.[cm]?[jt]sx?)$/.test(path) || path.endsWith("_test.go")) return false;
   if (path.startsWith("web/tests/") || path.startsWith("store/test/")) return false;
+  if (path.startsWith("extensions/web-clipper/")) {
+    const extensionPath = path.slice("extensions/web-clipper/".length);
+    if (extensionPath.startsWith("src/test/") || extensionPath.includes("/__tests__/")) return false;
+    if (/^scripts\/test_[^/]+\.py$/.test(extensionPath)) return false;
+    return ["src/", "public/", "assets/", "scripts/"].some((prefix) => extensionPath.startsWith(prefix)) ||
+      [".env.example", "package.json", "pnpm-lock.yaml", "manifest.config.ts", "vite.config.ts", "tsconfig.json"].includes(extensionPath);
+  }
   return path.startsWith("scripts/pdf/") || path.startsWith("web/src/") || path.startsWith("web/public/") || path.startsWith("proto/") || path.startsWith("store/db/") ||
     path.endsWith(".go") || ["go.mod", "go.sum", "web/package.json", "web/pnpm-lock.yaml", "web/index.html",
       "web/vite.config.mts", "scripts/Dockerfile", "scripts/entrypoint.sh"].includes(path);
@@ -16,6 +23,7 @@ export function classify(paths, { full = false, versionPR = false } = {}) {
   const all = full || versionPR || workflow;
   return {
     frontend: all || paths.some((path) => path.startsWith("scripts/pdf/") || path.startsWith("web/") || path.startsWith("proto/") || path === ".node-version"),
+    web_clipper: all || paths.some((path) => path.startsWith("extensions/web-clipper/") || path === ".node-version"),
     backend: all || paths.some((path) => path.endsWith(".go") || path.startsWith("proto/") || path.startsWith("store/") || ["go.mod", "go.sum", ".golangci.yaml"].includes(path)),
     proto: all || paths.some((path) => path.startsWith("proto/") && !path.endsWith(".md")),
     upgrade: full || paths.some((path) => path.startsWith("scripts/pdf/") || /^(store\/(db|migration)\/|store\/migrator\.go$|server\/server\.go$)/.test(path) ||
@@ -28,7 +36,7 @@ export function validateResults(needs) {
   for (const required of ["changes", "infrastructure"]) {
     if (needs[required]?.result !== "success") throw new Error(`${required} did not succeed`);
   }
-  for (const job of ["frontend", "backend", "proto", "upgrade"]) {
+  for (const job of ["frontend", "web_clipper", "backend", "proto", "upgrade"]) {
     const flag = needs.changes.outputs[job];
     if (!["true", "false"].includes(flag)) throw new Error(`${job}: missing change classification`);
     const required = flag === "true";

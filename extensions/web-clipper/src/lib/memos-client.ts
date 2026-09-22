@@ -1,0 +1,361 @@
+import { type CaptureData, type CaptureKind, parseCaptureData } from "./capture-data";
+import { InstanceError } from "./errors";
+
+export type MemosCredentials = { instanceUrl: string; accessToken: string };
+export type Visibility = "PRIVATE" | "PROTECTED" | "PUBLIC";
+
+export const INSTANCE_REQUEST_TIMEOUT_MS = 8000;
+
+/** The CORS-vs-unreachable probe uses a short fixed budget, independent of the caller's timeout. */
+const PROBE_TIMEOUT_MS = 3000;
+
+export type InstanceFetchDeps = {
+  fetchImpl?: (url: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+  pageProtocol?: string;
+  timeoutMs?: number;
+};
+
+/** Strips trailing slashes so a base URL can be concatenated with an absolute path. */
+export function normalizeInstanceUrl(instanceUrl: string): string {
+  return instanceUrl.replace(/\/+$/, "");
+}
+
+export function isValidInstanceUrl(instanceUrl: string): boolean {
+  try {
+    const url = new URL(instanceUrl);
+    return (
+      (url.protocol === "https:" || url.protocol === "http:") &&
+      Boolean(url.hostname) &&
+      !url.username &&
+      !url.password &&
+      !url.search &&
+      !url.hash
+    );
+  } catch {
+    return false;
+  }
+}
+
+function isLoopbackHttp(instanceUrl: string): boolean {
+  const url = new URL(instanceUrl);
+  if (url.protocol !== "http:") return false;
+  const host = url.hostname.replace(/^\[|\]$/g, "").toLowerCase();
+  if (host === "localhost" || host === "::1") return true;
+  const octets = host.split(".").map(Number);
+  return octets.length === 4 && octets.every((part) => Number.isInteger(part) && part >= 0 && part <= 255) && octets[0] === 127;
+}
+
+/** Plaintext HTTP to a non-loopback host sends the access token unencrypted; the user must opt in. */
+export function requiresInsecureHttpConfirmation(instanceUrl: string): boolean {
+  try {
+    const normalized = normalizeInstanceUrl(instanceUrl.trim());
+    return new URL(normalized).protocol === "http:" && !isLoopbackHttp(normalized);
+  } catch {
+    return false;
+  }
+}
+
+function buildUrl(instanceUrl: string, path: string): string {
+  return `${normalizeInstanceUrl(instanceUrl)}${path}`;
+}
+
+function currentProtocol(deps: InstanceFetchDeps): string {
+  if (deps.pageProtocol) return deps.pageProtocol;
+  return typeof self !== "undefined" && "location" in self ? self.location.protocol : "https:";
+}
+
+async function isReachable(instanceUrl: string, deps: InstanceFetchDeps): Promise<boolean> {
+  const fetchImpl = deps.fetchImpl ?? fetch;
+  try {
+    await fetchImpl(buildUrl(instanceUrl, "/api/v1/instance/profile"), {
+      method: "GET",
+      mode: "no-cors",
+      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+type RequestOptions = { method: "GET" | "POST"; body?: unknown };
+
+async function instanceFetchJson(
+  creds: MemosCredentials,
+  path: string,
+  options: RequestOptions,
+  deps: InstanceFetchDeps = {},
+): Promise<unknown> {
+  if (currentProtocol(deps) === "https:" && creds.instanceUrl.startsWith("http:")) {
+    throw new InstanceError("mixed-content");
+  }
+  const fetchImpl = deps.fetchImpl ?? fetch;
+  let response: Response;
+  try {
+    response = await fetchImpl(buildUrl(creds.instanceUrl, path), {
+      method: options.method,
+      headers: {
+        Authorization: `Bearer ${creds.accessToken}`,
+        Accept: "application/json",
+        ...(options.body !== undefined ? { "Content-Type": "application/json" } : {}),
+      },
+      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+      signal: AbortSignal.timeout(deps.timeoutMs ?? INSTANCE_REQUEST_TIMEOUT_MS),
+      redirect: "manual",
+    });
+  } catch (error) {
+    const name = typeof error === "object" && error !== null && "name" in error ? (error as { name?: unknown }).name : undefined;
+    if (name === "TimeoutError" || name === "AbortError") throw new InstanceError("timeout");
+    const errorName = typeof error === "object" && error !== null && "name" in error ? String(error.name) : "Error";
+    console.error("[memos-web-clipper] fetch threw", { path, method: options.method, errorName });
+    throw new InstanceError((await isReachable(creds.instanceUrl, deps)) ? "cors" : "unreachable");
+  }
+
+  if (!response.ok || response.type === "opaqueredirect" || response.status === 0) {
+    console.error("[memos-web-clipper] request not ok", {
+      path,
+      method: options.method,
+      status: response.status,
+      type: response.type,
+    });
+    if (response.status === 401 || response.status === 403) throw new InstanceError("unauthorized");
+    if (response.status === 404) throw new InstanceError("not-found");
+    if (response.status === 400 || response.status === 413) {
+      const errorBody = (await response.json().catch(() => null)) as { message?: unknown } | null;
+      const message = typeof errorBody?.message === "string" ? errorBody.message.slice(0, 1024) : "";
+      if (response.status === 413 || /content.*(length|size|limit|exceed)/i.test(message))
+        throw new InstanceError("content-too-large", message);
+      throw new InstanceError("invalid-content", message);
+    }
+    throw new InstanceError("bad-response");
+  }
+  const text = await response.text();
+  if (!text) return null; // some endpoints (e.g. SetMemoAttachments) return an empty body
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    console.error("[memos-web-clipper] JSON parse failed", { path, method: options.method, error: String(e) });
+    throw new InstanceError("bad-response");
+  }
+}
+
+export type InstanceProfile = { version: string; webClipperSupported?: boolean; memoContentMaxBytes?: number };
+export type CurrentMemosUser = { name: string; displayName?: string; username?: string };
+
+/** Human-readable name for a Memos user, falling back to the id in the `users/<id>` resource name. */
+export function memosUserDisplayName(user: CurrentMemosUser): string {
+  return user.displayName || user.username || user.name.replace(/^users\//, "");
+}
+
+function badResponse(): never {
+  throw new InstanceError("bad-response");
+}
+
+/** Reads the instance version from `/api/v1/instance/profile` (used to gate on version at connect). */
+export async function getInstanceProfile(creds: MemosCredentials, deps?: InstanceFetchDeps): Promise<InstanceProfile> {
+  const raw = await instanceFetchJson(creds, "/api/v1/instance/profile", { method: "GET" }, deps);
+  if (typeof raw !== "object" || raw === null || !("version" in raw) || typeof (raw as { version?: unknown }).version !== "string") {
+    return badResponse();
+  }
+  const version = (raw as { version: string }).version.trim();
+  if (!version) return badResponse();
+  const profile = raw as Record<string, unknown>;
+  return {
+    version,
+    ...(profile.webClipperSupported === true ? { webClipperSupported: true } : {}),
+    ...(typeof profile.memoContentMaxBytes === "number" &&
+    Number.isSafeInteger(profile.memoContentMaxBytes) &&
+    profile.memoContentMaxBytes > 0
+      ? { memoContentMaxBytes: profile.memoContentMaxBytes }
+      : {}),
+  };
+}
+
+/** Validates the access token and returns the authenticated Memos resource identity. */
+export async function getCurrentUser(creds: MemosCredentials, deps?: InstanceFetchDeps): Promise<CurrentMemosUser> {
+  const raw = await instanceFetchJson(creds, "/api/v1/auth/me", { method: "GET" }, deps);
+  if (typeof raw !== "object" || raw === null || typeof (raw as { user?: unknown }).user !== "object") return badResponse();
+  const user = (raw as { user: Record<string, unknown> }).user;
+  if (typeof user.name !== "string" || !user.name.trim()) return badResponse();
+  return {
+    name: user.name,
+    ...(typeof user.displayName === "string" && user.displayName.trim() ? { displayName: user.displayName } : {}),
+    ...(typeof user.username === "string" && user.username.trim() ? { username: user.username } : {}),
+  };
+}
+
+export type CreatedMemo = { name: string; uid?: string };
+
+export async function createMemo(
+  creds: MemosCredentials,
+  input: { content: string; visibility: Visibility; memoId?: string; attachments?: Array<{ name: string }>; capture?: CaptureData },
+  deps?: InstanceFetchDeps,
+): Promise<CreatedMemo> {
+  const { memoId, ...body } = input;
+  const path = memoId ? `/api/v1/memos?memoId=${encodeURIComponent(memoId)}` : "/api/v1/memos";
+  const raw = await instanceFetchJson(creds, path, { method: "POST", body }, deps);
+  if (typeof raw !== "object" || raw === null) return badResponse();
+  const obj = raw as Record<string, unknown>;
+  if (typeof obj.name !== "string" || !obj.name.trim()) return badResponse();
+  return { name: obj.name, uid: typeof obj.uid === "string" && obj.uid ? obj.uid : undefined };
+}
+
+export type MemoSummary = CreatedMemo & {
+  creator: string;
+  content: string;
+  visibility: Visibility;
+  createTime: string;
+  state?: "NORMAL" | "ARCHIVED";
+  capture?: CaptureData;
+  attachments?: Array<{ name: string }>;
+};
+
+function parseMemo(value: unknown): MemoSummary {
+  if (!value || typeof value !== "object") return badResponse();
+  const memo = value as Record<string, unknown>;
+  if (
+    typeof memo.name !== "string" ||
+    !memo.name ||
+    typeof memo.creator !== "string" ||
+    !memo.creator ||
+    (memo.content !== undefined && typeof memo.content !== "string") ||
+    !CLIPPER_VISIBILITIES.has(String(memo.visibility)) ||
+    typeof memo.createTime !== "string" ||
+    !Number.isFinite(Date.parse(memo.createTime))
+  )
+    return badResponse();
+  const capture = memo.capture === undefined ? undefined : parseCaptureData(memo.capture);
+  if (memo.capture !== undefined && !capture) return badResponse();
+  if (
+    memo.attachments !== undefined &&
+    (!Array.isArray(memo.attachments) ||
+      !memo.attachments.every((attachment) => attachment && typeof attachment === "object" && typeof attachment.name === "string"))
+  )
+    return badResponse();
+  return {
+    name: memo.name,
+    creator: memo.creator,
+    content: String(memo.content ?? ""),
+    visibility: memo.visibility as Visibility,
+    createTime: memo.createTime,
+    ...(typeof memo.uid === "string" && memo.uid ? { uid: memo.uid } : {}),
+    ...(memo.state === "NORMAL" || memo.state === "ARCHIVED" ? { state: memo.state } : {}),
+    ...(capture ? { capture } : {}),
+    ...(Array.isArray(memo.attachments) ? { attachments: memo.attachments.map((attachment) => ({ name: String(attachment.name) })) } : {}),
+  };
+}
+
+/** Retrieves an exact resource for retry reconciliation, including archived records. */
+export async function getMemo(creds: MemosCredentials, memoId: string, deps?: InstanceFetchDeps): Promise<MemoSummary | null> {
+  try {
+    return parseMemo(await instanceFetchJson(creds, `/api/v1/memos/${encodeURIComponent(memoId)}`, { method: "GET" }, deps));
+  } catch (error) {
+    if (error instanceof InstanceError && error.kind === "not-found") return null;
+    throw error;
+  }
+}
+
+/** Server capture history is scoped to the authenticated owner and personal space. */
+export async function listCapturedMemos(
+  creds: MemosCredentials,
+  options: { state: "NORMAL" | "ARCHIVED"; sourceUrl?: string; kind?: CaptureKind; firstOnly?: boolean },
+  deps?: InstanceFetchDeps,
+): Promise<MemoSummary[]> {
+  const terms = ["has_capture == true"];
+  if (options.sourceUrl) terms.push(`capture_source_url == ${JSON.stringify(options.sourceUrl)}`);
+  if (options.kind) terms.push(`capture_kind == ${JSON.stringify(options.kind)}`);
+  const params = new URLSearchParams({
+    pageSize: options.firstOnly ? "1" : "100",
+    orderBy: "create_time desc",
+    state: options.state,
+    filter: terms.join(" && "),
+  });
+  const memos: MemoSummary[] = [];
+  const seenTokens = new Set<string>();
+  for (;;) {
+    const raw = await instanceFetchJson(creds, `/api/v1/memos?${params}`, { method: "GET" }, deps);
+    if (!raw || typeof raw !== "object") return badResponse();
+    const page = raw as { memos?: unknown; nextPageToken?: unknown };
+    if (page.memos !== undefined && !Array.isArray(page.memos)) return badResponse();
+    for (const value of (page.memos ?? []) as unknown[]) {
+      const memo = parseMemo(value);
+      if (!memo.capture) return badResponse();
+      memos.push(memo);
+    }
+    if (!page.nextPageToken || options.firstOnly) break;
+    if (typeof page.nextPageToken !== "string" || seenTokens.has(page.nextPageToken)) return badResponse();
+    seenTokens.add(page.nextPageToken);
+    params.set("pageToken", page.nextPageToken);
+  }
+  return memos;
+}
+
+const CLIPPER_VISIBILITIES = new Set<string>(["PRIVATE", "PROTECTED", "PUBLIC"]);
+
+/**
+ * Newest memos used to reconcile a POST whose response may have been lost. Memos with a
+ * visibility the clipper never creates (e.g. `SPACE`, added in Memos 0.31) cannot be a lost
+ * clip, so they are skipped rather than failing the whole list.
+ */
+export async function listRecentMemos(
+  creds: MemosCredentials,
+  pageSize = 20,
+  creator?: string,
+  deps?: InstanceFetchDeps,
+): Promise<MemoSummary[]> {
+  const params = new URLSearchParams({ pageSize: String(pageSize), orderBy: "create_time desc" });
+  const raw = await instanceFetchJson(creds, `/api/v1/memos?${params}`, { method: "GET" }, deps);
+  if (typeof raw !== "object" || raw === null || !Array.isArray((raw as { memos?: unknown }).memos)) return badResponse();
+
+  return (raw as { memos: unknown[] }).memos
+    .flatMap((value): MemoSummary[] => {
+      if (typeof value !== "object" || value === null) return badResponse();
+      const memo = value as Record<string, unknown>;
+      if (
+        typeof memo.name !== "string" ||
+        !memo.name ||
+        typeof memo.creator !== "string" ||
+        !memo.creator ||
+        typeof memo.content !== "string" ||
+        typeof memo.visibility !== "string" ||
+        typeof memo.createTime !== "string" ||
+        !Number.isFinite(Date.parse(memo.createTime))
+      ) {
+        return badResponse();
+      }
+      if (!CLIPPER_VISIBILITIES.has(memo.visibility)) return [];
+      return [
+        {
+          name: memo.name,
+          uid: typeof memo.uid === "string" && memo.uid ? memo.uid : undefined,
+          creator: memo.creator,
+          content: memo.content,
+          visibility: memo.visibility as Visibility,
+          createTime: memo.createTime,
+        },
+      ];
+    })
+    .filter((memo) => !creator || memo.creator === creator);
+}
+
+export type CreatedAttachment = { name: string };
+
+/** Uploads bytes as a Memos attachment. `content` is base64-encoded (the API's bytes format). */
+export async function createAttachment(
+  creds: MemosCredentials,
+  input: { filename: string; type: string; content: string },
+  deps?: InstanceFetchDeps,
+): Promise<CreatedAttachment> {
+  const raw = await instanceFetchJson(creds, "/api/v1/attachments", { method: "POST", body: input }, deps);
+  if (typeof raw !== "object" || raw === null) return badResponse();
+  const obj = raw as Record<string, unknown>;
+  if (typeof obj.name !== "string" || !obj.name.trim()) return badResponse();
+  return { name: obj.name };
+}
+
+export function memoWebUrl(instanceUrl: string, memo: CreatedMemo): string {
+  const base = normalizeInstanceUrl(instanceUrl);
+  // Modern Memos routes memo detail at /memos/{uid}; `name` is "memos/{uid}", so its id is the uid.
+  const id = memo.uid || memo.name.split("/").pop();
+  return id ? `${base}/memos/${id}` : base;
+}

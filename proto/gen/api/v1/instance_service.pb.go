@@ -219,9 +219,13 @@ type InstanceProfile struct {
 	// setup (creating the first admin account). Unlike a null admin, this stays
 	// false once any user exists, so an instance that has lost its admins is not
 	// mistaken for a fresh install.
-	NeedsSetup    bool `protobuf:"varint,9,opt,name=needs_setup,json=needsSetup,proto3" json:"needs_setup,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	NeedsSetup bool `protobuf:"varint,9,opt,name=needs_setup,json=needsSetup,proto3" json:"needs_setup,omitempty"`
+	// Supports structured web captures and owner-scoped capture history filters.
+	WebClipperSupported bool `protobuf:"varint,10,opt,name=web_clipper_supported,json=webClipperSupported,proto3" json:"web_clipper_supported,omitempty"`
+	// Maximum UTF-8 bytes accepted in a memo body, including Markdown formatting.
+	MemoContentMaxBytes int32 `protobuf:"varint,11,opt,name=memo_content_max_bytes,json=memoContentMaxBytes,proto3" json:"memo_content_max_bytes,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *InstanceProfile) Reset() {
@@ -294,6 +298,20 @@ func (x *InstanceProfile) GetNeedsSetup() bool {
 		return x.NeedsSetup
 	}
 	return false
+}
+
+func (x *InstanceProfile) GetWebClipperSupported() bool {
+	if x != nil {
+		return x.WebClipperSupported
+	}
+	return false
+}
+
+func (x *InstanceProfile) GetMemoContentMaxBytes() int32 {
+	if x != nil {
+		return x.MemoContentMaxBytes
+	}
+	return 0
 }
 
 // Request for instance profile.
@@ -2311,7 +2329,7 @@ var File_api_v1_instance_service_proto protoreflect.FileDescriptor
 
 const file_api_v1_instance_service_proto_rawDesc = "" +
 	"\n" +
-	"\x1dapi/v1/instance_service.proto\x12\fmemos.api.v1\x1a\x19api/v1/user_service.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x17google/type/color.proto\"\xc5\x01\n" +
+	"\x1dapi/v1/instance_service.proto\x12\fmemos.api.v1\x1a\x19api/v1/user_service.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/api/client.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x19google/api/resource.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x17google/type/color.proto\"\xae\x02\n" +
 	"\x0fInstanceProfile\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\tR\aversion\x12\x12\n" +
 	"\x04demo\x18\x03 \x01(\bR\x04demo\x12!\n" +
@@ -2319,7 +2337,10 @@ const file_api_v1_instance_service_proto_rawDesc = "" +
 	"\x05admin\x18\a \x01(\v2\x12.memos.api.v1.UserR\x05admin\x12\x16\n" +
 	"\x06commit\x18\b \x01(\tR\x06commit\x12\x1f\n" +
 	"\vneeds_setup\x18\t \x01(\bR\n" +
-	"needsSetup\"\x1b\n" +
+	"needsSetup\x122\n" +
+	"\x15web_clipper_supported\x18\n" +
+	" \x01(\bR\x13webClipperSupported\x123\n" +
+	"\x16memo_content_max_bytes\x18\v \x01(\x05R\x13memoContentMaxBytes\"\x1b\n" +
 	"\x19GetInstanceProfileRequest\"\x86\x1c\n" +
 	"\x0fInstanceSetting\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12W\n" +

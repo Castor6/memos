@@ -27,7 +27,9 @@ type MemoPayload struct {
 	Location *MemoPayload_Location  `protobuf:"bytes,2,opt,name=location,proto3" json:"location,omitempty"`
 	Tags     []string               `protobuf:"bytes,3,rep,name=tags,proto3" json:"tags,omitempty"`
 	// Explicit tags must not be overwritten by Markdown extraction.
-	ExplicitTags  bool `protobuf:"varint,6,opt,name=explicit_tags,json=explicitTags,proto3" json:"explicit_tags,omitempty"`
+	ExplicitTags bool `protobuf:"varint,6,opt,name=explicit_tags,json=explicitTags,proto3" json:"explicit_tags,omitempty"`
+	// Immutable source snapshot from the personal web clipper.
+	Capture       *MemoCapture `protobuf:"bytes,7,opt,name=capture,proto3" json:"capture,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -90,6 +92,105 @@ func (x *MemoPayload) GetExplicitTags() bool {
 	return false
 }
 
+func (x *MemoPayload) GetCapture() *MemoCapture {
+	if x != nil {
+		return x.Capture
+	}
+	return nil
+}
+
+type MemoCapture struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Kind          string                 `protobuf:"bytes,1,opt,name=kind,proto3" json:"kind,omitempty"`
+	Platform      string                 `protobuf:"bytes,2,opt,name=platform,proto3" json:"platform,omitempty"`
+	SourceUrl     string                 `protobuf:"bytes,3,opt,name=source_url,json=sourceUrl,proto3" json:"source_url,omitempty"`
+	SourceId      string                 `protobuf:"bytes,4,opt,name=source_id,json=sourceId,proto3" json:"source_id,omitempty"`
+	Comment       string                 `protobuf:"bytes,5,opt,name=comment,proto3" json:"comment,omitempty"`
+	Context       string                 `protobuf:"bytes,6,opt,name=context,proto3" json:"context,omitempty"`
+	Posts         []*MemoCapture_Post    `protobuf:"bytes,7,rep,name=posts,proto3" json:"posts,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MemoCapture) Reset() {
+	*x = MemoCapture{}
+	mi := &file_store_memo_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MemoCapture) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MemoCapture) ProtoMessage() {}
+
+func (x *MemoCapture) ProtoReflect() protoreflect.Message {
+	mi := &file_store_memo_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MemoCapture.ProtoReflect.Descriptor instead.
+func (*MemoCapture) Descriptor() ([]byte, []int) {
+	return file_store_memo_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *MemoCapture) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *MemoCapture) GetPlatform() string {
+	if x != nil {
+		return x.Platform
+	}
+	return ""
+}
+
+func (x *MemoCapture) GetSourceUrl() string {
+	if x != nil {
+		return x.SourceUrl
+	}
+	return ""
+}
+
+func (x *MemoCapture) GetSourceId() string {
+	if x != nil {
+		return x.SourceId
+	}
+	return ""
+}
+
+func (x *MemoCapture) GetComment() string {
+	if x != nil {
+		return x.Comment
+	}
+	return ""
+}
+
+func (x *MemoCapture) GetContext() string {
+	if x != nil {
+		return x.Context
+	}
+	return ""
+}
+
+func (x *MemoCapture) GetPosts() []*MemoCapture_Post {
+	if x != nil {
+		return x.Posts
+	}
+	return nil
+}
+
 // The calculated properties from the memo content.
 type MemoPayload_Property struct {
 	state              protoimpl.MessageState `protogen:"open.v1"`
@@ -105,7 +206,7 @@ type MemoPayload_Property struct {
 
 func (x *MemoPayload_Property) Reset() {
 	*x = MemoPayload_Property{}
-	mi := &file_store_memo_proto_msgTypes[1]
+	mi := &file_store_memo_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -117,7 +218,7 @@ func (x *MemoPayload_Property) String() string {
 func (*MemoPayload_Property) ProtoMessage() {}
 
 func (x *MemoPayload_Property) ProtoReflect() protoreflect.Message {
-	mi := &file_store_memo_proto_msgTypes[1]
+	mi := &file_store_memo_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -179,7 +280,7 @@ type MemoPayload_Location struct {
 
 func (x *MemoPayload_Location) Reset() {
 	*x = MemoPayload_Location{}
-	mi := &file_store_memo_proto_msgTypes[2]
+	mi := &file_store_memo_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -191,7 +292,7 @@ func (x *MemoPayload_Location) String() string {
 func (*MemoPayload_Location) ProtoMessage() {}
 
 func (x *MemoPayload_Location) ProtoReflect() protoreflect.Message {
-	mi := &file_store_memo_proto_msgTypes[2]
+	mi := &file_store_memo_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -228,16 +329,109 @@ func (x *MemoPayload_Location) GetLongitude() float64 {
 	return 0
 }
 
+type MemoCapture_Post struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Url           string                 `protobuf:"bytes,2,opt,name=url,proto3" json:"url,omitempty"`
+	Author        string                 `protobuf:"bytes,3,opt,name=author,proto3" json:"author,omitempty"`
+	AuthorName    string                 `protobuf:"bytes,4,opt,name=author_name,json=authorName,proto3" json:"author_name,omitempty"`
+	Content       string                 `protobuf:"bytes,5,opt,name=content,proto3" json:"content,omitempty"`
+	PublishedAt   string                 `protobuf:"bytes,6,opt,name=published_at,json=publishedAt,proto3" json:"published_at,omitempty"`
+	Images        []string               `protobuf:"bytes,7,rep,name=images,proto3" json:"images,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MemoCapture_Post) Reset() {
+	*x = MemoCapture_Post{}
+	mi := &file_store_memo_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MemoCapture_Post) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MemoCapture_Post) ProtoMessage() {}
+
+func (x *MemoCapture_Post) ProtoReflect() protoreflect.Message {
+	mi := &file_store_memo_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MemoCapture_Post.ProtoReflect.Descriptor instead.
+func (*MemoCapture_Post) Descriptor() ([]byte, []int) {
+	return file_store_memo_proto_rawDescGZIP(), []int{1, 0}
+}
+
+func (x *MemoCapture_Post) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *MemoCapture_Post) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
+func (x *MemoCapture_Post) GetAuthor() string {
+	if x != nil {
+		return x.Author
+	}
+	return ""
+}
+
+func (x *MemoCapture_Post) GetAuthorName() string {
+	if x != nil {
+		return x.AuthorName
+	}
+	return ""
+}
+
+func (x *MemoCapture_Post) GetContent() string {
+	if x != nil {
+		return x.Content
+	}
+	return ""
+}
+
+func (x *MemoCapture_Post) GetPublishedAt() string {
+	if x != nil {
+		return x.PublishedAt
+	}
+	return ""
+}
+
+func (x *MemoCapture_Post) GetImages() []string {
+	if x != nil {
+		return x.Images
+	}
+	return nil
+}
+
 var File_store_memo_proto protoreflect.FileDescriptor
 
 const file_store_memo_proto_rawDesc = "" +
 	"\n" +
-	"\x10store/memo.proto\x12\vmemos.store\"\xf7\x03\n" +
+	"\x10store/memo.proto\x12\vmemos.store\"\xab\x04\n" +
 	"\vMemoPayload\x12=\n" +
 	"\bproperty\x18\x01 \x01(\v2!.memos.store.MemoPayload.PropertyR\bproperty\x12=\n" +
 	"\blocation\x18\x02 \x01(\v2!.memos.store.MemoPayload.LocationR\blocation\x12\x12\n" +
 	"\x04tags\x18\x03 \x03(\tR\x04tags\x12#\n" +
-	"\rexplicit_tags\x18\x06 \x01(\bR\fexplicitTags\x1a\xac\x01\n" +
+	"\rexplicit_tags\x18\x06 \x01(\bR\fexplicitTags\x122\n" +
+	"\acapture\x18\a \x01(\v2\x18.memos.store.MemoCaptureR\acapture\x1a\xac\x01\n" +
 	"\bProperty\x12\x19\n" +
 	"\bhas_link\x18\x01 \x01(\bR\ahasLink\x12\"\n" +
 	"\rhas_task_list\x18\x02 \x01(\bR\vhasTaskList\x12\x19\n" +
@@ -247,7 +441,25 @@ const file_store_memo_proto_rawDesc = "" +
 	"\bLocation\x12 \n" +
 	"\vplaceholder\x18\x01 \x01(\tR\vplaceholder\x12\x1a\n" +
 	"\blatitude\x18\x02 \x01(\x01R\blatitude\x12\x1c\n" +
-	"\tlongitude\x18\x03 \x01(\x01R\tlongitudeJ\x04\b\x04\x10\x05J\x04\b\x05\x10\x06R\x05spaceR\ais_todoB\x94\x01\n" +
+	"\tlongitude\x18\x03 \x01(\x01R\tlongitudeJ\x04\b\x04\x10\x05J\x04\b\x05\x10\x06R\x05spaceR\ais_todo\"\x9b\x03\n" +
+	"\vMemoCapture\x12\x12\n" +
+	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x1a\n" +
+	"\bplatform\x18\x02 \x01(\tR\bplatform\x12\x1d\n" +
+	"\n" +
+	"source_url\x18\x03 \x01(\tR\tsourceUrl\x12\x1b\n" +
+	"\tsource_id\x18\x04 \x01(\tR\bsourceId\x12\x18\n" +
+	"\acomment\x18\x05 \x01(\tR\acomment\x12\x18\n" +
+	"\acontext\x18\x06 \x01(\tR\acontext\x123\n" +
+	"\x05posts\x18\a \x03(\v2\x1d.memos.store.MemoCapture.PostR\x05posts\x1a\xb6\x01\n" +
+	"\x04Post\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x10\n" +
+	"\x03url\x18\x02 \x01(\tR\x03url\x12\x16\n" +
+	"\x06author\x18\x03 \x01(\tR\x06author\x12\x1f\n" +
+	"\vauthor_name\x18\x04 \x01(\tR\n" +
+	"authorName\x12\x18\n" +
+	"\acontent\x18\x05 \x01(\tR\acontent\x12!\n" +
+	"\fpublished_at\x18\x06 \x01(\tR\vpublishedAt\x12\x16\n" +
+	"\x06images\x18\a \x03(\tR\x06imagesB\x94\x01\n" +
 	"\x0fcom.memos.storeB\tMemoProtoP\x01Z)github.com/usememos/memos/proto/gen/store\xa2\x02\x03MSX\xaa\x02\vMemos.Store\xca\x02\vMemos\\Store\xe2\x02\x17Memos\\Store\\GPBMetadata\xea\x02\fMemos::Storeb\x06proto3"
 
 var (
@@ -262,20 +474,24 @@ func file_store_memo_proto_rawDescGZIP() []byte {
 	return file_store_memo_proto_rawDescData
 }
 
-var file_store_memo_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_store_memo_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_store_memo_proto_goTypes = []any{
 	(*MemoPayload)(nil),          // 0: memos.store.MemoPayload
-	(*MemoPayload_Property)(nil), // 1: memos.store.MemoPayload.Property
-	(*MemoPayload_Location)(nil), // 2: memos.store.MemoPayload.Location
+	(*MemoCapture)(nil),          // 1: memos.store.MemoCapture
+	(*MemoPayload_Property)(nil), // 2: memos.store.MemoPayload.Property
+	(*MemoPayload_Location)(nil), // 3: memos.store.MemoPayload.Location
+	(*MemoCapture_Post)(nil),     // 4: memos.store.MemoCapture.Post
 }
 var file_store_memo_proto_depIdxs = []int32{
-	1, // 0: memos.store.MemoPayload.property:type_name -> memos.store.MemoPayload.Property
-	2, // 1: memos.store.MemoPayload.location:type_name -> memos.store.MemoPayload.Location
-	2, // [2:2] is the sub-list for method output_type
-	2, // [2:2] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	2, // 0: memos.store.MemoPayload.property:type_name -> memos.store.MemoPayload.Property
+	3, // 1: memos.store.MemoPayload.location:type_name -> memos.store.MemoPayload.Location
+	1, // 2: memos.store.MemoPayload.capture:type_name -> memos.store.MemoCapture
+	4, // 3: memos.store.MemoCapture.posts:type_name -> memos.store.MemoCapture.Post
+	4, // [4:4] is the sub-list for method output_type
+	4, // [4:4] is the sub-list for method input_type
+	4, // [4:4] is the sub-list for extension type_name
+	4, // [4:4] is the sub-list for extension extendee
+	0, // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_store_memo_proto_init() }
@@ -289,7 +505,7 @@ func file_store_memo_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_store_memo_proto_rawDesc), len(file_store_memo_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   3,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

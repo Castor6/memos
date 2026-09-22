@@ -77,11 +77,38 @@ jobs:
         id: version
         run: |
           node --input-type=module <<'JS'
-          import {readFileSync, appendFileSync} from 'node:fs';
+          import {readFileSync, appendFileSync, existsSync} from 'node:fs';
           const {version} = JSON.parse(readFileSync('package.json', 'utf8'));
           if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version) || version === '0.0.0') throw Error('Invalid release version');
           appendFileSync(process.env.GITHUB_OUTPUT, `version=${version}\n`);
+          // Old version PRs keep their original assets when retried from this workflow.
+          appendFileSync(process.env.GITHUB_OUTPUT, `web_clipper=${existsSync('extensions/web-clipper/scripts/package-release.py')}\n`);
           JS
+      - uses: pnpm/action-setup@v4.2.0
+        if: steps.version.outputs.web_clipper == 'true'
+        with:
+          version: 11.10.0
+          package_json_file: extensions/web-clipper/package.json
+      - name: Check and build the web clipper
+        if: steps.version.outputs.web_clipper == 'true'
+        working-directory: extensions/web-clipper
+        run: |
+          cp .env.example .env
+          pnpm install --frozen-lockfile
+          pnpm lint
+          pnpm test
+          python3 -m unittest discover -s scripts -p 'test_package*.py'
+          pnpm build
+      - name: Package the versioned Chromium extension
+        if: steps.version.outputs.web_clipper == 'true'
+        run: python3 extensions/web-clipper/scripts/package-release.py --output build/candidate
+      - uses: pnpm/action-setup@v4.2.0
+        if: steps.version.outputs.web_clipper == 'true'
+        with:
+          version: 11.0.1
+          package_json_file: package.json
+      # Embedding the main frontend modifies a tracked placeholder, so package the
+      # extension from the clean source tree before running the main web release.
       - working-directory: web
         run: |
           pnpm install --frozen-lockfile
@@ -91,6 +118,7 @@ jobs:
       - name: Build versioned Linux candidates
         env:
           RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          WEB_CLIPPER: ${{ steps.version.outputs.web_clipper }}
           CGO_ENABLED: "0"
           GOOS: linux
         run: |
@@ -104,9 +132,16 @@ jobs:
           node --input-type=module <<'JS'
           import {writeFileSync} from 'node:fs';
           const version = process.env.RELEASE_VERSION;
-          writeFileSync('build/candidate/release.json', JSON.stringify({version, tag: `castor-v${version}`, commit: process.env.RELEASE_COMMIT}, null, 2) + '\n');
+          const release = {version, tag: `castor-v${version}`, commit: process.env.RELEASE_COMMIT};
+          if (process.env.WEB_CLIPPER === 'true') {
+            release.webClipper = {version, file: `memos-web-clipper-chromium-v${version}.zip`};
+          }
+          writeFileSync('build/candidate/release.json', JSON.stringify(release, null, 2) + '\n');
           JS
           (cd build/candidate && sha256sum memos-linux-* release.json CHANGELOG.md LICENSE > SHA256SUMS)
+          if [ "$WEB_CLIPPER" = 'true' ]; then
+            (cd build/candidate && sha256sum "memos-web-clipper-chromium-v$RELEASE_VERSION.zip" >> SHA256SUMS)
+          fi
       - name: Test and publish immutable image, then advance stable
         env:
           ACR_REGISTRY: ${{ vars.ACR_REGISTRY }}

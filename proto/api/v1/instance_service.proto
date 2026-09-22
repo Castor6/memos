@@ -107,6 +107,12 @@ message InstanceProfile {
   // false once any user exists, so an instance that has lost its admins is not
   // mistaken for a fresh install.
   bool needs_setup = 9;
+
+  // Supports structured web captures and owner-scoped capture history filters.
+  bool web_clipper_supported = 10;
+
+  // Maximum UTF-8 bytes accepted in a memo body, including Markdown formatting.
+  int32 memo_content_max_bytes = 11;
 }
 
 // Request for instance profile.

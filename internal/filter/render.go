@@ -133,7 +133,7 @@ func (r *renderer) renderFieldPredicate(cond *FieldPredicateCondition) (renderRe
 
 	switch field.Kind {
 	case FieldKindBoolColumn:
-		column := qualifyColumn(r.dialect, field.Column)
+		column := field.columnExpr(r.dialect)
 		return renderResult{
 			sql: fmt.Sprintf("%s IS TRUE", column),
 		}, nil
@@ -348,7 +348,7 @@ func (r *renderer) renderBoolColumnComparison(field Field, op ComparisonOperator
 		return renderResult{}, err
 	}
 	placeholder := r.addBoolArg(value)
-	column := qualifyColumn(r.dialect, field.Column)
+	column := field.columnExpr(r.dialect)
 	return renderResult{
 		sql: fmt.Sprintf("%s %s %s", column, sqlOperator(op), placeholder),
 	}, nil

@@ -52,6 +52,15 @@ func (s *APIV1Service) convertMemoFromStoreWithCreators(ctx context.Context, mem
 		memoMessage.ExplicitTags = memo.Payload.ExplicitTags
 		memoMessage.Property = convertMemoPropertyFromStore(memo.Payload.Property)
 		memoMessage.Location = convertLocationFromStore(memo.Payload.Location)
+		if memo.Payload.Capture != nil {
+			user, err := s.fetchCurrentUser(ctx)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to get capture owner")
+			}
+			if user != nil && user.ID == memo.CreatorID {
+				memoMessage.Capture = convertMemoCaptureFromStore(memo.Payload.Capture)
+			}
+		}
 	}
 
 	for _, url := range linkmetadata.URLs(memo.Content) {

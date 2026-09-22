@@ -292,6 +292,9 @@ message Memo {
   // Persisted link previews, available without fetching the source page again.
   repeated LinkMetadata link_metadata = 22 [(google.api.field_behavior) = OUTPUT_ONLY];
 
+  // Optional. Immutable web capture snapshot, returned only to the creator.
+  MemoCapture capture = 23 [(google.api.field_behavior) = OPTIONAL];
+
   // Computed properties of a memo.
   message Property {
     bool has_link = 1;
@@ -332,6 +335,7 @@ message ListMemosRequest {
   // The service may return fewer than this value.
   // If unspecified, at most 50 memos will be returned.
   // The maximum value is 1000; values above 1000 will be coerced to 1000.
+  // Requests using capture filters are limited to 100 memos per page.
   int32 page_size = 1 [(google.api.field_behavior) = OPTIONAL];
 
   // Optional. A page token, received from a previous `ListMemos` call.
@@ -358,6 +362,8 @@ message ListMemosRequest {
   //   visibility (string: PRIVATE | PROTECTED | PUBLIC),
   //   tags (list<string>; match with `"work" in tags`, not `tag == "work"`),
   //   has_task_list / has_link / has_code / has_incomplete_tasks (bool).
+  //   has_capture (bool), capture_source_id / capture_source_url / capture_kind (string).
+  // Capture filters are restricted to the authenticated user's own memos.
   // Note: the time fields here are created_ts / updated_ts, which differ from
   // the create_time / update_time names used by order_by.
   // Examples:
@@ -696,4 +702,34 @@ message ExportSharedMemoPdfRequest {
 
 message ExportMemoPdfResponse {
   bytes content = 1;
+}
+
+// Structured source material and personal observations saved by the web clipper.
+message MemoCapture {
+  // STAR or PICK_UP.
+  string kind = 1;
+  // WEB for generic pages, or X for posts. PICK_UP requires X.
+  string platform = 2;
+  // HTTP(S) page URL; X captures require a canonical HTTPS status URL without query or fragment.
+  string source_url = 3;
+  string source_id = 4;
+  // The user's thoughts, or the exact selected source post text for PICK_UP.
+  string comment = 5;
+  // Optional background supplied when saving.
+  string context = 6;
+  // Source posts in reading order, including the selected post for PICK_UP.
+  // Generic web pages use the memo content and may leave this empty.
+  // PICK_UP requires its selected post URL and author handle to identify the source.
+  repeated Post posts = 7;
+
+  message Post {
+    string id = 1;
+    string url = 2;
+    string author = 3;
+    string author_name = 4;
+    string content = 5;
+    // Optional RFC 3339 publication timestamp.
+    string published_at = 6;
+    repeated string images = 7;
+  }
 }

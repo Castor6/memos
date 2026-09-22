@@ -35,8 +35,19 @@ func NewEngine(schema Schema) (*Engine, error) {
 
 // Program stores a compiled filter condition.
 type Program struct {
-	schema    Schema
-	condition Condition
+	schema           Schema
+	condition        Condition
+	referencedFields map[string]bool
+}
+
+// ReferencesField reports whether the filter reads any of the supplied fields.
+func (p *Program) ReferencesField(names ...string) bool {
+	for _, name := range names {
+		if p.referencedFields[name] {
+			return true
+		}
+	}
+	return false
 }
 
 // ConditionTree exposes the underlying condition tree.
@@ -63,10 +74,21 @@ func (e *Engine) Compile(_ context.Context, filter string) (*Program, error) {
 	if err != nil {
 		return nil, err
 	}
+	checked, err := cel.AstToCheckedExpr(ast)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to inspect filter references")
+	}
+	referencedFields := make(map[string]bool)
+	for _, reference := range checked.ReferenceMap {
+		if _, ok := e.schema.Fields[reference.Name]; ok {
+			referencedFields[reference.Name] = true
+		}
+	}
 
 	return &Program{
-		schema:    e.schema,
-		condition: cond,
+		schema:           e.schema,
+		condition:        cond,
+		referencedFields: referencedFields,
 	}, nil
 }
 

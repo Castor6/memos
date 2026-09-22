@@ -57,13 +57,19 @@ func (s *APIV1Service) GetInstanceProfile(ctx context.Context, _ *v1pb.GetInstan
 		return nil, status.Errorf(codes.Internal, "failed to list users: %v", err)
 	}
 
+	contentLengthLimit, err := s.getContentLengthLimit(ctx)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get content length limit")
+	}
 	instanceProfile := &v1pb.InstanceProfile{
-		Version:     s.Profile.Version,
-		Demo:        s.Profile.Demo,
-		InstanceUrl: s.Profile.InstanceURL,
-		Admin:       admin, // for display only; may be nil even on a populated instance
-		Commit:      s.Profile.Commit,
-		NeedsSetup:  len(users) == 0,
+		Version:             s.Profile.Version,
+		Demo:                s.Profile.Demo,
+		InstanceUrl:         s.Profile.InstanceURL,
+		Admin:               admin, // for display only; may be nil even on a populated instance
+		Commit:              s.Profile.Commit,
+		NeedsSetup:          len(users) == 0,
+		WebClipperSupported: true,
+		MemoContentMaxBytes: int32(contentLengthLimit),
 	}
 	return instanceProfile, nil
 }

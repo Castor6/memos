@@ -790,6 +790,7 @@ paths:
                      The service may return fewer than this value.
                      If unspecified, at most 50 memos will be returned.
                      The maximum value is 1000; values above 1000 will be coerced to 1000.
+                     Requests using capture filters are limited to 100 memos per page.
                   schema:
                     type: integer
                     format: int32
@@ -834,6 +835,8 @@ paths:
                        visibility (string: PRIVATE | PROTECTED | PUBLIC),
                        tags (list<string>; match with `"work" in tags`, not `tag == "work"`),
                        has_task_list / has_link / has_code / has_incomplete_tasks (bool).
+                       has_capture (bool), capture_source_id / capture_source_url / capture_kind (string).
+                     Capture filters are restricted to the authenticated user's own memos.
                      Note: the time fields here are created_ts / updated_ts, which differ from
                      the create_time / update_time names used by order_by.
                      Examples:
@@ -3093,6 +3096,13 @@ components:
                          setup (creating the first admin account). Unlike a null admin, this stays
                          false once any user exists, so an instance that has lost its admins is not
                          mistaken for a fresh install.
+                webClipperSupported:
+                    type: boolean
+                    description: Supports structured web captures and owner-scoped capture history filters.
+                memoContentMaxBytes:
+                    type: integer
+                    description: Maximum UTF-8 bytes accepted in a memo body, including Markdown formatting.
+                    format: int32
             description: Instance profile message containing basic instance information.
         InstanceSetting:
             type: object
@@ -3638,6 +3648,58 @@ components:
                     items:
                         $ref: '#/components/schemas/LinkMetadata'
                     description: Persisted link previews, available without fetching the source page again.
+                capture:
+                    allOf:
+                        - $ref: '#/components/schemas/MemoCapture'
+                    description: Optional. Immutable web capture snapshot, returned only to the creator.
+        MemoCapture:
+            type: object
+            properties:
+                kind:
+                    type: string
+                    description: STAR or PICK_UP.
+                platform:
+                    type: string
+                    description: WEB for generic pages, or X for posts. PICK_UP requires X.
+                sourceUrl:
+                    type: string
+                    description: HTTP(S) page URL; X captures require a canonical HTTPS status URL without query or fragment.
+                sourceId:
+                    type: string
+                comment:
+                    type: string
+                    description: The user's thoughts, or the exact selected source post text for PICK_UP.
+                context:
+                    type: string
+                    description: Optional background supplied when saving.
+                posts:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/MemoCapture_Post'
+                    description: |-
+                        Source posts in reading order, including the selected post for PICK_UP.
+                         Generic web pages use the memo content and may leave this empty.
+                         PICK_UP requires its selected post URL and author handle to identify the source.
+            description: Structured source material and personal observations saved by the web clipper.
+        MemoCapture_Post:
+            type: object
+            properties:
+                id:
+                    type: string
+                url:
+                    type: string
+                author:
+                    type: string
+                authorName:
+                    type: string
+                content:
+                    type: string
+                publishedAt:
+                    type: string
+                images:
+                    type: array
+                    items:
+                        type: string
         MemoRelation:
             required:
                 - memo
