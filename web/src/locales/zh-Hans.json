@@ -671,6 +671,9 @@
       "no-tokens-found": "未找到访问令牌"
     },
     "account": {
+      "attachment-storage": "附件占用",
+      "attachment-storage-description": "账号全部空间的附件总量，包含未关联附件；不含临时上传、缩略图和生成的 PDF。",
+      "attachment-storage-retry": "容量加载失败，点击重试",
       "change-password": "修改密码",
       "danger-area": "危险操作区",
       "danger-area-description": "不可逆的账号操作统一放在这里，执行前请再次确认影响。",
@@ -871,6 +874,30 @@
       "delivery-failed": "投递失败",
       "cancelled": "已取消",
       "sending": "发送中"
+    },
+    "memo-archive": {
+      "label": "导入与导出",
+      "description": "使用 ZIP 文件迁移笔记与待办。",
+      "export-title": "导出 ZIP",
+      "export-description": "导出当前账号全部个人空间的笔记、待办、归档、评论及其附件。",
+      "export": "下载 ZIP",
+      "exporting": "正在准备 ZIP…",
+      "export-result": "已下载 {{memos}} 条记录和 {{attachments}} 个附件。",
+      "export-error": "导出失败，请重试。",
+      "import-title": "导入 ZIP",
+      "import-description": "导入到当前账号。已有相同 ID 的记录会跳过，不会覆盖。选择不超过 128 MiB 的 ZIP 文件后，点击导入。",
+      "import-spaces": "保留此定制版 Memos 的个人空间；上游 Memos 的空间内容会导入此标签页当前选择的空间。",
+      "choose-file": "ZIP 文件（最大 128 MiB）",
+      "invalid-file": "请选择非空且不超过 128 MiB 的 .zip 文件。",
+      "import": "导入到当前账号",
+      "importing": "正在导入…",
+      "import-complete": "导入完成",
+      "partial-result": "导入已结束，存在失败条目",
+      "import-result": "已导入 {{imported}} 条记录，跳过 {{skipped}} 条已有记录，新增 {{attachments}} 个附件。",
+      "import-error": "导入失败，请重试。",
+      "warnings": "提示",
+      "errors": "失败条目",
+      "settings-refresh-error": "导入已完成，但空间设置刷新失败，请刷新页面查看导入的空间。"
     }
   },
   "tag": {

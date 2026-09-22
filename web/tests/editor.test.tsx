@@ -221,3 +221,17 @@ it("focuses at the end of an existing task without adding a trailing paragraph",
   expect(ref.current!.getMarkdown().trim()).toBe("- [ ] 编辑待办末尾");
   expect(container.querySelector(".rich-editor > p")).toBeNull();
 });
+
+it("keeps currency editable while preserving actual math in the rich editor", async () => {
+  const { waitFor } = await import("@testing-library/react");
+  const ref = createRef<EditorController>();
+  const props = { className: "x", placeholder: "", onContentChange: vi.fn(), onFiles: vi.fn(), onSubmit: vi.fn() };
+  const { container, unmount } = render(<Editor {...props} ref={ref} initialContent="Price $20 and $30" />);
+  expect(container.querySelector("[data-node-view-wrapper]")).toBeNull();
+  expect(container.querySelector(".rich-editor p")).toHaveTextContent("Price $20 and $30");
+  expect(ref.current!.getMarkdown()).toBe("Price $20 and $30");
+  unmount();
+  const formula = render(<Editor {...props} ref={ref} initialContent="Formula $x^2$" />);
+  await waitFor(() => expect(formula.container.querySelector(".katex")).not.toBeNull());
+  expect(ref.current!.getMarkdown().trim()).toBe("Formula $x^2$");
+});

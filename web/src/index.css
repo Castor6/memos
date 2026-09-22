@@ -31,3 +31,8 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Search highlights leave the rendered memo DOM and authored marks untouched. */
+::highlight(memo-search-match) {
+  background-color: color-mix(in oklch, var(--warning) 40%, transparent);
+}

@@ -1,4 +1,5 @@
 import {
+  ArchiveIcon,
   BarChart3Icon,
   CogIcon,
   DatabaseIcon,
@@ -18,6 +19,7 @@ import AccessTokenSection from "@/components/Settings/AccessTokenSection";
 import AISection from "@/components/Settings/AISection";
 import InstanceSection from "@/components/Settings/InstanceSection";
 import MemberSection from "@/components/Settings/MemberSection";
+import MemoArchiveSection from "@/components/Settings/MemoArchiveSection";
 import MemoRelatedSettings from "@/components/Settings/MemoRelatedSettings";
 import MyAccountSection from "@/components/Settings/MyAccountSection";
 import NotificationSection from "@/components/Settings/NotificationSection";
@@ -30,6 +32,7 @@ import WechatKfSection from "@/components/Settings/WechatKfSection";
 import { InstanceSetting_Key } from "@/types/proto/api/v1/instance_service_pb";
 
 export type SettingSectionKey =
+  | "memo-archive"
   | "my-account"
   | "access-token"
   | "preference"
@@ -64,6 +67,7 @@ export const SETTINGS_SECTIONS: SettingSectionDefinition[] = [
     icon: UserIcon,
     component: MyAccountSection,
   },
+  { key: "memo-archive", scope: "basic", labelKey: "setting.memo-archive.label", icon: ArchiveIcon, component: MemoArchiveSection },
   {
     key: "access-token",
     scope: "basic",

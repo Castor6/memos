@@ -15,3 +15,9 @@ func SpaceFromContext(ctx context.Context) (string, bool) {
 	space, ok := ctx.Value(spaceContextKey{}).(string)
 	return space, ok
 }
+
+// WithoutSpace removes implicit content scoping for explicit cross-space queries.
+// Callers must still enforce ownership and authorization.
+func WithoutSpace(ctx context.Context) context.Context {
+	return context.WithValue(ctx, spaceContextKey{}, struct{}{})
+}

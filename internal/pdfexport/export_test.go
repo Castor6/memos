@@ -35,3 +35,15 @@ func TestPrepareFailsInsteadOfDroppingImages(t *testing.T) {
 	_, err = Prepare("![图片](https://example.com/invalid)", "", func(string) ([]byte, error) { return []byte("not an image"), nil })
 	require.ErrorContains(t, err, "图片格式无法解码")
 }
+
+func TestPreparePreservesCurrencyAndMathSource(t *testing.T) {
+	for _, content := range []string{"$20 and $30", "Price: \\$20", "$x+y$ and $$x^2$$"} {
+		body, err := Prepare(content, "", func(string) ([]byte, error) {
+			t.Fatal("plain text must not fetch images")
+			return nil, nil
+		})
+		require.NoError(t, err)
+		require.Contains(t, body, strings.ReplaceAll(content, `\$`, `$`))
+		require.NotContains(t, body, "math-inline")
+	}
+}

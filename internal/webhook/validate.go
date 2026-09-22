@@ -9,15 +9,18 @@ import (
 )
 
 // reservedCIDRs lists IP ranges that must never be targeted by outbound webhook requests.
-// Covers loopback, RFC-1918 private, link-local (including cloud IMDS at 169.254.169.254),
-// and their IPv6 equivalents.
+// Covers unspecified, loopback, RFC-1918 private, RFC-6598 shared, link-local
+// (including cloud IMDS at 169.254.169.254), and their IPv6 equivalents.
 var reservedCIDRs = []string{
+	"0.0.0.0/8",      // This network / unspecified IPv4
 	"127.0.0.0/8",    // IPv4 loopback
 	"10.0.0.0/8",     // RFC-1918 class A
 	"172.16.0.0/12",  // RFC-1918 class B
 	"192.168.0.0/16", // RFC-1918 class C
+	"100.64.0.0/10",  // RFC-6598 shared address space / CGNAT
 	"169.254.0.0/16", // Link-local / cloud IMDS
 	"::1/128",        // IPv6 loopback
+	"::/128",         // IPv6 unspecified address
 	"fc00::/7",       // IPv6 unique local
 	"fe80::/10",      // IPv6 link-local
 }

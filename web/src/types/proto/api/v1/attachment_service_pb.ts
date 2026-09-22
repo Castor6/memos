@@ -16,7 +16,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file api/v1/attachment_service.proto.
  */
 export const file_api_v1_attachment_service: GenFile = /*@__PURE__*/
-  fileDesc("Ch9hcGkvdjEvYXR0YWNobWVudF9zZXJ2aWNlLnByb3RvEgxtZW1vcy5hcGkudjEivAEKC01vdGlvbk1lZGlhEi8KBmZhbWlseRgBIAEoDjIfLm1lbW9zLmFwaS52MS5Nb3Rpb25NZWRpYUZhbWlseRIrCgRyb2xlGAIgASgOMh0ubWVtb3MuYXBpLnYxLk1vdGlvbk1lZGlhUm9sZRIQCghncm91cF9pZBgDIAEoCRIhChlwcmVzZW50YXRpb25fdGltZXN0YW1wX3VzGAQgASgDEhoKEmhhc19lbWJlZGRlZF92aWRlbxgFIAEoCCLsAgoKQXR0YWNobWVudBIRCgRuYW1lGAEgASgJQgPgQQgSNAoLY3JlYXRlX3RpbWUYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQMSFQoIZmlsZW5hbWUYAyABKAlCA+BBAhIUCgdjb250ZW50GAQgASgMQgPgQQQSGgoNZXh0ZXJuYWxfbGluaxgFIAEoCUID4EEBEhEKBHR5cGUYBiABKAlCA+BBAhIRCgRzaXplGAcgASgDQgPgQQMSFgoEbWVtbxgIIAEoCUID4EEBSACIAQESNAoMbW90aW9uX21lZGlhGAkgASgLMhkubWVtb3MuYXBpLnYxLk1vdGlvbk1lZGlhQgPgQQE6T+pBTAoXbWVtb3MuYXBpLnYxL0F0dGFjaG1lbnQSGGF0dGFjaG1lbnRzL3thdHRhY2htZW50fSoLYXR0YWNobWVudHMyCmF0dGFjaG1lbnRCBwoFX21lbW8iaAoXQ3JlYXRlQXR0YWNobWVudFJlcXVlc3QSMQoKYXR0YWNobWVudBgBIAEoCzIYLm1lbW9zLmFwaS52MS5BdHRhY2htZW50QgPgQQISGgoNYXR0YWNobWVudF9pZBgCIAEoCUID4EEBInUKFkxpc3RBdHRhY2htZW50c1JlcXVlc3QSFgoJcGFnZV9zaXplGAEgASgFQgPgQQESFwoKcGFnZV90b2tlbhgCIAEoCUID4EEBEhMKBmZpbHRlchgDIAEoCUID4EEBEhUKCG9yZGVyX2J5GAQgASgJQgPgQQEiYQoXTGlzdEF0dGFjaG1lbnRzUmVzcG9uc2USLQoLYXR0YWNobWVudHMYASADKAsyGC5tZW1vcy5hcGkudjEuQXR0YWNobWVudBIXCg9uZXh0X3BhZ2VfdG9rZW4YAiABKAkiRQoUR2V0QXR0YWNobWVudFJlcXVlc3QSLQoEbmFtZRgBIAEoCUIf4EEC+kEZChdtZW1vcy5hcGkudjEvQXR0YWNobWVudCKCAQoXVXBkYXRlQXR0YWNobWVudFJlcXVlc3QSMQoKYXR0YWNobWVudBgBIAEoCzIYLm1lbW9zLmFwaS52MS5BdHRhY2htZW50QgPgQQISNAoLdXBkYXRlX21hc2sYAiABKAsyGi5nb29nbGUucHJvdG9idWYuRmllbGRNYXNrQgPgQQIiSAoXRGVsZXRlQXR0YWNobWVudFJlcXVlc3QSLQoEbmFtZRgBIAEoCUIf4EEC+kEZChdtZW1vcy5hcGkudjEvQXR0YWNobWVudCIzCh1CYXRjaERlbGV0ZUF0dGFjaG1lbnRzUmVxdWVzdBISCgVuYW1lcxgBIAMoCUID4EECKmgKEU1vdGlvbk1lZGlhRmFtaWx5EiMKH01PVElPTl9NRURJQV9GQU1JTFlfVU5TUEVDSUZJRUQQABIUChBBUFBMRV9MSVZFX1BIT1RPEAESGAoUQU5EUk9JRF9NT1RJT05fUEhPVE8QAipZCg9Nb3Rpb25NZWRpYVJvbGUSIQodTU9USU9OX01FRElBX1JPTEVfVU5TUEVDSUZJRUQQABIJCgVTVElMTBABEgkKBVZJREVPEAISDQoJQ09OVEFJTkVSEAMy0AYKEUF0dGFjaG1lbnRTZXJ2aWNlEokBChBDcmVhdGVBdHRhY2htZW50EiUubWVtb3MuYXBpLnYxLkNyZWF0ZUF0dGFjaG1lbnRSZXF1ZXN0GhgubWVtb3MuYXBpLnYxLkF0dGFjaG1lbnQiNNpBCmF0dGFjaG1lbnSC0+STAiE6CmF0dGFjaG1lbnQiEy9hcGkvdjEvYXR0YWNobWVudHMSewoPTGlzdEF0dGFjaG1lbnRzEiQubWVtb3MuYXBpLnYxLkxpc3RBdHRhY2htZW50c1JlcXVlc3QaJS5tZW1vcy5hcGkudjEuTGlzdEF0dGFjaG1lbnRzUmVzcG9uc2UiG4LT5JMCFRITL2FwaS92MS9hdHRhY2htZW50cxJ6Cg1HZXRBdHRhY2htZW50EiIubWVtb3MuYXBpLnYxLkdldEF0dGFjaG1lbnRSZXF1ZXN0GhgubWVtb3MuYXBpLnYxLkF0dGFjaG1lbnQiK9pBBG5hbWWC0+STAh4SHC9hcGkvdjEve25hbWU9YXR0YWNobWVudHMvKn0SqQEKEFVwZGF0ZUF0dGFjaG1lbnQSJS5tZW1vcy5hcGkudjEuVXBkYXRlQXR0YWNobWVudFJlcXVlc3QaGC5tZW1vcy5hcGkudjEuQXR0YWNobWVudCJU2kEWYXR0YWNobWVudCx1cGRhdGVfbWFza4LT5JMCNToKYXR0YWNobWVudDInL2FwaS92MS97YXR0YWNobWVudC5uYW1lPWF0dGFjaG1lbnRzLyp9En4KEERlbGV0ZUF0dGFjaG1lbnQSJS5tZW1vcy5hcGkudjEuRGVsZXRlQXR0YWNobWVudFJlcXVlc3QaFi5nb29nbGUucHJvdG9idWYuRW1wdHkiK9pBBG5hbWWC0+STAh4qHC9hcGkvdjEve25hbWU9YXR0YWNobWVudHMvKn0SiQEKFkJhdGNoRGVsZXRlQXR0YWNobWVudHMSKy5tZW1vcy5hcGkudjEuQmF0Y2hEZWxldGVBdHRhY2htZW50c1JlcXVlc3QaFi5nb29nbGUucHJvdG9idWYuRW1wdHkiKoLT5JMCJDoBKiIfL2FwaS92MS9hdHRhY2htZW50czpiYXRjaERlbGV0ZUKuAQoQY29tLm1lbW9zLmFwaS52MUIWQXR0YWNobWVudFNlcnZpY2VQcm90b1ABWjBnaXRodWIuY29tL3VzZW1lbW9zL21lbW9zL3Byb3RvL2dlbi9hcGkvdjE7YXBpdjGiAgNNQViqAgxNZW1vcy5BcGkuVjHKAgxNZW1vc1xBcGlcVjHiAhhNZW1vc1xBcGlcVjFcR1BCTWV0YWRhdGHqAg5NZW1vczo6QXBpOjpWMWIGcHJvdG8z", [file_google_api_annotations, file_google_api_client, file_google_api_field_behavior, file_google_api_resource, file_google_protobuf_empty, file_google_protobuf_field_mask, file_google_protobuf_timestamp]);
+  fileDesc("Ch9hcGkvdjEvYXR0YWNobWVudF9zZXJ2aWNlLnByb3RvEgxtZW1vcy5hcGkudjEivAEKC01vdGlvbk1lZGlhEi8KBmZhbWlseRgBIAEoDjIfLm1lbW9zLmFwaS52MS5Nb3Rpb25NZWRpYUZhbWlseRIrCgRyb2xlGAIgASgOMh0ubWVtb3MuYXBpLnYxLk1vdGlvbk1lZGlhUm9sZRIQCghncm91cF9pZBgDIAEoCRIhChlwcmVzZW50YXRpb25fdGltZXN0YW1wX3VzGAQgASgDEhoKEmhhc19lbWJlZGRlZF92aWRlbxgFIAEoCCLsAgoKQXR0YWNobWVudBIRCgRuYW1lGAEgASgJQgPgQQgSNAoLY3JlYXRlX3RpbWUYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQMSFQoIZmlsZW5hbWUYAyABKAlCA+BBAhIUCgdjb250ZW50GAQgASgMQgPgQQQSGgoNZXh0ZXJuYWxfbGluaxgFIAEoCUID4EEBEhEKBHR5cGUYBiABKAlCA+BBAhIRCgRzaXplGAcgASgDQgPgQQMSFgoEbWVtbxgIIAEoCUID4EEBSACIAQESNAoMbW90aW9uX21lZGlhGAkgASgLMhkubWVtb3MuYXBpLnYxLk1vdGlvbk1lZGlhQgPgQQE6T+pBTAoXbWVtb3MuYXBpLnYxL0F0dGFjaG1lbnQSGGF0dGFjaG1lbnRzL3thdHRhY2htZW50fSoLYXR0YWNobWVudHMyCmF0dGFjaG1lbnRCBwoFX21lbW8iaAoXQ3JlYXRlQXR0YWNobWVudFJlcXVlc3QSMQoKYXR0YWNobWVudBgBIAEoCzIYLm1lbW9zLmFwaS52MS5BdHRhY2htZW50QgPgQQISGgoNYXR0YWNobWVudF9pZBgCIAEoCUID4EEBIrUBChdVcGxvYWRBdHRhY2htZW50UmVxdWVzdBIyCgRzcGVjGAEgASgLMiIubWVtb3MuYXBpLnYxLlVwbG9hZEF0dGFjaG1lbnRTcGVjSAASEwoJdXBsb2FkX2lkGAIgASgJSAASGQoMd3JpdGVfb2Zmc2V0GAMgASgDQgPgQQISEQoEZGF0YRgEIAEoDEID4EEBEhkKDGZpbmlzaF93cml0ZRgFIAEoCEID4EEBQggKBnVwbG9hZCJ+ChRVcGxvYWRBdHRhY2htZW50U3BlYxIxCgphdHRhY2htZW50GAEgASgLMhgubWVtb3MuYXBpLnYxLkF0dGFjaG1lbnRCA+BBAhIaCg1hdHRhY2htZW50X2lkGAIgASgJQgPgQQESFwoKdG90YWxfc2l6ZRgDIAEoA0ID4EEBIosBChhVcGxvYWRBdHRhY2htZW50UmVzcG9uc2USEQoJdXBsb2FkX2lkGAEgASgJEhYKDmNvbW1pdHRlZF9zaXplGAIgASgDEiwKCmF0dGFjaG1lbnQYAyABKAsyGC5tZW1vcy5hcGkudjEuQXR0YWNobWVudBIWCg5tYXhfY2h1bmtfc2l6ZRgEIAEoBSJ1ChZMaXN0QXR0YWNobWVudHNSZXF1ZXN0EhYKCXBhZ2Vfc2l6ZRgBIAEoBUID4EEBEhcKCnBhZ2VfdG9rZW4YAiABKAlCA+BBARITCgZmaWx0ZXIYAyABKAlCA+BBARIVCghvcmRlcl9ieRgEIAEoCUID4EEBImEKF0xpc3RBdHRhY2htZW50c1Jlc3BvbnNlEi0KC2F0dGFjaG1lbnRzGAEgAygLMhgubWVtb3MuYXBpLnYxLkF0dGFjaG1lbnQSFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJIkUKFEdldEF0dGFjaG1lbnRSZXF1ZXN0Ei0KBG5hbWUYASABKAlCH+BBAvpBGQoXbWVtb3MuYXBpLnYxL0F0dGFjaG1lbnQiggEKF1VwZGF0ZUF0dGFjaG1lbnRSZXF1ZXN0EjEKCmF0dGFjaG1lbnQYASABKAsyGC5tZW1vcy5hcGkudjEuQXR0YWNobWVudEID4EECEjQKC3VwZGF0ZV9tYXNrGAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLkZpZWxkTWFza0ID4EECIkgKF0RlbGV0ZUF0dGFjaG1lbnRSZXF1ZXN0Ei0KBG5hbWUYASABKAlCH+BBAvpBGQoXbWVtb3MuYXBpLnYxL0F0dGFjaG1lbnQiMwodQmF0Y2hEZWxldGVBdHRhY2htZW50c1JlcXVlc3QSEgoFbmFtZXMYASADKAlCA+BBAipoChFNb3Rpb25NZWRpYUZhbWlseRIjCh9NT1RJT05fTUVESUFfRkFNSUxZX1VOU1BFQ0lGSUVEEAASFAoQQVBQTEVfTElWRV9QSE9UTxABEhgKFEFORFJPSURfTU9USU9OX1BIT1RPEAIqWQoPTW90aW9uTWVkaWFSb2xlEiEKHU1PVElPTl9NRURJQV9ST0xFX1VOU1BFQ0lGSUVEEAASCQoFU1RJTEwQARIJCgVWSURFTxACEg0KCUNPTlRBSU5FUhADMtsHChFBdHRhY2htZW50U2VydmljZRKJAQoQQ3JlYXRlQXR0YWNobWVudBIlLm1lbW9zLmFwaS52MS5DcmVhdGVBdHRhY2htZW50UmVxdWVzdBoYLm1lbW9zLmFwaS52MS5BdHRhY2htZW50IjTaQQphdHRhY2htZW50gtPkkwIhOgphdHRhY2htZW50IhMvYXBpL3YxL2F0dGFjaG1lbnRzEogBChBVcGxvYWRBdHRhY2htZW50EiUubWVtb3MuYXBpLnYxLlVwbG9hZEF0dGFjaG1lbnRSZXF1ZXN0GiYubWVtb3MuYXBpLnYxLlVwbG9hZEF0dGFjaG1lbnRSZXNwb25zZSIlgtPkkwIfOgEqIhovYXBpL3YxL2F0dGFjaG1lbnRzOnVwbG9hZBJ7Cg9MaXN0QXR0YWNobWVudHMSJC5tZW1vcy5hcGkudjEuTGlzdEF0dGFjaG1lbnRzUmVxdWVzdBolLm1lbW9zLmFwaS52MS5MaXN0QXR0YWNobWVudHNSZXNwb25zZSIbgtPkkwIVEhMvYXBpL3YxL2F0dGFjaG1lbnRzEnoKDUdldEF0dGFjaG1lbnQSIi5tZW1vcy5hcGkudjEuR2V0QXR0YWNobWVudFJlcXVlc3QaGC5tZW1vcy5hcGkudjEuQXR0YWNobWVudCIr2kEEbmFtZYLT5JMCHhIcL2FwaS92MS97bmFtZT1hdHRhY2htZW50cy8qfRKpAQoQVXBkYXRlQXR0YWNobWVudBIlLm1lbW9zLmFwaS52MS5VcGRhdGVBdHRhY2htZW50UmVxdWVzdBoYLm1lbW9zLmFwaS52MS5BdHRhY2htZW50IlTaQRZhdHRhY2htZW50LHVwZGF0ZV9tYXNrgtPkkwI1OgphdHRhY2htZW50MicvYXBpL3YxL3thdHRhY2htZW50Lm5hbWU9YXR0YWNobWVudHMvKn0SfgoQRGVsZXRlQXR0YWNobWVudBIlLm1lbW9zLmFwaS52MS5EZWxldGVBdHRhY2htZW50UmVxdWVzdBoWLmdvb2dsZS5wcm90b2J1Zi5FbXB0eSIr2kEEbmFtZYLT5JMCHiocL2FwaS92MS97bmFtZT1hdHRhY2htZW50cy8qfRKJAQoWQmF0Y2hEZWxldGVBdHRhY2htZW50cxIrLm1lbW9zLmFwaS52MS5CYXRjaERlbGV0ZUF0dGFjaG1lbnRzUmVxdWVzdBoWLmdvb2dsZS5wcm90b2J1Zi5FbXB0eSIqgtPkkwIkOgEqIh8vYXBpL3YxL2F0dGFjaG1lbnRzOmJhdGNoRGVsZXRlQq4BChBjb20ubWVtb3MuYXBpLnYxQhZBdHRhY2htZW50U2VydmljZVByb3RvUAFaMGdpdGh1Yi5jb20vdXNlbWVtb3MvbWVtb3MvcHJvdG8vZ2VuL2FwaS92MTthcGl2MaICA01BWKoCDE1lbW9zLkFwaS5WMcoCDE1lbW9zXEFwaVxWMeICGE1lbW9zXEFwaVxWMVxHUEJNZXRhZGF0YeoCDk1lbW9zOjpBcGk6OlYxYgZwcm90bzM", [file_google_api_annotations, file_google_api_client, file_google_api_field_behavior, file_google_api_resource, file_google_protobuf_empty, file_google_protobuf_field_mask, file_google_protobuf_timestamp]);
 
 /**
  * @generated from message memos.api.v1.MotionMedia
@@ -161,6 +161,145 @@ export const CreateAttachmentRequestSchema: GenMessage<CreateAttachmentRequest> 
   messageDesc(file_api_v1_attachment_service, 2);
 
 /**
+ * @generated from message memos.api.v1.UploadAttachmentRequest
+ */
+export type UploadAttachmentRequest = Message<"memos.api.v1.UploadAttachmentRequest"> & {
+  /**
+   * Required. Start a new upload or continue an existing one.
+   *
+   * @generated from oneof memos.api.v1.UploadAttachmentRequest.upload
+   */
+  upload: {
+    /**
+     * Starts a new upload. The same call may also carry data and finish_write.
+     *
+     * @generated from field: memos.api.v1.UploadAttachmentSpec spec = 1;
+     */
+    value: UploadAttachmentSpec;
+    case: "spec";
+  } | {
+    /**
+     * Continues the upload identified by a previous response.
+     *
+     * @generated from field: string upload_id = 2;
+     */
+    value: string;
+    case: "uploadId";
+  } | { case: undefined; value?: undefined };
+
+  /**
+   * Required. Zero-based byte offset at which data is written. Must equal the
+   * committed size, except when retrying the most recently accepted chunk
+   * with identical bytes and offset, which is accepted without writing again.
+   *
+   * @generated from field: int64 write_offset = 3;
+   */
+  writeOffset: bigint;
+
+  /**
+   * Optional. File bytes, at most max_chunk_size long. With no data and
+   * finish_write false, the call reports progress without writing, and
+   * write_offset is ignored.
+   *
+   * @generated from field: bytes data = 4;
+   */
+  data: Uint8Array;
+
+  /**
+   * Optional. Finalize the upload after writing data. The committed size must
+   * then equal total_size. Any later call for the same upload_id returns the
+   * created attachment.
+   *
+   * @generated from field: bool finish_write = 5;
+   */
+  finishWrite: boolean;
+};
+
+/**
+ * Describes the message memos.api.v1.UploadAttachmentRequest.
+ * Use `create(UploadAttachmentRequestSchema)` to create a new message.
+ */
+export const UploadAttachmentRequestSchema: GenMessage<UploadAttachmentRequest> = /*@__PURE__*/
+  messageDesc(file_api_v1_attachment_service, 3);
+
+/**
+ * @generated from message memos.api.v1.UploadAttachmentSpec
+ */
+export type UploadAttachmentSpec = Message<"memos.api.v1.UploadAttachmentSpec"> & {
+  /**
+   * Required. Metadata for the attachment to create. content must be empty;
+   * file bytes are sent in data.
+   *
+   * @generated from field: memos.api.v1.Attachment attachment = 1;
+   */
+  attachment?: Attachment | undefined;
+
+  /**
+   * Optional. The attachment ID to use for this attachment.
+   * If empty, a unique ID will be generated.
+   * Format: ^[a-zA-Z0-9]([a-zA-Z0-9-]{0,34}[a-zA-Z0-9])?$
+   *
+   * @generated from field: string attachment_id = 2;
+   */
+  attachmentId: string;
+
+  /**
+   * Optional. Total size of the file in bytes before media processing.
+   * Zero represents an empty file.
+   *
+   * @generated from field: int64 total_size = 3;
+   */
+  totalSize: bigint;
+};
+
+/**
+ * Describes the message memos.api.v1.UploadAttachmentSpec.
+ * Use `create(UploadAttachmentSpecSchema)` to create a new message.
+ */
+export const UploadAttachmentSpecSchema: GenMessage<UploadAttachmentSpec> = /*@__PURE__*/
+  messageDesc(file_api_v1_attachment_service, 4);
+
+/**
+ * @generated from message memos.api.v1.UploadAttachmentResponse
+ */
+export type UploadAttachmentResponse = Message<"memos.api.v1.UploadAttachmentResponse"> & {
+  /**
+   * Opaque ID for subsequent calls. This is not a resource name.
+   *
+   * @generated from field: string upload_id = 1;
+   */
+  uploadId: string;
+
+  /**
+   * Number of file bytes committed so far.
+   *
+   * @generated from field: int64 committed_size = 2;
+   */
+  committedSize: bigint;
+
+  /**
+   * Set once the upload has been finalized.
+   *
+   * @generated from field: memos.api.v1.Attachment attachment = 3;
+   */
+  attachment?: Attachment | undefined;
+
+  /**
+   * Maximum number of data bytes accepted in one call.
+   *
+   * @generated from field: int32 max_chunk_size = 4;
+   */
+  maxChunkSize: number;
+};
+
+/**
+ * Describes the message memos.api.v1.UploadAttachmentResponse.
+ * Use `create(UploadAttachmentResponseSchema)` to create a new message.
+ */
+export const UploadAttachmentResponseSchema: GenMessage<UploadAttachmentResponse> = /*@__PURE__*/
+  messageDesc(file_api_v1_attachment_service, 5);
+
+/**
  * @generated from message memos.api.v1.ListAttachmentsRequest
  */
 export type ListAttachmentsRequest = Message<"memos.api.v1.ListAttachmentsRequest"> & {
@@ -206,7 +345,7 @@ export type ListAttachmentsRequest = Message<"memos.api.v1.ListAttachmentsReques
  * Use `create(ListAttachmentsRequestSchema)` to create a new message.
  */
 export const ListAttachmentsRequestSchema: GenMessage<ListAttachmentsRequest> = /*@__PURE__*/
-  messageDesc(file_api_v1_attachment_service, 3);
+  messageDesc(file_api_v1_attachment_service, 6);
 
 /**
  * @generated from message memos.api.v1.ListAttachmentsResponse
@@ -233,7 +372,7 @@ export type ListAttachmentsResponse = Message<"memos.api.v1.ListAttachmentsRespo
  * Use `create(ListAttachmentsResponseSchema)` to create a new message.
  */
 export const ListAttachmentsResponseSchema: GenMessage<ListAttachmentsResponse> = /*@__PURE__*/
-  messageDesc(file_api_v1_attachment_service, 4);
+  messageDesc(file_api_v1_attachment_service, 7);
 
 /**
  * @generated from message memos.api.v1.GetAttachmentRequest
@@ -253,7 +392,7 @@ export type GetAttachmentRequest = Message<"memos.api.v1.GetAttachmentRequest"> 
  * Use `create(GetAttachmentRequestSchema)` to create a new message.
  */
 export const GetAttachmentRequestSchema: GenMessage<GetAttachmentRequest> = /*@__PURE__*/
-  messageDesc(file_api_v1_attachment_service, 5);
+  messageDesc(file_api_v1_attachment_service, 8);
 
 /**
  * @generated from message memos.api.v1.UpdateAttachmentRequest
@@ -279,7 +418,7 @@ export type UpdateAttachmentRequest = Message<"memos.api.v1.UpdateAttachmentRequ
  * Use `create(UpdateAttachmentRequestSchema)` to create a new message.
  */
 export const UpdateAttachmentRequestSchema: GenMessage<UpdateAttachmentRequest> = /*@__PURE__*/
-  messageDesc(file_api_v1_attachment_service, 6);
+  messageDesc(file_api_v1_attachment_service, 9);
 
 /**
  * @generated from message memos.api.v1.DeleteAttachmentRequest
@@ -299,7 +438,7 @@ export type DeleteAttachmentRequest = Message<"memos.api.v1.DeleteAttachmentRequ
  * Use `create(DeleteAttachmentRequestSchema)` to create a new message.
  */
 export const DeleteAttachmentRequestSchema: GenMessage<DeleteAttachmentRequest> = /*@__PURE__*/
-  messageDesc(file_api_v1_attachment_service, 7);
+  messageDesc(file_api_v1_attachment_service, 10);
 
 /**
  * @generated from message memos.api.v1.BatchDeleteAttachmentsRequest
@@ -316,7 +455,7 @@ export type BatchDeleteAttachmentsRequest = Message<"memos.api.v1.BatchDeleteAtt
  * Use `create(BatchDeleteAttachmentsRequestSchema)` to create a new message.
  */
 export const BatchDeleteAttachmentsRequestSchema: GenMessage<BatchDeleteAttachmentsRequest> = /*@__PURE__*/
-  messageDesc(file_api_v1_attachment_service, 8);
+  messageDesc(file_api_v1_attachment_service, 11);
 
 /**
  * @generated from enum memos.api.v1.MotionMediaFamily
@@ -388,6 +527,20 @@ export const AttachmentService: GenService<{
     methodKind: "unary";
     input: typeof CreateAttachmentRequestSchema;
     output: typeof AttachmentSchema;
+  },
+  /**
+   * UploadAttachment uploads a file in bounded chunks. The first call carries
+   * the spec and returns an upload_id; later calls carry that upload_id.
+   * Uploads are bound to the authenticated user, expire after 30 minutes of
+   * inactivity, and do not survive a server restart. The selected personal space
+   * must remain the same for every call in the session.
+   *
+   * @generated from rpc memos.api.v1.AttachmentService.UploadAttachment
+   */
+  uploadAttachment: {
+    methodKind: "unary";
+    input: typeof UploadAttachmentRequestSchema;
+    output: typeof UploadAttachmentResponseSchema;
   },
   /**
    * ListAttachments lists all attachments.

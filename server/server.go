@@ -39,6 +39,7 @@ type Server struct {
 	echoServer   *echo.Echo
 	httpServer   *http.Server
 	sseHub       *apiv1.SSEHub
+	apiV1Service *apiv1.APIV1Service
 	wechatRunner *kfrunner.Runner
 
 	backgroundRunnerCancels []context.CancelFunc
@@ -79,6 +80,7 @@ func NewServer(ctx context.Context, profile *profile.Profile, store *store.Store
 
 	apiV1Service := apiv1.NewAPIV1Service(s.Secret, profile, store)
 	s.sseHub = apiV1Service.SSEHub
+	s.apiV1Service = apiV1Service
 	s.wechatRunner = kfrunner.New(s.Store, s.Secret, func(config corekf.Config) corekf.Notes {
 		return apiV1Service.NewWeChatKFNotes(config.OwnerID, config.Space)
 	})
@@ -149,6 +151,9 @@ func (s *Server) Shutdown(ctx context.Context) {
 	s.stopBackgroundRunners()
 	s.closeLongLivedConnections()
 	s.shutdownHTTPServer(ctx)
+	if s.apiV1Service != nil {
+		s.apiV1Service.CloseUploads()
+	}
 	s.waitBackgroundRunners(ctx)
 
 	// Close database connection.

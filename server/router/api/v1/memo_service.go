@@ -154,6 +154,7 @@ func (s *APIV1Service) CreateMemo(ctx context.Context, request *v1pb.CreateMemoR
 		return nil, err
 	}
 
+	trackArchiveMemo(ctx, memo)
 	attachments := []*store.Attachment{}
 
 	if len(request.Memo.Attachments) > 0 {
@@ -189,7 +190,7 @@ func (s *APIV1Service) CreateMemo(ctx context.Context, request *v1pb.CreateMemoR
 	}
 
 	// Broadcast live refresh event (skipped when called from CreateMemoComment).
-	if !isSSESuppressed(ctx) {
+	if !isSSESuppressed(ctx) && !isArchiveImport(ctx) {
 		s.SSEHub.Broadcast(&SSEEvent{
 			Type:       SSEEventMemoCreated,
 			Name:       memoMessage.Name,

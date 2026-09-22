@@ -301,6 +301,8 @@ func AttachmentNeedsInstanceStorageSetting(attachment *Attachment) bool {
 
 func (s *Store) deleteAttachmentDerivedCaches(attachment *Attachment) {
 	for _, cachePath := range []string{
+		filepath.Join(s.profile.Data, thumbnailCacheFolder, attachment.UID+".v2.jpeg"),
+		filepath.Join(s.profile.Data, thumbnailCacheFolder, attachment.UID+".v2.jpeg.failed"),
 		filepath.Join(s.profile.Data, thumbnailCacheFolder, attachment.UID+".jpeg"),
 		filepath.Join(s.profile.Data, motionCacheFolder, attachment.UID+".mp4"),
 	} {
@@ -313,4 +315,9 @@ func (s *Store) deleteAttachmentDerivedCaches(attachment *Attachment) {
 func shouldFailDeleteAttachmentStorage(ctx context.Context) bool {
 	failpoint, ok := ctx.Value(deleteAttachmentStorageFailpointKey{}).(bool)
 	return ok && failpoint
+}
+
+// GetAttachmentStorageUsage returns persisted bytes owned by a user across all personal spaces.
+func (s *Store) GetAttachmentStorageUsage(ctx context.Context, creatorID int32) (int64, error) {
+	return s.driver.GetAttachmentStorageUsage(ctx, creatorID)
 }

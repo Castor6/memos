@@ -9,6 +9,7 @@ import { AuthService } from "./types/proto/api/v1/auth_service_pb";
 import { IdentityProviderService } from "./types/proto/api/v1/idp_service_pb";
 import { InstanceService } from "./types/proto/api/v1/instance_service_pb";
 import { MemoService } from "./types/proto/api/v1/memo_service_pb";
+import { MemoTransferService } from "./types/proto/api/v1/memo_transfer_service_pb";
 import { ShortcutService } from "./types/proto/api/v1/shortcut_service_pb";
 import { UserService } from "./types/proto/api/v1/user_service_pb";
 import { redirectOnAuthFailure } from "./utils/auth-redirect";
@@ -188,7 +189,7 @@ const transport = createConnectTransport({
   fetch: fetchWithCredentials,
   interceptors: [
     (next) => (req) => {
-      req.header.set("X-Memos-Space", getActiveSpace());
+      if (!req.header.has("X-Memos-Space")) req.header.set("X-Memos-Space", getActiveSpace());
       return next(req);
     },
     authInterceptor,
@@ -202,6 +203,7 @@ export const userServiceClient = createClient(UserService, transport);
 
 // Content service clients
 export const memoServiceClient = createClient(MemoService, transport);
+export const memoTransferServiceClient = createClient(MemoTransferService, transport);
 export const attachmentServiceClient = createClient(AttachmentService, transport);
 export const aiServiceClient = createClient(AIService, transport);
 export const shortcutServiceClient = createClient(ShortcutService, transport);
