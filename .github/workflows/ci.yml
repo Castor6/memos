@@ -19,6 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       frontend: ${{ steps.plan.outputs.frontend }}
+      web_clipper: ${{ steps.plan.outputs.web_clipper }}
       backend: ${{ steps.plan.outputs.backend }}
       proto: ${{ steps.plan.outputs.proto }}
       upgrade: ${{ steps.plan.outputs.upgrade }}
@@ -88,6 +89,11 @@ jobs:
     if: needs.changes.outputs.frontend == 'true'
     uses: ./.github/workflows/frontend-tests.yml
 
+  web_clipper:
+    needs: changes
+    if: needs.changes.outputs.web_clipper == 'true'
+    uses: ./.github/workflows/web-clipper-tests.yml
+
   backend:
     needs: changes
     if: needs.changes.outputs.backend == 'true'
@@ -106,7 +112,7 @@ jobs:
   validate:
     name: validate
     if: always()
-    needs: [changes, infrastructure, frontend, backend, proto, upgrade]
+    needs: [changes, infrastructure, frontend, web_clipper, backend, proto, upgrade]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6

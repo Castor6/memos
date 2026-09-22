@@ -1,0 +1,45 @@
+name: Web Clipper Tests
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Lint, test and build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: extensions/web-clipper
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4.2.0
+        with:
+          version: 11.10.0
+          package_json_file: extensions/web-clipper/package.json
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: pnpm
+          cache-dependency-path: extensions/web-clipper/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - name: Prepare public build configuration
+        run: cp .env.example .env
+      - run: pnpm lint
+      - run: pnpm test
+      - name: Test release packaging
+        run: python3 -m unittest discover -s scripts -p 'test_package*.py'
+      - run: pnpm build
+      - name: Package Chromium extension
+        working-directory: .
+        run: python3 extensions/web-clipper/scripts/package-release.py --output build/clipper-ci
+      - name: Upload extension for manual testing
+        uses: actions/upload-artifact@v7
+        with:
+          name: web-clipper-chromium
+          path: build/clipper-ci/
+          if-no-files-found: error
