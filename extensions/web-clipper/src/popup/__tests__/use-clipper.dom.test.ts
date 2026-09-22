@@ -539,6 +539,31 @@ describe("useClipper manual capture and durable drafts", () => {
     expect(result.current.draft?.original).toBe("Repaired source");
   });
 
+  it("marks resumed requests as retries and requires an explicit new save after a missing record", async () => {
+    wireRuntime({ SAVE_MEMO: { ok: false, errorKind: "timeout" } });
+    const { result } = renderHook(useReadyClipper);
+    await waitReady(result);
+    await act(async () => result.current.start("STAR"));
+    await act(async () => {
+      await result.current.save();
+    });
+    expect(saves()[0]?.saveIsRetry).toBe(false);
+    const previousId = saves()[0]?.saveRequestId;
+    wireRuntime({ SAVE_MEMO: { ok: false, errorKind: "not-found" } });
+    await act(async () => {
+      await result.current.save();
+    });
+    expect(saves()[1]).toMatchObject({ saveIsRetry: true, saveRequestId: previousId });
+    expect(result.current.notice).toContain("请先检查历史");
+    expect(result.current.draft?.operation).toBeNull();
+    wireRuntime();
+    await act(async () => {
+      await result.current.save();
+    });
+    expect(saves()[2]?.saveIsRetry).toBe(false);
+    expect(saves()[2]?.saveRequestId).not.toBe(previousId);
+  });
+
   it("blocks editing and duplicate sends while a save is in flight", async () => {
     let resolveSave!: (value: unknown) => void;
     wireRuntime({

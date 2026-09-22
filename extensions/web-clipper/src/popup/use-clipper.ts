@@ -452,6 +452,7 @@ export function useClipper(expectation: SaveExpectation | null, template: string
           expectedInstanceUrl: expectation.instanceUrl,
           saveRequestId: operation.requestId,
           saveStartedAt: operation.startedAt,
+          saveIsRetry: Boolean(current.operation),
           images: current.images,
           clip: {
             sourceUrl: current.capture.sourceUrl,
@@ -478,6 +479,9 @@ export function useClipper(expectation: SaveExpectation | null, template: string
         await writeLastVisibility(current.visibility).catch(() => {});
       } else if (AMBIGUOUS_ERRORS.has(result.errorKind)) {
         setNotice("保存结果尚未确认，请重试保存；将使用同一请求避免重复创建。");
+      } else if (result.errorKind === "not-found") {
+        setSavedClip(null);
+        setNotice("服务器未找到上次记录，可能未送达或已被删除。请先检查历史；若确实需要新建，请再次点击保存。");
       }
       return result;
     } finally {
