@@ -113,7 +113,8 @@ const Editor = forwardRef<EditorController, EditorProps>((props, ref) => {
   });
 
   useEffect(() => {
-    editor?.setEditable(!props.readOnly);
+    // Toggling editability must not emit the old document over a successful reset.
+    editor?.setEditable(!props.readOnly, false);
   }, [editor, props.readOnly]);
 
   useEffect(() => {
