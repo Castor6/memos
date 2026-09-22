@@ -63,4 +63,56 @@ describe("capture rendering", () => {
   it("counts UTF-8 bytes including Chinese and emoji", () => {
     expect(utf8Bytes("思考👍")).toBe(10);
   });
+
+  it("keeps Star images with each post, including repeated images in different posts", () => {
+    const shared = "https://pbs.twimg.com/media/shared?format=jpg&name=large";
+    const last = "https://pbs.twimg.com/media/last?format=png&name=large";
+    const withImages: CaptureData = {
+      ...capture,
+      kind: "STAR",
+      posts: capture.posts.map((post, index) => ({ ...post, images: index === 0 ? [shared] : [shared, last] })),
+    };
+    const before = structuredClone(withImages);
+    const content = formatCapturedPosts(withImages);
+    expect(content).toContain(`Original idea\n\n![](<${shared}>)\n\n---\n\n### [Me @me]`);
+    expect(content).toContain(`My reply\n\n![](<${shared}>)\n\n![](<${last}>)`);
+    expect(withImages).toEqual(before);
+  });
+
+  it("keeps Pick up reply images before provenance and source images with the original post", () => {
+    const originalImage = "https://pbs.twimg.com/media/original?format=jpg";
+    const replyImage = "https://pbs.twimg.com/media/reply?format=jpg";
+    const withImages: CaptureData = {
+      ...capture,
+      comment: "  Exact reply\nwith original whitespace  ",
+      posts: capture.posts.map((post, index) => ({ ...post, images: [index === 0 ? originalImage : replyImage] })),
+    };
+    const before = structuredClone(withImages);
+    const original = formatCapturedPosts(withImages);
+    expect(original).not.toContain(replyImage);
+    const content = composeCaptureMemo(withImages, original);
+    expect(content).toContain(`${withImages.comment}\n\n![](<${replyImage}>)\n\n[我的原回复]`);
+    expect(content).toContain(`Original idea\n\n![](<${originalImage}>)`);
+    expect(content.split(replyImage)).toHaveLength(2);
+    expect(withImages).toEqual(before);
+  });
+
+  it("renders image-only posts and protects Markdown destinations from delimiters", () => {
+    const withImages: CaptureData = {
+      ...capture,
+      kind: "STAR",
+      posts: [{ ...capture.posts[0]!, content: "", images: ["https://pbs.twimg.com/media/a(b)<c> d\\e"] }],
+    };
+    expect(formatCapturedPosts(withImages)).toContain("![](<https://pbs.twimg.com/media/a(b)%3Cc%3E%20d%5Ce>)");
+  });
+
+  it("does not add reply images when reconstructing a legacy pending request", () => {
+    const withImages: CaptureData = {
+      ...capture,
+      posts: capture.posts.map((post) => ({ ...post, images: ["https://pbs.twimg.com/media/reply"] })),
+    };
+    expect(composeCaptureMemo(withImages, "Previously saved source", true)).toBe(
+      composeCaptureMemo(capture, "Previously saved source", true),
+    );
+  });
 });

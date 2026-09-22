@@ -123,7 +123,8 @@ describe("useClipper manual capture and durable drafts", () => {
     });
     expect(saves()[0]).toMatchObject({
       content: result.current.content,
-      images: page.images,
+      images: [],
+      inlineImages: true,
       tags: ["star"],
       expectedSource: "direct",
       expectedConnectionId: "user_123",
@@ -188,6 +189,50 @@ describe("useClipper manual capture and durable drafts", () => {
     await act(async () => reopened.result.current.save());
     expect(saves()[1]?.tags).toEqual(["pick up"]);
     expect(String(saves()[1]?.content)).toContain("## Pick up");
+  });
+
+  it.each([false, true])("preserves images in pre-inline drafts without changing a pending request (pending=%s)", async (pending) => {
+    const first = renderHook(useReadyClipper);
+    await waitReady(first.result);
+    await act(async () => first.result.current.start("STAR"));
+    const stored = await browserMock.storage.local.get(null);
+    const key = Object.keys(stored).find((key) => key.endsWith(":STAR"))!;
+    const old: Record<string, unknown> = {
+      ...(stored[key] as Record<string, unknown>),
+      original: "User-edited original",
+      images: page.images,
+    };
+    delete old.imageLayout;
+    old.operation = pending ? { requestId: "old-image-operation", startedAt: Date.now(), content: "Frozen old body" } : null;
+    first.unmount();
+    seedStorage({ [key]: old });
+    const reopened = renderHook(useReadyClipper);
+    await waitReady(reopened.result);
+    expect(reopened.result.current.content).toContain(pending ? "Frozen old body" : page.images[0]!);
+    await act(async () => reopened.result.current.save());
+    if (pending) {
+      expect(saves()[0]).toMatchObject({ content: "Frozen old body", images: page.images, inlineImages: false });
+      await act(async () => reopened.result.current.save());
+    }
+    expect(saves().at(-1)).toMatchObject({ inlineImages: true, images: [] });
+    expect(String(saves().at(-1)?.content)).toContain(`User-edited original\n\n![](<${page.images[0]}>)`);
+  });
+
+  it("checks an embedded image against the estimated archived size before allowing the upload", async () => {
+    const dataImage = `data:image/png;base64,${"A".repeat(20_000)}`;
+    vi.mocked(captureActivePage).mockResolvedValue({
+      ...page,
+      images: [dataImage],
+      selectionMarkdown: `Before\n\n![image](${dataImage})\n\nAfter`,
+    });
+    const { result } = renderHook(useReadyClipper);
+    await waitReady(result);
+    await act(async () => result.current.start("STAR"));
+    expect(result.current.content.length).toBeGreaterThan(20_000);
+    expect(result.current.contentBytes).toBeLessThan(8192);
+    expect(result.current.overLimit).toBe(false);
+    await act(async () => expect((await result.current.save()).ok).toBe(true));
+    expect(saves()[0]).toMatchObject({ inlineImages: true });
   });
 
   it("ignores tag suggestions arriving after switching accounts", async () => {

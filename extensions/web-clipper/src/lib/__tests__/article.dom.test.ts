@@ -46,7 +46,7 @@ describe("extractArticle", () => {
     expect(markdown).toContain("| Mode | Kept |");
   });
 
-  it("drops images rather than hotlinking them, but keeps their captions", async () => {
+  it("preserves images in their original article position with captions", async () => {
     const withFigure = page(`
       <article>
         <p>${prose("An illustrated article.")}</p>
@@ -55,9 +55,21 @@ describe("extractArticle", () => {
     `);
     const markdown = (await extractArticle(withFigure, PAGE_URL)) ?? "";
 
-    expect(markdown).not.toContain("diagram.png");
-    expect(markdown).not.toMatch(/!\[/);
+    expect(markdown).toContain("![A diagram](https://example.com/img/diagram.png)");
+    expect(markdown.indexOf("An illustrated article.")).toBeLessThan(markdown.indexOf("![A diagram]"));
+    expect(markdown.indexOf("![A diagram]")).toBeLessThan(markdown.indexOf("The extraction pipeline."));
     expect(markdown).toContain("The extraction pipeline.");
+  });
+
+  it("preserves lazy WeChat CDN images without changing their format parameters", async () => {
+    const source = "https://mmbiz.qpic.cn/mmbiz_png/example/640?wx_fmt=png&from=appmsg&tp=webp&wx_lazy=1#imgIndex=0";
+    const markdown = await extractArticle(
+      page(
+        `<article><p>${prose("Before the image.")}</p><img data-src="${source}" alt="WeChat"><p>${prose("After the image.")}</p></article>`,
+      ),
+      "https://mp.weixin.qq.com/s/example",
+    );
+    expect(markdown).toContain(`![WeChat](${source})`);
   });
 
   it("resolves relative links against the page, not the extension origin", async () => {

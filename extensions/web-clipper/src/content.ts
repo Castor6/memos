@@ -1,5 +1,6 @@
 import browser from "webextension-polyfill";
 import { selectionToHtml } from "@/lib/capture";
+import { normalizeImageSources } from "@/lib/image-sources";
 import type { Request, SelectionClip } from "@/lib/messages";
 
 // The popup's capture doesn't go through this script — it injects its own function via
@@ -7,9 +8,7 @@ import type { Request, SelectionClip } from "@/lib/messages";
 // This script serves the context-menu flow: selection→markdown, clearing, and the save toast.
 
 /**
- * Renders the current selection for a context-menu save. Images are pulled out (as absolute URLs,
- * for the background to upload as attachments) and removed from the HTML so they aren't also emitted
- * as inline remote-image markdown — the memo carries them as real attachments instead.
+ * Keeps selected images in their text positions so saving can replace their URLs with attachments.
  */
 async function clipSelection(): Promise<SelectionClip> {
   const html = selectionToHtml(window.getSelection());
@@ -19,18 +18,12 @@ async function clipSelection(): Promise<SelectionClip> {
   const parsed = new DOMParser().parseFromString(html, "text/html");
   const container = parsed.body;
   for (const executable of container.querySelectorAll("script,style,template,noscript")) executable.remove();
-  const imgs = Array.from(container.querySelectorAll("img"));
-  // Inert documents have no page base URL, so resolve the raw attribute against the live page.
-  const images = imgs
-    .map((img) => {
-      try {
-        return new URL(img.getAttribute("src") ?? "", document.baseURI).href;
-      } catch {
-        return "";
-      }
-    })
-    .filter((src) => /^(https?|data):/i.test(src));
-  for (const img of imgs) img.remove();
+  const range = window.getSelection()?.rangeCount ? window.getSelection()?.getRangeAt(0) : undefined;
+  const originals = Array.from(document.querySelectorAll("img")).filter((img) => range?.intersectsNode(img));
+  container.querySelectorAll("img").forEach((img, index) => {
+    if (originals[index]?.currentSrc) img.setAttribute("src", originals[index].currentSrc);
+  });
+  const images = normalizeImageSources(container, document.baseURI);
   // Turndown is loaded lazily: this script runs on every page, but markdown conversion is only
   // needed on the rare context-menu save — keep the per-page cost to this thin shell.
   const { htmlToMarkdown } = await import("@/lib/format");

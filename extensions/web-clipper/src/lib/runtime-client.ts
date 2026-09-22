@@ -2,6 +2,7 @@ import browser from "webextension-polyfill";
 import type { BackgroundRequest } from "./background-protocol";
 import type { ClipSaveStatus } from "./clip-records";
 import type {
+  AttachmentPreviewResult,
   AuthUserResult,
   CaptureCapabilitiesResult,
   ClipRecordsResult,
@@ -13,6 +14,7 @@ import type {
 } from "./messages";
 
 type BackgroundResponses = {
+  GET_ATTACHMENT_PREVIEW: AttachmentPreviewResult;
   GET_POPUP_STATE: PopupStateResult;
   GET_AUTH_USER: AuthUserResult;
   GET_CONNECTION_STATE: ConnectionStateResult;

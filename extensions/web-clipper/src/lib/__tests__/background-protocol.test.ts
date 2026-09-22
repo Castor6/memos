@@ -99,6 +99,7 @@ describe("background protocol", () => {
       expectedInstanceUrl: "https://x",
     },
     { ...save, visibility: "SECRET" },
+    { ...save, inlineImages: "true" },
     { ...save, expectedSource: "other" },
     { ...save, expectedConnectionId: "" },
     { ...save, images: ["ok", 2] },

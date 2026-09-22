@@ -32,6 +32,23 @@ describe("usePageCapture", () => {
     expect(result.current?.articleMarkdown).toBe("");
   });
 
+  it("keeps an image-only selection instead of extracting the entire article", async () => {
+    document.body.innerHTML = '<p><img data-src="/images/selected.webp" alt="Selected image"></p>';
+    const range = document.createRange();
+    range.selectNode(document.querySelector("img")!);
+    window.getSelection()?.removeAllRanges();
+    window.getSelection()?.addRange(range);
+    browserMock.scripting.executeScript.mockImplementation(async (options: unknown) => {
+      const { func, args } = options as { func: (...a: unknown[]) => unknown; args?: unknown[] };
+      return [{ result: func(...(args ?? [])) }];
+    });
+    const { result } = renderHook(() => usePageCapture(true));
+    await waitFor(() => expect(result.current).not.toBeNull());
+    expect(result.current?.selectionMarkdown).toBe(`> ![Selected image](${new URL("/images/selected.webp", document.baseURI).href})`);
+    expect(result.current?.articleMarkdown).toBe("");
+    window.getSelection()?.removeAllRanges();
+  });
+
   it("falls back to the tab title/url with no selection when injection is refused", async () => {
     browserMock.scripting.executeScript.mockRejectedValue(new Error("cannot access page"));
     const { result } = renderHook(() => usePageCapture(true));

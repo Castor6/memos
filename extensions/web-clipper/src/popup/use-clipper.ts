@@ -5,6 +5,7 @@ import { composeCaptureMemo, formatCapturedPosts, utf8Bytes } from "@/lib/captur
 import { type CaptureData, type CaptureKind, type ClipSaveStatus, normalizeClipSourceUrl } from "@/lib/clip-records";
 import type { ConnectionSource } from "@/lib/connection-config";
 import { composeMemoContent } from "@/lib/format";
+import { estimatedArchivedBytes, markdownImageUrls } from "@/lib/markdown-images";
 import type { Visibility } from "@/lib/memos-client";
 import type { SaveResult } from "@/lib/messages";
 import { sendBackgroundRequest } from "@/lib/runtime-client";
@@ -13,13 +14,14 @@ import { captureXPage, type XCaptureResult } from "@/lib/x-capture";
 import { captureActivePage } from "./page-capture";
 
 type SaveExpectation = { source: ConnectionSource; connectionId: string; instanceUrl: string };
-type SaveOperation = { requestId: string; startedAt: number; content?: string; legacyTags?: boolean };
+type SaveOperation = { requestId: string; startedAt: number; content?: string; legacyTags?: boolean; inlineImages?: boolean };
 type Tab = { id?: number; title?: string; url?: string };
 export type Draft = {
   capture: CaptureData;
   title: string;
   original: string;
   images: string[];
+  imageLayout?: "inline";
   tags: string[];
   warnings: string[];
   confirmed: boolean;
@@ -31,6 +33,22 @@ const STORAGE_ERROR = "草稿未能写入本机存储，请保留当前窗口并
 const AMBIGUOUS_ERRORS = new Set(["timeout", "unreachable", "cors", "bad-response", "extension-error"]);
 const validVisibility = (value: unknown): value is Visibility => ["PRIVATE", "PROTECTED", "PUBLIC"].includes(String(value));
 const defaultTags = (mode: CaptureKind) => [mode === "PICK_UP" ? "pick up" : "star"];
+
+/** Older drafts only kept a separate image list. Preserve those images without replacing edited text. */
+function upgradeDraftImages(draft: Draft): Draft {
+  if (draft.imageLayout === "inline") return draft;
+  const existing = new Set(markdownImageUrls(composeCaptureMemo(draft.capture, draft.original)));
+  const missing = [...new Set(draft.images)].filter((source) => !existing.has(source));
+  return {
+    ...draft,
+    imageLayout: "inline",
+    original: [
+      draft.original,
+      ...missing.map((source) => `![](<${source.replace(/[<>\s\\]/g, (character) => encodeURIComponent(character))}>)`),
+    ].join("\n\n"),
+    warnings: missing.length ? [...draft.warnings, "旧草稿的图片已补到原内容末尾；重新提取可恢复图文位置。"] : draft.warnings,
+  };
+}
 
 async function bounded<T>(promise: Promise<T>, message: string, milliseconds: number): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -76,24 +94,28 @@ function restoreDraft(value: unknown, mode: CaptureKind, pageUrl: string): Draft
     if (typeof saved.startedAt !== "number" || !Number.isFinite(saved.startedAt) || saved.startedAt <= 0) return null;
     if (saved.content !== undefined && typeof saved.content !== "string") return null;
     if (saved.legacyTags !== undefined && typeof saved.legacyTags !== "boolean") return null;
+    if (saved.inlineImages !== undefined && typeof saved.inlineImages !== "boolean") return null;
     operation = {
       requestId: saved.requestId,
       startedAt: saved.startedAt,
-      content: saved.content ?? composeCaptureMemo(capture, raw.original, raw.tags === undefined),
+      content: saved.content ?? composeCaptureMemo(capture, raw.original, raw.tags === undefined, false),
       legacyTags: saved.legacyTags ?? raw.tags === undefined,
+      inlineImages: saved.inlineImages ?? false,
     };
   }
-  return {
+  const draft: Draft = {
     capture,
     title: raw.title,
     original: raw.original,
     images: raw.images,
+    ...(raw.imageLayout === "inline" ? { imageLayout: "inline" } : {}),
     tags: (raw.tags as string[] | undefined) ?? defaultTags(mode),
     warnings: raw.warnings,
     confirmed: raw.confirmed,
     visibility: raw.visibility,
     operation,
   };
+  return operation ? draft : upgradeDraftImages(draft);
 }
 
 /** Manual capture with account-scoped drafts and durable, retryable save operations. */
@@ -401,6 +423,7 @@ export function useClipper(expectation: SaveExpectation | null, template: string
             title: captured.title,
             original,
             images: captured.images,
+            imageLayout: "inline",
             tags: existing?.tags ?? defaultTags(mode),
             warnings: captured.fallbackReason ? ["页面正文未能完整提取，请核对原内容；必要时选择正文后重新提取。"] : [],
             confirmed: true,
@@ -432,6 +455,7 @@ export function useClipper(expectation: SaveExpectation | null, template: string
                 ? `${formatCapturedPosts(result.capture)}\n\n[来源](${result.capture.sourceUrl})`
                 : formatCapturedPosts(result.capture),
             images: result.images,
+            imageLayout: "inline",
             tags: existing?.tags ?? defaultTags(mode),
             warnings: result.warnings,
             confirmed: mode === "STAR" || result.isOwnPost === true || existing?.confirmed === true,
@@ -460,7 +484,7 @@ export function useClipper(expectation: SaveExpectation | null, template: string
   );
 
   const content = draft ? (draft.operation?.content ?? composeCaptureMemo(draft.capture, draft.original)) : "";
-  const contentBytes = utf8Bytes(content);
+  const contentBytes = draft?.operation && !draft.operation.inlineImages ? utf8Bytes(content) : estimatedArchivedBytes(content);
   const overLimit = !!capabilities && capabilities.contentMaxBytes > 0 && contentBytes > capabilities.contentMaxBytes;
 
   const save = useCallback(async (): Promise<SaveResult> => {
@@ -472,12 +496,14 @@ export function useClipper(expectation: SaveExpectation | null, template: string
     if (current.capture.kind === "PICK_UP" && !current.confirmed)
       return { ok: false, errorKind: "invalid-content", message: "请先确认这条评论属于你。" };
     const memo = current.operation?.content ?? composeCaptureMemo(current.capture, current.original);
-    if (capabilities.contentMaxBytes > 0 && utf8Bytes(memo) > capabilities.contentMaxBytes)
+    const saveBytes = current.operation && !current.operation.inlineImages ? utf8Bytes(memo) : estimatedArchivedBytes(memo);
+    if (capabilities.contentMaxBytes > 0 && saveBytes > capabilities.contentMaxBytes)
       return { ok: false, errorKind: "content-too-large", contentMaxBytes: capabilities.contentMaxBytes };
     const operation: SaveOperation = current.operation ?? {
       requestId: globalThis.crypto?.randomUUID?.() ?? `clip_${Date.now()}_${Math.random().toString(36).slice(2)}`,
       startedAt: Date.now(),
       content: memo,
+      inlineImages: true,
     };
     const pending = { ...current, operation };
     busyRef.current = true;
@@ -502,12 +528,13 @@ export function useClipper(expectation: SaveExpectation | null, template: string
           saveRequestId: operation.requestId,
           saveStartedAt: operation.startedAt,
           saveIsRetry: Boolean(current.operation),
-          images: current.images,
+          images: operation.inlineImages ? [] : current.images,
+          inlineImages: operation.inlineImages,
           ...(operation.legacyTags ? {} : { tags: current.tags }),
           clip: {
             sourceUrl: current.capture.sourceUrl,
             sourceTitle: current.title,
-            imageCount: current.images.length,
+            imageCount: Math.min(current.images.length, 100),
             capture: current.capture,
           },
         });
@@ -517,7 +544,7 @@ export function useClipper(expectation: SaveExpectation | null, template: string
       }
       if (!mounted.current || scopeRef.current !== scope || accountRef.current !== accountKey) return result;
       if (result.ok || !AMBIGUOUS_ERRORS.has(result.errorKind)) {
-        const finished = { ...pending, operation: null };
+        const finished = upgradeDraftImages({ ...pending, operation: null });
         applyDraft(finished);
         await persist(finished, scope);
       }

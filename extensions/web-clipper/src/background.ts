@@ -1,5 +1,6 @@
 import browser from "webextension-polyfill";
 import { beginOAuthSignIn, clearOAuthSession, getOAuthUser, OAuthUnavailableError, toOAuthIdentity } from "@/auth/oauth-session";
+import { attachmentPreview } from "@/background/attachment-preview";
 import { getOptionsConnectionState, reconcilePopupState } from "@/background/auth-session";
 import {
   clearActiveConnectionConfig,
@@ -90,6 +91,7 @@ async function activateConnection(verify: () => Promise<VerifiedConnection>) {
 browser.runtime.onMessage.addListener((message: unknown, sender: RuntimeSender) => {
   const req = parseBackgroundRequest(message);
   if (!req || !isTrustedBackgroundRequest(req, sender, browser.runtime.id)) return undefined;
+  if (req.type === "GET_ATTACHMENT_PREVIEW") return attachmentPreview(req);
   if (req.type === "GET_POPUP_STATE") return reconcilePopupState();
   if (req.type === "LIST_CLIP_RECORDS")
     return (async () => {
@@ -205,6 +207,7 @@ browser.runtime.onMessage.addListener((message: unknown, sender: RuntimeSender) 
       {
         requestId,
         startedAt: req.saveStartedAt ?? Date.now(),
+        inlineImages: req.inlineImages,
         ...(req.saveIsRetry !== undefined ? { isRetry: req.saveIsRetry } : {}),
         ...(req.saveRequestId || req.clip ? { serverMemoId: requestId } : {}),
       },

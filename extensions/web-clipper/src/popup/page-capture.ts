@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import browser from "webextension-polyfill";
 import { extractArticle } from "@/lib/article";
 import { htmlToMarkdown, toQuotedMarkdown } from "@/lib/format";
+import { normalizeImageSources } from "@/lib/image-sources";
 import type { CapturePayload } from "@/lib/messages";
 
 /** The raw capture, template-independent — composed into the editor prefill once the template loads. */
@@ -56,7 +57,7 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T
 function capturePage(maxDocumentHtmlChars: number): CapturePayload {
   const selection = window.getSelection();
   let selectionHtml = "";
-  let images: string[] = [];
+  const images: string[] = [];
   if (selection && !selection.isCollapsed && selection.rangeCount > 0) {
     // Keep this self-contained: Chrome serializes only `capturePage`, not imported helpers.
     const inlineTags = new Set([
@@ -102,12 +103,23 @@ function capturePage(maxDocumentHtmlChars: number): CapturePayload {
     }
     const container = document.createElement("div");
     container.appendChild(wrapped);
-    // Images become attachments, never hotlinked markdown: pull them out (absolute URLs the
-    // background can fetch) and drop the nodes so Turndown doesn't also emit inline images.
-    const imgs = Array.from(container.querySelectorAll("img"));
-    images = imgs.map((img) => img.src).filter((src) => /^(https?|data):/i.test(src));
-    for (const img of imgs) img.remove();
-    selectionHtml = container.innerHTML;
+    // Keep image nodes in place, resolving against the live page's base before serialization.
+    const selectedImages = Array.from(document.querySelectorAll("img")).filter((img) => range.intersectsNode(img));
+    container.querySelectorAll("img").forEach((img, index) => {
+      if (selectedImages[index]?.currentSrc) img.setAttribute("src", selectedImages[index].currentSrc);
+      for (const attribute of ["src", "data-src", "data-original", "data-lazy-src", "data-url"]) {
+        const raw = img.getAttribute(attribute);
+        if (!raw?.trim()) continue;
+        try {
+          img.setAttribute(attribute, new URL(raw, document.baseURI).href);
+        } catch {
+          /* Retain for inert normalization. */
+        }
+      }
+    });
+    const base = document.createElement("base");
+    base.href = document.baseURI;
+    selectionHtml = base.outerHTML + container.innerHTML;
   }
   const normalized = (value: string | null | undefined) => value?.replace(/\s+/g, " ").trim() || undefined;
   const meta = (s: string) => normalized(document.querySelector<HTMLMetaElement>(s)?.content);
@@ -136,6 +148,10 @@ function capturePage(maxDocumentHtmlChars: number): CapturePayload {
   let documentHtml: string | undefined;
   if (!selectionHtml) {
     const clone = document.documentElement.cloneNode(true) as HTMLElement;
+    const originals = Array.from(document.querySelectorAll("img"));
+    clone.querySelectorAll("img").forEach((img, index) => {
+      if (originals[index]?.currentSrc) img.setAttribute("src", originals[index].currentSrc);
+    });
     for (const element of clone.querySelectorAll("script,noscript,template,iframe,object,embed,canvas,svg")) {
       element.remove();
     }
@@ -202,7 +218,17 @@ export async function captureActivePage(): Promise<PageCapture> {
         title = title || cap.title;
         url = url || cap.url;
         description = cap.description;
-        if (cap.selectionHtml) selectionMarkdown = toQuotedMarkdown(htmlToMarkdown(cap.selectionHtml));
+        let selectionImages = cap.images ?? [];
+        if (cap.selectionHtml) {
+          const selected = new DOMParser().parseFromString(cap.selectionHtml, "text/html");
+          selectionImages = [
+            ...new Set([
+              ...selectionImages,
+              ...normalizeImageSources(selected, selected.querySelector("base[href]")?.getAttribute("href") || cap.url || url),
+            ]),
+          ];
+          selectionMarkdown = toQuotedMarkdown(htmlToMarkdown(selected.body.innerHTML));
+        }
         // A selection is an explicit instruction about what to capture — never second-guess it
         // with the whole article. Extraction only fills the gap when nothing was selected.
         const article = selectionMarkdown || !cap.documentHtml ? null : await extractArticle(cap.documentHtml, url || cap.url);
@@ -212,7 +238,7 @@ export async function captureActivePage(): Promise<PageCapture> {
           description,
           selectionMarkdown,
           articleMarkdown: article ?? "",
-          images: cap.images ?? [],
+          images: selectionImages,
           ...captureFallback({ hasSelection: Boolean(selectionMarkdown), hasArticle: Boolean(article), description }),
         };
       }

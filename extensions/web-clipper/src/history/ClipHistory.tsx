@@ -97,7 +97,7 @@ function ClipDetail({ record }: { record: ClipRecord }) {
             <section>
               <h3 className={`mb-2 ${SECTION_LABEL_CLASS}`}>{t("historyMemoContent")}</h3>
               <div className="max-h-[28rem] overflow-auto rounded-md border bg-muted/15 px-4 py-3.5">
-                <MarkdownPreview content={record.memoContent} />
+                <MarkdownPreview content={record.memoContent} connection={record.previewConnection} />
               </div>
             </section>
             {record.capture ? (

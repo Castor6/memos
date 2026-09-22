@@ -11,6 +11,7 @@ import {
   normalizeInstanceUrl,
   type Visibility,
 } from "./memos-client";
+import type { PreviewConnection } from "./messages";
 
 export type { CaptureData, CapturedPost, CaptureKind } from "./capture-data";
 
@@ -22,6 +23,7 @@ export type ClipSelection = {
 };
 
 export type ClipRecord = {
+  previewConnection?: PreviewConnection;
   schemaVersion: 1;
   id: string;
   dedupeKey: string;
@@ -179,6 +181,11 @@ function serverRecord(connection: ClipConnection, memo: MemoSummary): ClipRecord
     schemaVersion: 1,
     id: memo.name,
     dedupeKey: `server:${memo.name}`,
+    previewConnection: {
+      expectedSource: connection.source,
+      expectedConnectionId: connection.connectionId,
+      expectedInstanceUrl: connection.credentials.instanceUrl,
+    },
     instanceUrl: normalizeInstanceUrl(connection.credentials.instanceUrl),
     sourceUrl: capture.sourceUrl,
     sourceTitle: capture.posts.find((post) => post.id === capture.sourceId)?.content.slice(0, 120) || capture.sourceUrl,

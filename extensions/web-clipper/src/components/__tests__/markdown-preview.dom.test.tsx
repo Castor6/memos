@@ -1,9 +1,64 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { composeCaptureMemo } from "@/lib/capture-format";
+import { browserMock } from "@/test/browser-mock";
 import { MarkdownPreview } from "../markdown-preview";
 
 describe("MarkdownPreview", () => {
+  it("previews captured base64 raster images while blocking active data images and links", () => {
+    const { container } = render(
+      <MarkdownPreview
+        content={
+          '![Raster](data:image/png;base64,AQID)\n\n![Active](data:image/svg+xml;base64,PHN2Zz4=)\n\n<img src="data:text/html;base64,PHNjcmlwdD4=">\n\n[Data link](data:image/png;base64,AQID)'
+        }
+      />,
+    );
+    expect(screen.getByRole("img", { name: "Raster" })).toHaveAttribute("src", "data:image/png;base64,AQID");
+    expect(container.querySelectorAll("img")).toHaveLength(1);
+    expect(screen.getByText("Data link")).not.toHaveAttribute("href", "data:image/png;base64,AQID");
+  });
+
+  it("loads private attachment previews through the worker without cookies or credentials in image URLs", async () => {
+    browserMock.runtime.sendMessage.mockResolvedValue({ ok: true, dataUrl: "data:image/png;base64,AQID" });
+    render(
+      <MarkdownPreview
+        connection={{ expectedSource: "direct", expectedConnectionId: "one", expectedInstanceUrl: "https://memos.example.com" }}
+        content="![Archived](/file/attachments/image1/photo.png)\n\n![Remote](https://example.com/remote.png)"
+      />,
+    );
+    await waitFor(() => expect(screen.getByRole("img", { name: "Archived" })).toHaveAttribute("src", "data:image/png;base64,AQID"));
+    expect(browserMock.runtime.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "GET_ATTACHMENT_PREVIEW", expectedConnectionId: "one" }),
+    );
+    expect(screen.getByRole("img", { name: "Remote" })).toHaveAttribute("src", "https://example.com/remote.png");
+  });
+
+  it("ignores late results after an account switch and shows preview failure", async () => {
+    let finish: (value: unknown) => void = () => {};
+    browserMock.runtime.sendMessage.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const { rerender } = render(
+      <MarkdownPreview
+        connection={{ expectedSource: "direct", expectedConnectionId: "old", expectedInstanceUrl: "https://memos.example.com" }}
+        content="![Private](/file/attachments/image1/photo.png)"
+      />,
+    );
+    browserMock.runtime.sendMessage.mockResolvedValue({ ok: false });
+    rerender(
+      <MarkdownPreview
+        connection={{ expectedSource: "direct", expectedConnectionId: "new", expectedInstanceUrl: "https://memos.example.com" }}
+        content="![Private](/file/attachments/image1/photo.png)"
+      />,
+    );
+    finish({ ok: true, dataUrl: "data:image/png;base64,OLD" });
+    await screen.findByText(/图片预览不可用/);
+    expect(screen.getByRole("img", { name: "Private" })).not.toHaveAttribute("src");
+  });
+
   it("preserves soft line breaks in multiline Pick up comments", () => {
     const { container } = render(<MarkdownPreview content={"## Pick up\n\n第一行评论\n第二行评论\n第三行评论"} />);
     expect(container.querySelector("p")?.innerHTML).toBe("第一行评论<br>\n第二行评论<br>\n第三行评论");

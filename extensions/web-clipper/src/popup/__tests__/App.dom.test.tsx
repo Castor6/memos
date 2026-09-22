@@ -173,6 +173,49 @@ describe("App — manual capture workspace", () => {
     expect(await screen.findByText(/2 images weren't attached/i)).toBeInTheDocument();
   });
 
+  it("shows persistent image failure details safely and clears them when editing", async () => {
+    const embedded = `data:image/png;base64,${"a".repeat(300)}`;
+    wireSaveResult({
+      ok: true,
+      webUrl: "https://memos.example.com/memos/1",
+      failedImages: 2,
+      failedImageDetails: [
+        { url: "https://example.com/missing.png", reason: "图片下载失败" },
+        { url: embedded, reason: "图片超过大小限制" },
+      ],
+    });
+    const { user } = await startStar();
+    await user.click(screen.getByRole("button", { name: /save to memos/i }));
+    await user.click(await screen.findByText("未转存的图片（已保留原链接）"));
+    expect(screen.getByText("图片下载失败")).toBeVisible();
+    expect(screen.getByTitle("https://example.com/missing.png").tagName).toBe("P");
+    const embeddedLabel = screen.getByTitle(embedded);
+    expect(embeddedLabel.textContent!.length).toBeLessThan(180);
+    expect(embeddedLabel).not.toHaveAttribute("href");
+    await waitFor(() => expect(screen.queryByRole("button", { name: /saved to memos/i })).not.toBeInTheDocument(), {
+      timeout: 2500,
+    });
+    expect(screen.getByText("图片下载失败")).toBeVisible();
+    await user.type(screen.getByRole("textbox", { name: "我的思考" }), "Updated thought");
+    expect(screen.queryByText("未转存的图片（已保留原链接）")).not.toBeInTheDocument();
+    expect(screen.queryByText(/2 images weren't attached/i)).not.toBeInTheDocument();
+  });
+
+  it("clears image failures when starting another capture mode", async () => {
+    wireSaveResult({
+      ok: true,
+      webUrl: "https://memos.example.com/memos/1",
+      failedImages: 1,
+      failedImageDetails: [{ url: "https://example.com/missing.png", reason: "图片下载失败" }],
+    });
+    const { user } = await startStar();
+    await user.click(screen.getByRole("button", { name: /save to memos/i }));
+    await screen.findByText("未转存的图片（已保留原链接）");
+    await user.click(screen.getByRole("button", { name: "Pick up" }));
+    expect(screen.queryByText("未转存的图片（已保留原链接）")).not.toBeInTheDocument();
+    expect(screen.queryByText(/weren't attached/i)).not.toBeInTheDocument();
+  });
+
   it("retries the same save after a timeout without recapturing", async () => {
     wireSaveResult({ ok: false, errorKind: "timeout" });
     const { user } = await startStar();

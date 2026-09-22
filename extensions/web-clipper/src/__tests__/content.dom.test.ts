@@ -86,6 +86,7 @@ describe("content script — GET_SELECTION", () => {
 
     expect(result.markdown).toContain("Hello");
     expect(result.markdown).not.toContain("window.bad");
+    expect(result.markdown).toContain(`![clip](${new URL("/clip.png", document.baseURI).href})`);
     expect(result.images).toEqual([new URL("/clip.png", document.baseURI).href]);
   });
 });

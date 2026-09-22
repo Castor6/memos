@@ -1,6 +1,13 @@
 import browser from "webextension-polyfill";
 import { OAuthUnavailableError } from "@/auth/oauth-session";
 import { resolveActiveConnection } from "@/background/connection-source";
+import {
+  archiveMarkdownImages,
+  type ImageArchiveEntry,
+  imageArchivePlan,
+  recoveredImageContent,
+  uploadImages,
+} from "@/background/image-archive";
 import { parseCaptureData } from "@/lib/capture-data";
 import {
   type CaptureData,
@@ -12,8 +19,8 @@ import {
 import type { ConnectionSource } from "@/lib/connection-config";
 import { InstanceError, toSaveErrorKind } from "@/lib/errors";
 import { composeMemoContent, toQuotedMarkdown } from "@/lib/format";
+import { estimatedArchivedBytes, markdownImageUrls } from "@/lib/markdown-images";
 import {
-  createAttachment,
   createMemo,
   getCurrentUser,
   getMemo,
@@ -25,7 +32,7 @@ import {
 import type { SaveResult, SelectionClip } from "@/lib/messages";
 
 export type SaveExpectation = { source: ConnectionSource; connectionId: string; instanceUrl: string };
-export type SaveOperation = { requestId: string; startedAt: number; serverMemoId?: string; isRetry?: boolean };
+export type SaveOperation = { requestId: string; startedAt: number; serverMemoId?: string; isRetry?: boolean; inlineImages?: boolean };
 
 export const SAVE_ATTEMPTS_KEY = "memoSaveAttemptsV1";
 const ATTEMPT_TTL_MS = 15 * 60_000;
@@ -37,6 +44,11 @@ type AttemptRecord = {
   updatedAt?: number;
   attachmentNames?: string[];
   failedImages?: number;
+  failedImageDetails?: Array<{ url: string; reason: string }>;
+  imageEntries?: ImageArchiveEntry[];
+  inlineImages?: boolean;
+  memoContent?: string;
+  memoCreationStarted?: boolean;
   result?: Extract<SaveResult, { ok: true }>;
 };
 
@@ -66,6 +78,7 @@ async function saveFingerprint(
   accessToken: string,
   capture?: CaptureData,
   tags?: string[],
+  inlineImages = false,
 ): Promise<string> {
   const value = JSON.stringify([
     content,
@@ -77,6 +90,7 @@ async function saveFingerprint(
     accessToken,
     capture,
     ...(tags !== undefined ? [tags] : []),
+    ...(inlineImages ? ["inline-images-v1"] : []),
   ]);
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -146,12 +160,17 @@ export async function savePopupMemo(
     return { ok: false, errorKind: "auth-changed" };
   }
   let capture = clip?.capture;
+  let contentMaxBytes: number | undefined;
   if (capture) {
     capture = { ...capture, sourceUrl: normalizeClipSourceUrl(capture.sourceUrl) };
     try {
       const capabilities = await captureCapabilities(connection);
+      contentMaxBytes = capabilities.contentMaxBytes;
       if (!capabilities.supported) return { ok: false, errorKind: "capture-unsupported" };
-      if (new TextEncoder().encode(content).byteLength > capabilities.contentMaxBytes)
+      if (
+        (operation.inlineImages ? estimatedArchivedBytes(content) : new TextEncoder().encode(content).byteLength) >
+        capabilities.contentMaxBytes
+      )
         return { ok: false, errorKind: "content-too-large", contentMaxBytes: capabilities.contentMaxBytes };
     } catch (error) {
       return { ok: false, errorKind: toSaveErrorKind(error) };
@@ -159,11 +178,32 @@ export async function savePopupMemo(
   }
   if (!(await connectionStillMatches(expected, credentials))) return { ok: false, errorKind: "auth-changed" };
   const attemptKey = JSON.stringify([expected.source, expected.connectionId, expected.instanceUrl, operation.requestId]);
-  const fingerprint = await saveFingerprint(content, visibility, expected, images, credentials.accessToken, capture, tags);
+  const fingerprint = await saveFingerprint(
+    content,
+    visibility,
+    expected,
+    images,
+    credentials.accessToken,
+    capture,
+    tags,
+    operation.inlineImages,
+  );
   const running = inFlight.get(attemptKey);
   if (running) return running.fingerprint === fingerprint ? running.promise : { ok: false, errorKind: "invalid-content" };
 
-  const save = savePopupMemoOnce(content, visibility, images, expected, operation, credentials, attemptKey, fingerprint, capture, tags)
+  const save = savePopupMemoOnce(
+    content,
+    visibility,
+    images,
+    expected,
+    operation,
+    credentials,
+    attemptKey,
+    fingerprint,
+    capture,
+    tags,
+    contentMaxBytes,
+  )
     .then(async (result) => {
       if (!(await connectionStillMatches(expected, credentials))) return { ok: false, errorKind: "auth-changed" } as const;
       if (result.ok && clip && !clip.capture) {
@@ -207,10 +247,13 @@ async function savePopupMemoOnce(
   fingerprint: string,
   capture?: CaptureData,
   tags?: string[],
+  contentMaxBytes?: number,
 ): Promise<SaveResult> {
   const previous = (await readAttempts())[attemptKey];
   if (previous && previous.fingerprint !== fingerprint) return { ok: false, errorKind: "bad-response" };
   if (previous?.result && !operation.serverMemoId) return previous.result;
+
+  const imagePlan = operation.inlineImages ? (previous?.imageEntries ?? (await imageArchivePlan(content, attemptKey))) : [];
 
   // Stable capture IDs must be checked even after local retry state expires or is cleared.
   // This also avoids uploading attachments again for a previously completed remote save.
@@ -219,11 +262,17 @@ async function savePopupMemoOnce(
       const exact = operation.serverMemoId ? await getMemo(credentials, operation.serverMemoId) : null;
       // An unknown save may already have been created and subsequently deleted. A retry
       // may confirm an existing memo, but only an explicit new operation may create one.
-      if (operation.serverMemoId && !exact && (previous?.result || (capture && operation.isRetry))) {
+      if (
+        operation.serverMemoId &&
+        !exact &&
+        (previous?.result || (capture && operation.isRetry && !(previous?.inlineImages && !previous.memoCreationStarted)))
+      ) {
         return { ok: false, errorKind: "not-found" };
       }
       const currentUser = exact || !operation.serverMemoId ? await getCurrentUser(credentials) : null;
       const recent = operation.serverMemoId ? (exact ? [exact] : []) : await listRecentMemos(credentials, 20, currentUser?.name);
+      const expectedContent = (memo: (typeof recent)[number]) =>
+        previous?.memoContent ?? (operation.inlineImages ? recoveredImageContent(content, imagePlan, memo.attachments ?? []) : content);
       const match = recent.find(
         (memo) =>
           memo.creator === currentUser?.name &&
@@ -231,16 +280,25 @@ async function savePopupMemoOnce(
             (capture && previous?.result) ||
             ((memo.tags ?? []).length === tags.length && tags.every((tag) => memo.tags?.includes(tag)))) &&
           (capture
-            ? sameCapture(memo.capture, capture) && (previous?.result || (memo.content === content && memo.visibility === visibility))
-            : memo.content === content && memo.visibility === visibility) &&
+            ? sameCapture(memo.capture, capture) &&
+              (previous?.result || (memo.content === expectedContent(memo) && memo.visibility === visibility))
+            : memo.content === expectedContent(memo) && memo.visibility === visibility) &&
           (operation.serverMemoId || Date.parse(memo.createTime) >= operation.startedAt - RECONCILIATION_CLOCK_SKEW_MS),
       );
       if (match) {
-        const failedImages = previous?.failedImages ?? Math.max(0, images.length - (match.attachments?.length ?? 0));
+        const failedImageDetails = operation.inlineImages
+          ? (previous?.failedImageDetails ??
+            imagePlan
+              .filter((entry) => !match.attachments?.some((attachment) => attachment.name === `attachments/${entry.id}`))
+              .map((entry) => ({ url: entry.source, reason: "图片未能转存，已保留原链接" })))
+          : undefined;
+        const failedImages =
+          previous?.failedImages ?? failedImageDetails?.length ?? Math.max(0, images.length - (match.attachments?.length ?? 0));
         const result: Extract<SaveResult, { ok: true }> = {
           ok: true,
           webUrl: memoWebUrl(credentials.instanceUrl, match),
           ...(failedImages ? { failedImages } : {}),
+          ...(failedImageDetails?.length ? { failedImageDetails } : {}),
         };
         await writeAttempt(attemptKey, { fingerprint, startedAt: operation.startedAt, ...previous, result });
         return result;
@@ -252,12 +310,39 @@ async function savePopupMemoOnce(
     }
   }
 
-  let attempt: AttemptRecord = previous ?? { fingerprint, startedAt: operation.startedAt };
+  let attempt: AttemptRecord = previous ?? {
+    fingerprint,
+    startedAt: operation.startedAt,
+    ...(operation.inlineImages ? { inlineImages: true } : {}),
+  };
   await writeAttempt(attemptKey, attempt);
 
   let names = attempt.attachmentNames;
   let failed = attempt.failedImages ?? 0;
-  if (!names) {
+  let finalContent = attempt.memoContent ?? content;
+  if (operation.inlineImages && !names) {
+    const archived = await archiveMarkdownImages(
+      content,
+      imagePlan,
+      credentials,
+      async (imageEntries) => {
+        attempt = { ...attempt, imageEntries: imageEntries.map((entry) => ({ ...entry })) };
+        await writeAttempt(attemptKey, attempt);
+      },
+      () => connectionStillMatches(expected, credentials),
+    );
+    names = archived.names;
+    failed = archived.failures.length;
+    finalContent = archived.content;
+    attempt = {
+      ...attempt,
+      attachmentNames: names,
+      failedImages: failed,
+      failedImageDetails: archived.failures,
+      memoContent: finalContent,
+    };
+    await writeAttempt(attemptKey, attempt);
+  } else if (!names) {
     const uploaded = await uploadImages(images, credentials, () => connectionStillMatches(expected, credentials));
     names = uploaded.names;
     failed = uploaded.failed;
@@ -266,9 +351,21 @@ async function savePopupMemoOnce(
   }
 
   if (!(await connectionStillMatches(expected, credentials))) return { ok: false, errorKind: "auth-changed" };
-  const result = await createMemoWithAttachments(content, names, credentials, visibility, operation.serverMemoId, capture, tags);
+  if (contentMaxBytes !== undefined && new TextEncoder().encode(finalContent).byteLength > contentMaxBytes) {
+    return { ok: false, errorKind: "content-too-large", contentMaxBytes };
+  }
+  attempt = { ...attempt, memoCreationStarted: true };
+  await writeAttempt(attemptKey, attempt);
+  const result = await createMemoWithAttachments(finalContent, names, credentials, visibility, operation.serverMemoId, capture, tags);
   if (result.ok) {
-    const success = failed > 0 ? { ...result, failedImages: failed } : result;
+    const success =
+      failed > 0
+        ? {
+            ...result,
+            failedImages: failed,
+            ...(attempt.failedImageDetails?.length ? { failedImageDetails: attempt.failedImageDetails } : {}),
+          }
+        : result;
     await writeAttempt(attemptKey, { ...attempt, result: success });
     return success;
   }
@@ -281,161 +378,6 @@ async function savePopupMemoOnce(
   return result;
 }
 
-const MAX_IMAGES_PER_CLIP = 10;
-const IMAGE_DOWNLOAD_TIMEOUT_MS = 8_000;
-const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
-const MAX_DATA_URL_LENGTH = Math.ceil((MAX_IMAGE_BYTES * 4) / 3) + 1024;
-const SAFE_IMAGE_TYPES = new Set(["image/avif", "image/gif", "image/jpeg", "image/png", "image/webp"]);
-const PRIVATE_HOST_SUFFIXES = [".corp", ".home", ".internal", ".lan", ".local", ".localdomain"];
-
-function blockedIpv4(hostname: string): boolean {
-  const octets = hostname.split(".").map(Number);
-  if (octets.length !== 4 || octets.some((value) => !Number.isInteger(value) || value < 0 || value > 255)) return false;
-  const [a, b] = octets as [number, number, number, number];
-  return (
-    a === 0 ||
-    a === 10 ||
-    a === 127 ||
-    (a === 100 && b >= 64 && b <= 127) ||
-    (a === 169 && b === 254) ||
-    (a === 172 && b >= 16 && b <= 31) ||
-    (a === 192 && b === 168) ||
-    a >= 224
-  );
-}
-
-function blockedImageHostname(hostname: string): boolean {
-  const host = hostname.replace(/^\[|\]$/g, "").toLowerCase();
-  if (
-    host === "localhost" ||
-    host.endsWith(".localhost") ||
-    host === "metadata.google.internal" ||
-    PRIVATE_HOST_SUFFIXES.some((suffix) => host.endsWith(suffix))
-  ) {
-    return true;
-  }
-  if (blockedIpv4(host)) return true;
-  // Single-label hostnames normally resolve through a private DNS search domain. IPv4-mapped
-  // IPv6 literals are blocked as a class so alternate spellings cannot bypass the IPv4 ranges.
-  if (!host.includes(".") && !host.includes(":")) return true;
-  return host === "::" || host === "::1" || /^f[cd]/.test(host) || /^fe[89ab]/.test(host) || /(^|:)ffff:/.test(host);
-}
-
-function validImageSource(srcUrl: string): URL | null {
-  if (!srcUrl || srcUrl.length > MAX_DATA_URL_LENGTH) return null;
-  let url: URL;
-  try {
-    url = new URL(srcUrl);
-  } catch {
-    return null;
-  }
-  if (url.protocol === "data:") return /^data:image\/[a-z0-9.+-]+[;,]/i.test(srcUrl) ? url : null;
-  if (url.protocol !== "https:" || url.username || url.password || blockedImageHostname(url.hostname)) return null;
-  return url;
-}
-
-async function readImageBytes(response: Response): Promise<{ bytes: Uint8Array; type: string } | null> {
-  const type = response.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase() ?? "";
-  // SVG and arbitrary image/* subtypes can carry active content. Only passive raster formats
-  // that browsers and Memos serve safely are accepted as attachments.
-  if (!SAFE_IMAGE_TYPES.has(type)) return null;
-
-  const declaredLength = Number(response.headers.get("content-length"));
-  if (Number.isFinite(declaredLength) && declaredLength > MAX_IMAGE_BYTES) return null;
-  if (!response.body) {
-    const bytes = new Uint8Array(await response.arrayBuffer());
-    return bytes.byteLength <= MAX_IMAGE_BYTES ? { bytes, type } : null;
-  }
-
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    total += value.byteLength;
-    if (total > MAX_IMAGE_BYTES) {
-      await reader.cancel();
-      return null;
-    }
-    chunks.push(value);
-  }
-
-  const bytes = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return { bytes, type };
-}
-
-async function uploadImages(
-  images: string[],
-  credentials: MemosCredentials,
-  stillCurrent?: () => Promise<boolean>,
-): Promise<{ names: string[]; failed: number }> {
-  const capped = images.slice(0, MAX_IMAGES_PER_CLIP);
-  const names: string[] = [];
-  // Sequential downloads keep the peak memory bounded to one decoded/base64 image.
-  for (const src of capped) {
-    if (stillCurrent && !(await stillCurrent())) break;
-    const name = await uploadImageAttachment(src, credentials, stillCurrent);
-    if (name) names.push(name);
-  }
-  return { names, failed: images.length - names.length };
-}
-
-function bytesToBase64(bytes: Uint8Array): string {
-  let binary = "";
-  const chunk = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunk) binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
-  return btoa(binary);
-}
-
-function imageFilename(srcUrl: string, type: string): string {
-  try {
-    const base = new URL(srcUrl).pathname.split("/").pop();
-    if (base && /\.\w+$/.test(base)) return decodeURIComponent(base);
-  } catch {
-    // data: URL or non-URL — fall through to a generated name.
-  }
-  const ext = type.split("/")[1]?.split("+")[0] || "png";
-  return `clip.${ext}`;
-}
-
-async function uploadImageAttachment(
-  srcUrl: string,
-  credentials: MemosCredentials,
-  stillCurrent?: () => Promise<boolean>,
-): Promise<string | null> {
-  const source = validImageSource(srcUrl);
-  if (!source) return null;
-  try {
-    const res = await fetch(source, {
-      credentials: "omit",
-      redirect: "error",
-      referrerPolicy: "no-referrer",
-      signal: AbortSignal.timeout(IMAGE_DOWNLOAD_TIMEOUT_MS),
-    });
-    if (!res.ok) return null;
-    const image = await readImageBytes(res);
-    if (!image) return null;
-    if (stillCurrent && !(await stillCurrent())) return null;
-    const content = bytesToBase64(image.bytes);
-    const attachment = await createAttachment(credentials, {
-      filename: imageFilename(source.toString(), image.type),
-      type: image.type,
-      content,
-    });
-    return attachment.name;
-  } catch (error) {
-    const errorName = typeof error === "object" && error !== null && "name" in error ? String(error.name) : "Error";
-    console.warn("[memos-web-clipper] image attachment failed", { origin: source.origin, errorName });
-    return null;
-  }
-}
-
 export async function saveSelectionClip(
   clip: SelectionClip,
   title: string,
@@ -443,17 +385,36 @@ export async function saveSelectionClip(
   credentials: MemosCredentials,
   template: string | null,
 ): Promise<SaveResult> {
-  const { names, failed } = await uploadImages(clip.images, credentials);
-  if (!clip.markdown && names.length === 0) return { ok: false, errorKind: "bad-response" };
+  // Older content scripts and the image context menu send media separately; preserve it inline too.
+  const inlineSources = new Set(markdownImageUrls(clip.markdown));
+  const missingImages = [...new Set(clip.images)].filter((source) => !inlineSources.has(source));
+  const body = [
+    clip.markdown,
+    ...missingImages.map((source) => `![](<${source.replace(/[<>\s\\]/g, (character) => encodeURIComponent(character))}>)`),
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+  if (!body.trim()) return { ok: false, errorKind: "bad-response" };
   const content = composeMemoContent({
-    bodyMarkdown: toQuotedMarkdown(clip.markdown),
+    bodyMarkdown: toQuotedMarkdown(body),
     title,
     url,
     description: clip.description,
     template,
   });
-  const result = await createMemoWithAttachments(content, names, credentials, "PRIVATE");
-  return result.ok && failed > 0 ? { ...result, failedImages: failed } : result;
+  // Context-menu saves predate the popup's durable save operation; keep their one-shot behavior.
+  const plan = await imageArchivePlan(content, crypto.randomUUID());
+  const archived = await archiveMarkdownImages(
+    content,
+    plan,
+    credentials,
+    async () => {},
+    async () => true,
+  );
+  const result = await createMemoWithAttachments(archived.content, archived.names, credentials, "PRIVATE");
+  return result.ok && archived.failures.length
+    ? { ...result, failedImages: archived.failures.length, failedImageDetails: archived.failures }
+    : result;
 }
 
 async function createMemoWithAttachments(

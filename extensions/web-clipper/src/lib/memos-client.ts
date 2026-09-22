@@ -192,7 +192,7 @@ export async function createMemo(
     content: string;
     visibility: Visibility;
     memoId?: string;
-    attachments?: Array<{ name: string }>;
+    attachments?: Array<{ name: string; filename?: string }>;
     capture?: CaptureData;
     tags?: string[];
     explicitTags?: boolean;
@@ -216,7 +216,7 @@ export type MemoSummary = CreatedMemo & {
   state?: "NORMAL" | "ARCHIVED";
   capture?: CaptureData;
   tags?: string[];
-  attachments?: Array<{ name: string }>;
+  attachments?: Array<{ name: string; filename?: string }>;
 };
 
 function parseMemo(value: unknown): MemoSummary {
@@ -252,7 +252,14 @@ function parseMemo(value: unknown): MemoSummary {
     ...(memo.state === "NORMAL" || memo.state === "ARCHIVED" ? { state: memo.state } : {}),
     ...(capture ? { capture } : {}),
     ...(Array.isArray(memo.tags) ? { tags: memo.tags as string[] } : {}),
-    ...(Array.isArray(memo.attachments) ? { attachments: memo.attachments.map((attachment) => ({ name: String(attachment.name) })) } : {}),
+    ...(Array.isArray(memo.attachments)
+      ? {
+          attachments: memo.attachments.map((attachment) => ({
+            name: String(attachment.name),
+            ...(typeof attachment.filename === "string" ? { filename: attachment.filename } : {}),
+          })),
+        }
+      : {}),
   };
 }
 
@@ -352,19 +359,43 @@ export async function listRecentMemos(
     .filter((memo) => !creator || memo.creator === creator);
 }
 
-export type CreatedAttachment = { name: string };
+export type CreatedAttachment = { name: string; filename: string };
+
+function parseAttachment(raw: unknown, fallbackFilename?: string): CreatedAttachment {
+  if (!raw || typeof raw !== "object") return badResponse();
+  const obj = raw as Record<string, unknown>;
+  const filename = typeof obj.filename === "string" && obj.filename ? obj.filename : fallbackFilename;
+  if (typeof obj.name !== "string" || !/^attachments\/[a-zA-Z0-9_-]+$/.test(obj.name) || !filename) return badResponse();
+  return { name: obj.name, filename };
+}
+
+/** Read a known attachment to reconcile an upload whose response was lost. */
+export async function getAttachment(creds: MemosCredentials, id: string, deps?: InstanceFetchDeps): Promise<CreatedAttachment | null> {
+  try {
+    return parseAttachment(await instanceFetchJson(creds, `/api/v1/attachments/${encodeURIComponent(id)}`, { method: "GET" }, deps));
+  } catch (error) {
+    if (error instanceof InstanceError && error.kind === "not-found") return null;
+    throw error;
+  }
+}
+
+/** Stable file route also resolves S3 storage without persisting an expiring signed URL. */
+export function attachmentMarkdownUrl(attachment: CreatedAttachment): string {
+  return `/file/${attachment.name}/${encodeURIComponent(attachment.filename)}`;
+}
 
 /** Uploads bytes as a Memos attachment. `content` is base64-encoded (the API's bytes format). */
 export async function createAttachment(
   creds: MemosCredentials,
-  input: { filename: string; type: string; content: string },
+  input: { filename: string; type: string; content: string; attachmentId?: string },
   deps?: InstanceFetchDeps,
 ): Promise<CreatedAttachment> {
-  const raw = await instanceFetchJson(creds, "/api/v1/attachments", { method: "POST", body: input }, deps);
-  if (typeof raw !== "object" || raw === null) return badResponse();
-  const obj = raw as Record<string, unknown>;
-  if (typeof obj.name !== "string" || !obj.name.trim()) return badResponse();
-  return { name: obj.name };
+  const { attachmentId, ...attachment } = input;
+  const query = attachmentId ? `?attachmentId=${encodeURIComponent(attachmentId)}` : "";
+  return parseAttachment(
+    await instanceFetchJson(creds, `/api/v1/attachments${query}`, { method: "POST", body: attachment }, deps),
+    input.filename,
+  );
 }
 
 export function memoWebUrl(instanceUrl: string, memo: CreatedMemo): string {

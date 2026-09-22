@@ -206,6 +206,7 @@ function SignedInView({ c, state, blocked }: { c: ClipperState; state: ReadyPopu
   const [error, setError] = useState<SaveErrorDetail | null>(null);
   const [saved, setSaved] = useState(false);
   const [failedImages, setFailedImages] = useState(0);
+  const [failedImageDetails, setFailedImageDetails] = useState<Array<{ url: string; reason: string }>>([]);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(
     () => () => {
@@ -217,21 +218,28 @@ function SignedInView({ c, state, blocked }: { c: ClipperState; state: ReadyPopu
   const isPickup = draft?.capture.kind === "PICK_UP";
   const disabled = c.busy || c.extracting || !!blocked;
   const editingDisabled = disabled || c.awaitingConfirmation;
+  const clearFeedback = () => {
+    setSaved(false);
+    setError(null);
+    setFailedImages(0);
+    setFailedImageDetails([]);
+  };
   const onSave = async () => {
     setSaved(false);
     setFailedImages(0);
+    setFailedImageDetails([]);
     const result = await c.save();
     if (result.ok) {
       setError(null);
       setSaved(true);
       setFailedImages(result.failedImages ?? 0);
+      setFailedImageDetails(result.failedImageDetails ?? []);
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(() => setSaved(false), SAVED_CONFIRMATION_MS);
     } else setError(describeSaveError(result.errorKind, state.source));
   };
   const edit = (change: Parameters<ClipperState["update"]>[0], fields?: Parameters<ClipperState["update"]>[1]) => {
-    setSaved(false);
-    setError(null);
+    clearFeedback();
     c.update(change, fields);
   };
   const visibilityItems = { PRIVATE: t("commonPrivate"), PROTECTED: t("commonProtected"), PUBLIC: t("commonPublic") };
@@ -246,8 +254,7 @@ function SignedInView({ c, state, blocked }: { c: ClipperState; state: ReadyPopu
             variant={draft?.capture.kind === "STAR" ? "default" : "outline"}
             disabled={!c.ready || disabled}
             onClick={() => {
-              setError(null);
-              setSaved(false);
+              clearFeedback();
               void c.start("STAR");
             }}
           >
@@ -257,8 +264,7 @@ function SignedInView({ c, state, blocked }: { c: ClipperState; state: ReadyPopu
             variant={isPickup ? "default" : "outline"}
             disabled={!c.ready || disabled}
             onClick={() => {
-              setError(null);
-              setSaved(false);
+              clearFeedback();
               void c.start("PICK_UP");
             }}
           >
@@ -317,7 +323,15 @@ function SignedInView({ c, state, blocked }: { c: ClipperState; state: ReadyPopu
               >
                 {draft.title || draft.capture.sourceUrl}
               </a>
-              <Button size="xs" variant="ghost" disabled={editingDisabled} onClick={() => void c.start(draft.capture.kind, true)}>
+              <Button
+                size="xs"
+                variant="ghost"
+                disabled={editingDisabled}
+                onClick={() => {
+                  clearFeedback();
+                  void c.start(draft.capture.kind, true);
+                }}
+              >
                 重新提取原内容
               </Button>
             </div>
@@ -392,12 +406,19 @@ function SignedInView({ c, state, blocked }: { c: ClipperState; state: ReadyPopu
             <details className="rounded-md border p-2">
               <summary className="cursor-pointer text-xs">预览完整保存内容</summary>
               <div className="mt-2">
-                <MarkdownPreview content={c.content} />
+                <MarkdownPreview
+                  content={c.content}
+                  connection={{
+                    expectedSource: state.source,
+                    expectedConnectionId: state.identity.userId,
+                    expectedInstanceUrl: state.instanceUrl,
+                  }}
+                />
               </div>
             </details>
             {draft.images.length ? <p className="text-xs text-muted-foreground">{draft.images.length} 张图片将尝试保存为附件。</p> : null}
             <p role={c.overLimit ? "alert" : "status"} className={`text-xs ${c.overLimit ? "text-destructive" : "text-muted-foreground"}`}>
-              正文 {c.contentBytes.toLocaleString()} 字节
+              预计正文 {c.contentBytes.toLocaleString()} 字节
               {c.capabilities ? ` / 上限 ${c.capabilities.contentMaxBytes.toLocaleString()} 字节` : " · 正在读取服务器限制…"}
               {c.overLimit ? "。已超限，请精简原内容，或在 Memos 实例设置中调整正文上限。草稿会保留。" : ""}
             </p>
@@ -420,6 +441,21 @@ function SignedInView({ c, state, blocked }: { c: ClipperState; state: ReadyPopu
               <p role="status" className="text-xs text-destructive">
                 {tp("popupFailedImages", failedImages)}
               </p>
+            ) : null}
+            {failedImageDetails.length ? (
+              <details className="min-w-0 rounded-md border p-2 text-xs text-destructive">
+                <summary className="cursor-pointer">未转存的图片（已保留原链接）</summary>
+                <ul className="mt-2 space-y-2">
+                  {failedImageDetails.map(({ url, reason }) => (
+                    <li key={url} className="min-w-0">
+                      <p className="truncate select-text" title={url}>
+                        {url.length > 180 ? `${url.slice(0, 140)}…${url.slice(-24)}` : url}
+                      </p>
+                      <p className="break-words">{reason}</p>
+                    </li>
+                  ))}
+                </ul>
+              </details>
             ) : null}
           </>
         ) : null}
