@@ -39,7 +39,12 @@ func (d *DB) CreateMemo(ctx context.Context, create *store.Memo) (*store.Memo, e
 	}
 
 	stmt := "INSERT INTO `memo` (" + strings.Join(fields, ", ") + ") VALUES (" + strings.Join(placeholder, ", ") + ")"
-	result, err := d.db.ExecContext(ctx, stmt, args...)
+	tx, err := d.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	result, err := tx.ExecContext(ctx, stmt, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -49,6 +54,12 @@ func (d *DB) CreateMemo(ctx context.Context, create *store.Memo) (*store.Memo, e
 		return nil, err
 	}
 	id := int32(rawID)
+	if err := store.EnqueueMemoLinks(ctx, tx, "mysql", create.Content); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
 	memo, err := d.GetMemo(ctx, &store.FindMemo{ID: &id})
 	if err != nil {
 		return nil, err
@@ -260,10 +271,20 @@ func (d *DB) UpdateMemo(ctx context.Context, update *store.UpdateMemo) error {
 	args = append(args, update.ID)
 
 	stmt := "UPDATE `memo` SET " + strings.Join(set, ", ") + " WHERE `id` = ?"
-	if _, err := d.db.ExecContext(ctx, stmt, args...); err != nil {
+	tx, err := d.db.BeginTx(ctx, nil)
+	if err != nil {
 		return err
 	}
-	return nil
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, stmt, args...); err != nil {
+		return err
+	}
+	if update.Content != nil {
+		if err := store.EnqueueMemoLinks(ctx, tx, "mysql", *update.Content); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 func (d *DB) DeleteMemo(ctx context.Context, delete *store.DeleteMemo) error {

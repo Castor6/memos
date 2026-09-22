@@ -3,14 +3,18 @@ package v1
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"testing"
+	"time"
 
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/usememos/memos/internal/httpgetter"
 	v1pb "github.com/usememos/memos/proto/gen/api/v1"
+	"github.com/usememos/memos/store"
 )
 
 func TestGetLinkMetadata(t *testing.T) {
@@ -50,6 +54,56 @@ func TestGetLinkMetadataInternalURL(t *testing.T) {
 	})
 	require.Error(t, err)
 	require.Equal(t, codes.InvalidArgument, status.Code(err))
+}
+
+func TestLinkMetadataInvalidURLsAreNotQueued(t *testing.T) {
+	service := newIntegrationService(t)
+	original := fetchHTMLMetaWithContext
+	t.Cleanup(func() { fetchHTMLMetaWithContext = original })
+	fetchHTMLMetaWithContext = func(context.Context, string) (*httpgetter.HTMLMeta, error) {
+		t.Fatal("invalid URLs must be rejected before fetching")
+		return nil, nil
+	}
+	ctx := context.Background()
+	for _, url := range []string{"file:///tmp/article", "http://", "https://%", "http://127.0.0.1/article", "https://[::1]/"} {
+		t.Run(url, func(t *testing.T) {
+			_, err := service.GetLinkMetadata(ctx, &v1pb.GetLinkMetadataRequest{Url: url})
+			require.Equal(t, codes.InvalidArgument, status.Code(err))
+			_, err = service.BatchGetLinkMetadata(ctx, &v1pb.BatchGetLinkMetadataRequest{Urls: []string{url}})
+			require.Equal(t, codes.InvalidArgument, status.Code(err))
+		})
+	}
+	var jobs int
+	require.NoError(t, service.Store.GetDriver().GetDB().QueryRowContext(ctx, "SELECT COUNT(*) FROM link_metadata_job").Scan(&jobs))
+	require.Zero(t, jobs)
+}
+
+func TestLinkMetadataPublicFailuresOnlyCreateTemporaryRequests(t *testing.T) {
+	service := newIntegrationService(t)
+	original := fetchHTMLMetaWithContext
+	t.Cleanup(func() { fetchHTMLMetaWithContext = original })
+	fetchHTMLMetaWithContext = func(context.Context, string) (*httpgetter.HTMLMeta, error) {
+		return nil, errors.New("preview unavailable")
+	}
+	ctx := context.Background()
+	_, err := service.GetLinkMetadata(ctx, &v1pb.GetLinkMetadataRequest{Url: "https://example.com/public-preview"})
+	require.Equal(t, codes.Unavailable, status.Code(err))
+	_, err = service.BatchGetLinkMetadata(ctx, &v1pb.BatchGetLinkMetadataRequest{Urls: []string{"https://example.com/public-batch-preview"}})
+	require.Equal(t, codes.Unavailable, status.Code(err))
+	var jobs int
+	require.NoError(t, service.Store.GetDriver().GetDB().QueryRowContext(ctx, "SELECT COUNT(*) FROM link_metadata_job WHERE expires_ts > 0").Scan(&jobs))
+	require.Equal(t, 2, jobs)
+	_, err = service.Store.GetDriver().GetDB().ExecContext(ctx, "UPDATE link_metadata_job SET next_attempt_ts = 0")
+	require.NoError(t, err)
+	urls, err := service.Store.ListDueLinkMetadata(ctx, 8)
+	require.NoError(t, err)
+	require.Empty(t, urls, "unreferenced public previews must not become background retry work")
+	_, err = service.Store.GetDriver().GetDB().ExecContext(ctx, "UPDATE link_metadata_job SET expires_ts = 1")
+	require.NoError(t, err)
+	_, err = service.Store.ListDueLinkMetadata(ctx, 8)
+	require.NoError(t, err)
+	require.NoError(t, service.Store.GetDriver().GetDB().QueryRowContext(ctx, "SELECT COUNT(*) FROM link_metadata_job").Scan(&jobs))
+	require.Zero(t, jobs)
 }
 
 func TestBatchGetLinkMetadata(t *testing.T) {
@@ -104,10 +158,10 @@ func TestBatchGetLinkMetadataTooManyURLs(t *testing.T) {
 
 func TestLinkMetadataUsesPersistentSnapshot(t *testing.T) {
 	service := newIntegrationService(t)
-	original := fetchHTMLMeta
-	t.Cleanup(func() { fetchHTMLMeta = original })
+	original := fetchHTMLMetaWithContext
+	t.Cleanup(func() { fetchHTMLMetaWithContext = original })
 	calls := 0
-	fetchHTMLMeta = func(_ string) (*httpgetter.HTMLMeta, error) {
+	fetchHTMLMetaWithContext = func(context.Context, string) (*httpgetter.HTMLMeta, error) {
 		calls++
 		return &httpgetter.HTMLMeta{Title: "历史标题", Description: "历史摘要"}, nil
 	}
@@ -121,4 +175,56 @@ func TestLinkMetadataUsesPersistentSnapshot(t *testing.T) {
 	require.Equal(t, first.Title, second.Title)
 	require.Equal(t, first.Description, second.Description)
 	require.Equal(t, 1, calls)
+}
+
+func TestLinkMetadataAPIAndWorkerShareFirstFetch(t *testing.T) {
+	service := newIntegrationService(t)
+	original := fetchHTMLMetaWithContext
+	t.Cleanup(func() { fetchHTMLMetaWithContext = original })
+	ctx := context.Background()
+	for _, apiFirst := range []bool{false, true} {
+		t.Run(fmt.Sprintf("api_first_%t", apiFirst), func(t *testing.T) {
+			url := fmt.Sprintf("https://example.com/competition-%t", apiFirst)
+			request := &v1pb.GetLinkMetadataRequest{Url: url}
+			started, release := make(chan struct{}), make(chan struct{})
+			var calls atomic.Int32
+			fetchHTMLMetaWithContext = func(ctx context.Context, _ string) (*httpgetter.HTMLMeta, error) {
+				if calls.Add(1) == 1 {
+					close(started)
+				}
+				select {
+				case <-release:
+				case <-ctx.Done():
+					return nil, ctx.Err()
+				}
+				return &httpgetter.HTMLMeta{Title: "shared title"}, nil
+			}
+			worker := func(ctx context.Context) error {
+				_, err := service.Store.FetchLinkMetadata(ctx, url, func(ctx context.Context, url string) (*store.LinkMetadata, error) {
+					meta, err := fetchHTMLMetaWithContext(ctx, url)
+					if err != nil {
+						return nil, err
+					}
+					return &store.LinkMetadata{Title: meta.Title}, nil
+				})
+				return err
+			}
+			api := func(ctx context.Context) error { _, err := service.GetLinkMetadata(ctx, request); return err }
+			first, second := worker, api
+			if apiFirst {
+				first, second = api, worker
+			}
+			result := make(chan error, 2)
+			go func() { result <- first(ctx) }()
+			<-started
+			waitCtx, cancel := context.WithTimeout(ctx, 30*time.Millisecond)
+			require.Error(t, second(waitCtx))
+			cancel()
+			go func() { result <- second(ctx) }()
+			close(release)
+			require.NoError(t, <-result)
+			require.NoError(t, <-result)
+			require.Equal(t, int32(1), calls.Load())
+		})
+	}
 }

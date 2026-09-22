@@ -4,17 +4,15 @@ package linkmetadata
 import (
 	"context"
 	"log/slog"
-	"strings"
 	"time"
 
 	"github.com/usememos/memos/internal/httpgetter"
-	links "github.com/usememos/memos/internal/linkmetadata"
 	"github.com/usememos/memos/store"
 )
 
-// Run backfills existing notes and discovers new links on each pass.
+// Run drains durable preview jobs and advances a one-time historical backfill.
 func Run(ctx context.Context, db *store.Store) {
-	ticker := time.NewTicker(time.Minute)
+	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 	for {
 		runOnce(ctx, db, httpgetter.GetHTMLMetaWithContext)
@@ -27,44 +25,32 @@ func Run(ctx context.Context, db *store.Store) {
 }
 
 func runOnce(ctx context.Context, db *store.Store, fetch func(context.Context, string) (*httpgetter.HTMLMeta, error)) {
-	seen := map[string]bool{}
-	limit := 100
-	for offset := 0; ; offset += limit {
-		memos, err := db.ListMemos(ctx, &store.FindMemo{Limit: &limit, Offset: &offset})
-		if err != nil {
-			if ctx.Err() == nil {
-				slog.Error("list notes for link previews", "error", err)
-			}
+	if _, err := db.BackfillLinkMetadata(ctx, 100); err != nil {
+		if ctx.Err() == nil {
+			slog.Error("backfill link preview jobs", "error", err)
+		}
+		return
+	}
+	urls, err := db.ListDueLinkMetadata(ctx, 8)
+	if err != nil {
+		if ctx.Err() == nil {
+			slog.Error("list link preview jobs", "error", err)
+		}
+		return
+	}
+	for _, url := range urls {
+		if ctx.Err() != nil {
 			return
 		}
-		for _, memo := range memos {
-			for _, url := range links.URLs(memo.Content) {
-				if ctx.Err() != nil {
-					return
-				}
-				if seen[url] {
-					continue
-				}
-				seen[url] = true
-				cached, err := db.GetLinkMetadata(ctx, url)
-				if err != nil {
-					slog.Error("read link preview cache", "error", err)
-					return
-				}
-				if cached != nil {
-					continue
-				}
-				meta, err := fetch(ctx, url)
-				if err != nil || strings.TrimSpace(meta.Title) == "" {
-					continue
-				}
-				if err := db.SaveLinkMetadata(ctx, &store.LinkMetadata{URL: url, Title: meta.Title, Description: meta.Description, Image: meta.Image}); err != nil {
-					slog.Error("save link preview cache", "error", err)
-				}
+		_, err := db.FetchLinkMetadata(ctx, url, func(ctx context.Context, url string) (*store.LinkMetadata, error) {
+			meta, err := fetch(ctx, url)
+			if err != nil || meta == nil {
+				return nil, err
 			}
-		}
-		if len(memos) < limit {
-			return
+			return &store.LinkMetadata{URL: url, Title: meta.Title, Description: meta.Description, Image: meta.Image}, nil
+		})
+		if err != nil && ctx.Err() == nil {
+			slog.Debug("link preview attempt deferred", "error", err)
 		}
 	}
 }

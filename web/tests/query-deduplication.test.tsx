@@ -8,7 +8,7 @@ import {
   useResolvedUser,
 } from "@/components/MemoContent/MentionResolutionContext";
 import { useResolvedRelationMemos } from "@/components/MemoMetadata/Relation/useResolvedRelationMemos";
-import { memoKeys } from "@/hooks/useMemoQueries";
+import { memoCollectionQueryKeysContaining, memoKeys } from "@/hooks/useMemoQueries";
 import { useUser, userKeys, useUsersByNames, useUsersByUsernames } from "@/hooks/useUserQueries";
 import type { Memo } from "@/types/proto/api/v1/memo_service_pb";
 import type { User } from "@/types/proto/api/v1/user_service_pb";
@@ -45,6 +45,19 @@ const createWrapper = (queryClient: QueryClient) =>
   };
 
 describe("query deduplication", () => {
+  it("limits reaction refreshes to collections containing the changed memo", () => {
+    const client = createQueryClient();
+    const matching = memoKeys.list({ filter: "tag == work" });
+    const unrelated = memoKeys.list({ filter: "tag == home" });
+    const comments = memoKeys.comments("memos/parent");
+    client.setQueryData(matching, { pages: [{ memos: [{ name: "memos/target" }] }], pageParams: [""] });
+    client.setQueryData(unrelated, { pages: [{ memos: [{ name: "memos/other" }] }], pageParams: [""] });
+    client.setQueryData(comments, { memos: [{ name: "memos/target" }] });
+    client.setQueryData(memoKeys.detail("memos/target"), { name: "memos/target" });
+    expect(memoCollectionQueryKeysContaining(client, "memos/target")).toEqual([matching, comments]);
+    client.clear();
+  });
+
   beforeEach(() => {
     clients.batchGetUsers.mockReset();
     clients.getMemo.mockReset();
@@ -158,6 +171,6 @@ describe("query deduplication", () => {
     });
 
     expect(clients.getMemo).toHaveBeenCalledTimes(1);
-    expect(clients.getMemo).toHaveBeenCalledWith({ name: missingMemo.name });
+    expect(clients.getMemo).toHaveBeenCalledWith({ name: missingMemo.name }, { signal: expect.any(AbortSignal) });
   });
 });

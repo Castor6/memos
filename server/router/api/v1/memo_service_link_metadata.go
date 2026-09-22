@@ -7,9 +7,12 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/usememos/memos/internal/httpgetter"
 	v1pb "github.com/usememos/memos/proto/gen/api/v1"
 	"github.com/usememos/memos/store"
 )
+
+var fetchHTMLMetaWithContext = httpgetter.GetHTMLMetaWithContext
 
 // GetLinkMetadata gets metadata for a link.
 func (s *APIV1Service) GetLinkMetadata(ctx context.Context, request *v1pb.GetLinkMetadataRequest) (*v1pb.LinkMetadata, error) {
@@ -59,32 +62,29 @@ func getLinkMetadata(inputURL string) (*v1pb.LinkMetadata, error) {
 
 func (s *APIV1Service) cachedLinkMetadata(ctx context.Context, input string) (*v1pb.LinkMetadata, error) {
 	url := strings.TrimSpace(input)
-	if s.Store != nil {
-		cached, err := s.Store.GetLinkMetadata(ctx, url)
-		if err != nil {
-			return nil, status.Error(codes.Internal, "failed to read link preview")
-		}
-		if cached != nil {
-			return linkMetadataFromStore(cached), nil
-		}
+	if url == "" {
+		return nil, status.Error(codes.InvalidArgument, "url is required")
 	}
-	result, err := getLinkMetadata(url)
+	if err := httpgetter.ValidateURL(url); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid link URL: %v", err)
+	}
+	if s.Store == nil {
+		return getLinkMetadata(url)
+	}
+	result, err := s.Store.FetchLinkMetadata(ctx, url, func(ctx context.Context, url string) (*store.LinkMetadata, error) {
+		meta, err := fetchHTMLMetaWithContext(ctx, url)
+		if err != nil || meta == nil {
+			return nil, err
+		}
+		return &store.LinkMetadata{URL: url, Title: meta.Title, Description: meta.Description, Image: meta.Image}, nil
+	})
 	if err != nil {
-		return nil, err
+		if ctx.Err() != nil {
+			return nil, status.FromContextError(ctx.Err()).Err()
+		}
+		return nil, status.Errorf(codes.Unavailable, "failed to fetch link preview: %v", err)
 	}
-	if s.Store != nil && strings.TrimSpace(result.Title) != "" {
-		if err := s.Store.SaveLinkMetadata(ctx, &store.LinkMetadata{URL: url, Title: result.Title, Description: result.Description, Image: result.Image}); err != nil {
-			return nil, status.Error(codes.Internal, "failed to save link preview")
-		}
-		cached, err := s.Store.GetLinkMetadata(ctx, url)
-		if err != nil {
-			return nil, status.Error(codes.Internal, "failed to read link preview")
-		}
-		if cached != nil {
-			return linkMetadataFromStore(cached), nil
-		}
-	}
-	return result, nil
+	return linkMetadataFromStore(result), nil
 }
 
 func linkMetadataFromStore(value *store.LinkMetadata) *v1pb.LinkMetadata {

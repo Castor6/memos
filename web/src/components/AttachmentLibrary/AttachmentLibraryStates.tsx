@@ -57,7 +57,7 @@ export const AttachmentLibraryUnusedPanel = ({ count, isDeleting, isExpanded, on
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div className="min-w-0">
           <div className="text-sm font-medium text-foreground">
-            {t("attachment-library.unused.title")} ({count})
+            {t("attachment-library.unused.title")} · {t("attachment-library.loaded-count", { count })}
           </div>
           <p className="mt-1 text-sm text-muted-foreground">{t("attachment-library.unused.description")}</p>
         </div>

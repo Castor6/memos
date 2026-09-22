@@ -47,6 +47,18 @@ export interface AttachmentLibraryMonthGroup {
 
 const PAGE_SIZE = 50;
 
+// Match the display helpers: PSD and MIDI files belong to documents. Images and
+// videos share one cursor so both halves of a Live Photo can still be paired.
+const mediaFilter =
+  '((mime_type.startsWith("image/") && mime_type != "image/vnd.adobe.photoshop" && mime_type != "image/x-photoshop" && mime_type != "image/photoshop") || mime_type.startsWith("video"))';
+const audioFilter =
+  '(mime_type.startsWith("audio") && mime_type != "audio/midi" && mime_type != "audio/mid" && mime_type != "audio/x-midi")';
+export const ATTACHMENT_LIBRARY_FILTERS: Record<AttachmentLibraryTab, string> = {
+  media: `memo_id != null && ${mediaFilter}`,
+  audio: `memo_id != null && ${audioFilter}`,
+  documents: `memo_id != null && !(${mediaFilter} || ${audioFilter})`,
+};
+
 const sortByNewest = (a?: Date, b?: Date) => (b?.getTime() ?? 0) - (a?.getTime() ?? 0);
 
 const isLinkedAttachment = (attachment: Attachment) => Boolean(attachment.memo);
@@ -128,11 +140,17 @@ const groupMediaByMonth = (
     }));
 };
 
-export function useAttachmentLibrary(locale: string) {
+export function useAttachmentLibrary(locale: string, tab: AttachmentLibraryTab = "media") {
   const t = useTranslate();
   const query = useInfiniteAttachments({
     pageSize: PAGE_SIZE,
     orderBy: "create_time desc",
+    filter: ATTACHMENT_LIBRARY_FILTERS[tab],
+  });
+  const unusedQuery = useInfiniteAttachments({
+    pageSize: PAGE_SIZE,
+    orderBy: "create_time desc",
+    filter: "memo_id == null",
   });
 
   const attachments = useMemo(() => (query.data?.pages ?? []).flatMap((page) => page.attachments), [query.data?.pages]);
@@ -142,10 +160,7 @@ export function useAttachmentLibrary(locale: string) {
     [attachments],
   );
 
-  const unusedAttachments = useMemo(
-    () => attachments.filter((attachment) => !isLinkedAttachment(attachment)).sort((a, b) => sortByNewest(toCreatedAt(a), toCreatedAt(b))),
-    [attachments],
-  );
+  const unusedAttachments = useMemo(() => (unusedQuery.data?.pages ?? []).flatMap((page) => page.attachments), [unusedQuery.data?.pages]);
 
   const mediaItems = useMemo(
     () =>
@@ -198,6 +213,7 @@ export function useAttachmentLibrary(locale: string) {
     documentItems,
     audioItems,
     unusedItems,
+    unusedQuery,
     stats,
   };
 }

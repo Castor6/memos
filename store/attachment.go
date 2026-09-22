@@ -100,7 +100,7 @@ func (s *Store) CreateAttachment(ctx context.Context, create *Attachment) (*Atta
 
 func (s *Store) ListAttachments(ctx context.Context, find *FindAttachment) ([]*Attachment, error) {
 	// Set default limits to prevent loading too many attachments at once
-	shouldApplyDefaultLimit := find.Limit == nil && len(find.MemoIDList) == 0
+	shouldApplyDefaultLimit := find.Limit == nil && len(find.MemoIDList) == 0 && (find.GetBlob || find.MemoID == nil)
 	if shouldApplyDefaultLimit && find.GetBlob {
 		// When fetching blobs, we should be especially careful with limits
 		defaultLimit := 10
@@ -209,6 +209,16 @@ func (s *Store) DeleteAttachmentStorageWithInstanceSetting(ctx context.Context, 
 }
 
 func (s *Store) deleteAttachmentStorageImpl(ctx context.Context, attachment *Attachment, instanceStorageSetting *storepb.InstanceStorageSetting) error {
+	if err := s.deleteAttachmentStorageObject(ctx, attachment, instanceStorageSetting); err != nil {
+		return err
+	}
+	if attachment != nil {
+		s.deleteAttachmentDerivedCaches(attachment)
+	}
+	return nil
+}
+
+func (s *Store) deleteAttachmentStorageObject(ctx context.Context, attachment *Attachment, instanceStorageSetting *storepb.InstanceStorageSetting) error {
 	if attachment == nil {
 		return nil
 	}
@@ -264,7 +274,6 @@ func (s *Store) deleteAttachmentStorageImpl(ctx context.Context, attachment *Att
 		}
 	}
 
-	s.deleteAttachmentDerivedCaches(attachment)
 	return nil
 }
 

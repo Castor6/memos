@@ -39,6 +39,7 @@ describe("useInfiniteMemoComments", () => {
     expect(listMemoComments).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({ name: "memos/parent", pageSize: 2, pageToken: "" }),
+      { signal: expect.any(AbortSignal) },
     );
     expect(result.current.hasNextPage).toBe(true);
 
@@ -52,6 +53,7 @@ describe("useInfiniteMemoComments", () => {
     expect(listMemoComments).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({ name: "memos/parent", pageSize: 2, pageToken: "page-2" }),
+      { signal: expect.any(AbortSignal) },
     );
     expect(result.current.hasNextPage).toBe(false);
   });

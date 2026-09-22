@@ -45,6 +45,7 @@ const MemoEditorImpl: React.FC<MemoEditorProps> = ({
   // typing (which changes content) does not re-render the editor shell and its
   // toolbar/metadata children.
   const isFocusMode = useEditorSelector((s) => s.ui.isFocusMode);
+  const isSaving = useEditorSelector((s) => s.ui.isLoading.saving);
   const hasTimestamp = useEditorSelector((s) => Boolean(s.timestamps.createTime));
   const { userGeneralSetting } = useAuth();
   const { aiSetting, fetchSetting } = useInstance();
@@ -245,6 +246,8 @@ const MemoEditorImpl: React.FC<MemoEditorProps> = ({
 
       <div
         data-editor-shell
+        inert={isSaving}
+        aria-busy={isSaving}
         ref={editorContainerRef}
         className={cn(
           "group relative w-full flex flex-col justify-between items-start bg-card px-4 pt-3 pb-1 rounded-lg border border-border gap-2",

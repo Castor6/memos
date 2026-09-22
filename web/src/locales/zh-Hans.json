@@ -256,6 +256,8 @@
     "link-preview": "链接预览",
     "links": "链接",
     "load-more": "加载更多",
+    "load-error": "笔记加载失败，请重试。已有笔记不会丢失。",
+    "retry": "重试",
     "no-archived-memos": "没有已归档备忘录。",
     "no-memos": "无备忘录",
     "new-badge": "新",
@@ -921,6 +923,7 @@
       "unknown-date": "未知日期",
       "unused": "未使用"
     },
+    "loaded-count": "已加载 {{count}} 项",
     "tabs": {
       "audio": "音频",
       "documents": "文档",

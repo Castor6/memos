@@ -149,22 +149,5 @@ func (s *Store) UpdateMemo(ctx context.Context, update *UpdateMemo) error {
 }
 
 func (s *Store) DeleteMemo(ctx context.Context, delete *DeleteMemo) error {
-	// Clean up memo_relation records where this memo is either the source or target.
-	if err := s.driver.DeleteMemoRelation(ctx, &DeleteMemoRelation{MemoID: &delete.ID}); err != nil {
-		return err
-	}
-	if err := s.driver.DeleteMemoRelation(ctx, &DeleteMemoRelation{RelatedMemoID: &delete.ID}); err != nil {
-		return err
-	}
-	// Clean up attachments linked to this memo.
-	attachments, err := s.ListAttachments(ctx, &FindAttachment{MemoID: &delete.ID})
-	if err != nil {
-		return err
-	}
-	for _, attachment := range attachments {
-		if err := s.DeleteAttachment(ctx, &DeleteAttachment{ID: attachment.ID}); err != nil {
-			return err
-		}
-	}
-	return s.driver.DeleteMemo(ctx, delete)
+	return s.deleteMemoWithCleanup(ctx, delete.ID)
 }

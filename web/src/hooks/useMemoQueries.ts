@@ -12,6 +12,7 @@ import {
 import { memoServiceClient } from "@/connect";
 import { userKeys } from "@/hooks/useUserQueries";
 import { DEFAULT_LIST_MEMOS_PAGE_SIZE } from "@/lib/constants";
+import { scheduleQueryRefresh } from "@/lib/query-refresh";
 import type { ListMemosRequest, ListMemosResponse, Memo } from "@/types/proto/api/v1/memo_service_pb";
 import { ListMemoCommentsRequestSchema, ListMemosRequestSchema, MemoSchema } from "@/types/proto/api/v1/memo_service_pb";
 
@@ -29,7 +30,7 @@ export const memoKeys = {
 export const memoDetailQueryOptions = (name: string) =>
   queryOptions({
     queryKey: memoKeys.detail(name),
-    queryFn: () => memoServiceClient.getMemo({ name }),
+    queryFn: ({ signal }) => memoServiceClient.getMemo({ name }, { signal }),
     staleTime: 1000 * 10,
   });
 
@@ -119,6 +120,12 @@ export function findMemoInCollectionQueries(queryClient: QueryClient, name: stri
   return undefined;
 }
 
+export function memoCollectionQueryKeysContaining(queryClient: QueryClient, name: string) {
+  return queryClient
+    .getQueriesData<unknown>({ queryKey: memoKeys.all })
+    .flatMap(([key, data]) => (findMemoInQueryData(data, name) ? [key] : []));
+}
+
 function patchMemoInCollectionQueries(queryClient: QueryClient, update: MemoPatch) {
   queryClient.setQueriesData<MemoCollectionQueryData>({ queryKey: memoKeys.all }, (data) => patchMemoListQueryData(data, update));
 }
@@ -126,8 +133,8 @@ function patchMemoInCollectionQueries(queryClient: QueryClient, update: MemoPatc
 export function useMemos(request: Partial<ListMemosRequest> = {}) {
   return useQuery({
     queryKey: memoKeys.list(request),
-    queryFn: async () => {
-      const response = await memoServiceClient.listMemos(create(ListMemosRequestSchema, request as Record<string, unknown>));
+    queryFn: async ({ signal }) => {
+      const response = await memoServiceClient.listMemos(create(ListMemosRequestSchema, request as Record<string, unknown>), { signal });
       return response;
     },
   });
@@ -136,12 +143,13 @@ export function useMemos(request: Partial<ListMemosRequest> = {}) {
 export function useInfiniteMemos(request: Partial<ListMemosRequest> = {}, options?: { enabled?: boolean }) {
   return useInfiniteQuery({
     queryKey: memoKeys.list(request),
-    queryFn: async ({ pageParam }) => {
+    queryFn: async ({ pageParam, signal }) => {
       const response = await memoServiceClient.listMemos(
         create(ListMemosRequestSchema, {
           ...request,
           pageToken: pageParam || "",
         } as Record<string, unknown>),
+        { signal },
       );
       return response;
     },
@@ -194,11 +202,11 @@ export function useCreateMemo() {
     },
     onSuccess: (newMemo) => {
       // Invalidate memo lists to refetch
-      queryClient.invalidateQueries({ queryKey: memoKeys.lists() });
+      scheduleQueryRefresh(queryClient, memoKeys.lists());
       // Add new memo to cache
       queryClient.setQueryData(memoKeys.detail(newMemo.name), newMemo);
       // Invalidate user stats
-      queryClient.invalidateQueries({ queryKey: userKeys.stats() });
+      scheduleQueryRefresh(queryClient, userKeys.stats());
     },
   });
 }
@@ -241,7 +249,7 @@ export function useUpdateMemo() {
         queryClient.setQueryData(memoKeys.detail(update.name), context.previousMemo);
         patchMemoInCollectionQueries(queryClient, context.previousMemo);
       } else {
-        queryClient.invalidateQueries({ queryKey: memoKeys.all });
+        scheduleQueryRefresh(queryClient, memoKeys.all);
       }
     },
     onSuccess: (updatedMemo) => {
@@ -249,12 +257,12 @@ export function useUpdateMemo() {
       queryClient.setQueryData(memoKeys.detail(updatedMemo.name), updatedMemo);
       patchMemoInCollectionQueries(queryClient, updatedMemo);
       // Invalidate lists to refresh
-      queryClient.invalidateQueries({ queryKey: memoKeys.lists() });
+      scheduleQueryRefresh(queryClient, memoKeys.lists());
       if (updatedMemo.parent) {
-        queryClient.invalidateQueries({ queryKey: memoKeys.comments(updatedMemo.parent) });
+        scheduleQueryRefresh(queryClient, memoKeys.comments(updatedMemo.parent));
       }
       // Invalidate user stats
-      queryClient.invalidateQueries({ queryKey: userKeys.stats() });
+      scheduleQueryRefresh(queryClient, userKeys.stats());
     },
   });
 }
@@ -271,9 +279,9 @@ export function useDeleteMemo() {
       // Remove from cache
       queryClient.removeQueries({ queryKey: memoKeys.detail(name) });
       // Invalidate lists
-      queryClient.invalidateQueries({ queryKey: memoKeys.lists() });
+      scheduleQueryRefresh(queryClient, memoKeys.lists());
       // Invalidate user stats
-      queryClient.invalidateQueries({ queryKey: userKeys.stats() });
+      scheduleQueryRefresh(queryClient, userKeys.stats());
     },
   });
 }
@@ -281,12 +289,13 @@ export function useDeleteMemo() {
 export function useMemoComments(name: string, options?: { enabled?: boolean; pageSize?: number }) {
   return useQuery({
     queryKey: [...memoKeys.comments(name), options?.pageSize ?? 0],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const response = await memoServiceClient.listMemoComments(
         create(ListMemoCommentsRequestSchema, {
           name,
           pageSize: options?.pageSize ?? 0,
         }),
+        { signal },
       );
       return response;
     },
@@ -301,13 +310,14 @@ export function useInfiniteMemoComments(name: string, options?: { enabled?: bool
   const pageSize = options?.pageSize ?? DEFAULT_LIST_MEMOS_PAGE_SIZE;
   return useInfiniteQuery({
     queryKey: [...memoKeys.comments(name), "infinite", pageSize],
-    queryFn: async ({ pageParam }) => {
+    queryFn: async ({ pageParam, signal }) => {
       const response = await memoServiceClient.listMemoComments(
         create(ListMemoCommentsRequestSchema, {
           name,
           pageSize,
           pageToken: pageParam || "",
         }),
+        { signal },
       );
       return response;
     },

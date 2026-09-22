@@ -14,6 +14,7 @@ export const EditorContent = forwardRef<EditorController, EditorContentProps>(({
   const { actions, dispatch, getState } = useEditorContext();
   const { createBlobUrl } = useBlobUrls();
   const content = useEditorSelector((s) => s.content);
+  const isSaving = useEditorSelector((s) => s.ui.isLoading.saving);
   const isTodo = useEditorSelector((state) => state.metadata.isTodo);
   const localFiles = useEditorSelector((s) => s.localFiles);
   const isFocusMode = useEditorSelector((s) => s.ui.isFocusMode);
@@ -60,6 +61,7 @@ export const EditorContent = forwardRef<EditorController, EditorContentProps>(({
         ref={editorRef}
         className="memo-editor-content"
         initialContent={content || (isTodo ? "- [ ] " : "")}
+        readOnly={isSaving}
         placeholder={placeholder || ""}
         isFocusMode={isFocusMode}
         onContentChange={(value) => dispatch(actions.updateContent(value))}
