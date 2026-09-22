@@ -159,6 +159,10 @@ func TestLinkMetadataFailureBackoffSurvivesRestartAndCanSucceed(t *testing.T) {
 	s := store.New(driver, p)
 	require.NoError(t, s.Migrate(ctx))
 	url := "https://example.com/retry"
+	user, err := createTestingHostUser(ctx, s)
+	require.NoError(t, err)
+	_, err = s.CreateMemo(ctx, &store.Memo{UID: "durable-retry", CreatorID: user.ID, Content: url, Visibility: store.Private})
+	require.NoError(t, err)
 	_, err = s.FetchLinkMetadata(ctx, url, func(context.Context, string) (*store.LinkMetadata, error) { return nil, errors.New("HTTP 404") })
 	require.Error(t, err)
 	require.NoError(t, s.Close())
@@ -193,6 +197,175 @@ func TestLinkMetadataFailureBackoffSurvivesRestartAndCanSucceed(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "recovered", value.Title)
 	require.Equal(t, 1, calls)
+}
+
+func TestLinkMetadataTemporaryFailuresExpireWithoutBackgroundRetries(t *testing.T) {
+	ctx := context.Background()
+	s := NewTestingStore(ctx, t)
+	t.Cleanup(func() { s.Close() })
+	url := "https://example.com/api-only"
+	calls := 0
+	fetch := func(context.Context, string) (*store.LinkMetadata, error) {
+		calls++
+		return nil, errors.New("temporary failure")
+	}
+	_, err := s.FetchLinkMetadata(ctx, url, fetch)
+	require.Error(t, err)
+	var expires int64
+	require.NoError(t, s.GetDriver().GetDB().QueryRowContext(ctx, "SELECT expires_ts FROM link_metadata_job").Scan(&expires))
+	require.InDelta(t, float64(time.Now().Add(15*time.Minute).Unix()), float64(expires), 5)
+	_, err = s.FetchLinkMetadata(ctx, url, fetch)
+	require.ErrorIs(t, err, store.ErrLinkMetadataDeferred)
+	require.Equal(t, 1, calls)
+	_, err = s.GetDriver().GetDB().ExecContext(ctx, "UPDATE link_metadata_job SET next_attempt_ts = 0")
+	require.NoError(t, err)
+	urls, err := s.ListDueLinkMetadata(ctx, 8)
+	require.NoError(t, err)
+	require.Empty(t, urls, "API-only previews must never become automatic retry work")
+	_, err = s.FetchLinkMetadata(ctx, url, fetch)
+	require.Error(t, err)
+	require.Equal(t, 2, calls, "an explicit request can retry after backoff")
+	var unchangedExpiry int64
+	require.NoError(t, s.GetDriver().GetDB().QueryRowContext(ctx, "SELECT expires_ts FROM link_metadata_job").Scan(&unchangedExpiry))
+	require.Equal(t, expires, unchangedExpiry, "repeated requests must not extend temporary retention")
+	_, err = s.GetDriver().GetDB().ExecContext(ctx, "UPDATE link_metadata_job SET expires_ts = 1")
+	require.NoError(t, err)
+	urls, err = s.ListDueLinkMetadata(ctx, 8)
+	require.NoError(t, err)
+	require.Empty(t, urls)
+	var count int
+	require.NoError(t, s.GetDriver().GetDB().QueryRowContext(ctx, "SELECT COUNT(*) FROM link_metadata_job").Scan(&count))
+	require.Zero(t, count)
+	value, err := s.FetchLinkMetadata(ctx, url, func(context.Context, string) (*store.LinkMetadata, error) {
+		return &store.LinkMetadata{Title: "now available"}, nil
+	})
+	require.NoError(t, err)
+	require.Equal(t, "now available", value.Title)
+	value, err = s.FetchLinkMetadata(ctx, url, fetch)
+	require.NoError(t, err)
+	require.Equal(t, "now available", value.Title)
+	require.Equal(t, 2, calls, "successful API previews remain permanent")
+}
+
+func TestLinkMetadataMemoRegistrationPromotesAnActiveTemporaryJob(t *testing.T) {
+	ctx := context.Background()
+	s := NewTestingStore(ctx, t)
+	t.Cleanup(func() { s.Close() })
+	user, err := createTestingHostUser(ctx, s)
+	require.NoError(t, err)
+	url := "https://example.com/promoted"
+	started, release := make(chan struct{}), make(chan struct{})
+	var once sync.Once
+	unblock := func() { once.Do(func() { close(release) }) }
+	t.Cleanup(unblock)
+	result := make(chan error, 1)
+	go func() {
+		_, err := s.FetchLinkMetadata(ctx, url, func(context.Context, string) (*store.LinkMetadata, error) {
+			close(started)
+			<-release
+			return nil, errors.New("network unavailable")
+		})
+		result <- err
+	}()
+	<-started
+	var originalLease string
+	require.NoError(t, s.GetDriver().GetDB().QueryRowContext(ctx, "SELECT lease_token FROM link_metadata_job").Scan(&originalLease))
+	_, err = s.CreateMemo(ctx, &store.Memo{UID: "promoted-preview", CreatorID: user.ID, Content: url, Visibility: store.Private})
+	require.NoError(t, err)
+	var expires int64
+	var lease string
+	require.NoError(t, s.GetDriver().GetDB().QueryRowContext(ctx, "SELECT expires_ts, lease_token FROM link_metadata_job").Scan(&expires, &lease))
+	require.Zero(t, expires)
+	require.Equal(t, originalLease, lease, "registration must preserve the current owner")
+	unblock()
+	require.Error(t, <-result)
+	_, err = s.GetDriver().GetDB().ExecContext(ctx, "UPDATE link_metadata_job SET next_attempt_ts = 0")
+	require.NoError(t, err)
+	urls, err := s.ListDueLinkMetadata(ctx, 8)
+	require.NoError(t, err)
+	require.Equal(t, []string{url}, urls)
+	_, err = s.FetchLinkMetadata(ctx, url, func(context.Context, string) (*store.LinkMetadata, error) {
+		return nil, errors.New("still unavailable")
+	})
+	require.Error(t, err)
+	require.NoError(t, s.GetDriver().GetDB().QueryRowContext(ctx, "SELECT expires_ts FROM link_metadata_job").Scan(&expires))
+	require.Zero(t, expires, "later API requests must not downgrade a memo job")
+}
+
+func TestLinkMetadataRequestRenewsAnExpiredTemporaryJob(t *testing.T) {
+	ctx := context.Background()
+	s := NewTestingStore(ctx, t)
+	t.Cleanup(func() { s.Close() })
+	url := "https://example.com/expired-preview"
+	_, err := s.FetchLinkMetadata(ctx, url, func(context.Context, string) (*store.LinkMetadata, error) {
+		return nil, errors.New("temporarily unavailable")
+	})
+	require.Error(t, err)
+	_, err = s.GetDriver().GetDB().ExecContext(ctx, "UPDATE link_metadata_job SET expires_ts = 1")
+	require.NoError(t, err)
+	// A new request must recover even if no background cleanup has run yet.
+	value, err := s.FetchLinkMetadata(ctx, url, func(context.Context, string) (*store.LinkMetadata, error) {
+		return &store.LinkMetadata{Title: "available again"}, nil
+	})
+	require.NoError(t, err)
+	require.Equal(t, "available again", value.Title)
+}
+
+func TestLinkMetadataTemporaryCleanupIsBoundedAndPreservesLeases(t *testing.T) {
+	ctx := context.Background()
+	s := NewTestingStore(ctx, t)
+	t.Cleanup(func() { s.Close() })
+	for i := range 101 {
+		_, err := s.GetDriver().GetDB().ExecContext(ctx, fmt.Sprintf("INSERT INTO link_metadata_job (url_hash,url,expires_ts) VALUES ('%064d','https://example.com/expired-%d',1)", i, i))
+		require.NoError(t, err)
+	}
+	_, err := s.GetDriver().GetDB().ExecContext(ctx, fmt.Sprintf("INSERT INTO link_metadata_job (url_hash,url,expires_ts,lease_until) VALUES ('active','https://example.com/active',1,%d)", time.Now().Add(time.Minute).Unix()))
+	require.NoError(t, err)
+	_, err = s.GetDriver().GetDB().ExecContext(ctx, "INSERT INTO link_metadata_job (url_hash,url,expires_ts) VALUES ('memo','https://example.com/memo',0)")
+	require.NoError(t, err)
+	urls, err := s.ListDueLinkMetadata(ctx, 8)
+	require.NoError(t, err)
+	require.Equal(t, []string{"https://example.com/memo"}, urls)
+	var count int
+	require.NoError(t, s.GetDriver().GetDB().QueryRowContext(ctx, "SELECT COUNT(*) FROM link_metadata_job").Scan(&count))
+	require.Equal(t, 3, count, "one pass must prune at most 100 expired jobs")
+	_, err = s.ListDueLinkMetadata(ctx, 8)
+	require.NoError(t, err)
+	require.NoError(t, s.GetDriver().GetDB().QueryRowContext(ctx, "SELECT COUNT(*) FROM link_metadata_job").Scan(&count))
+	require.Equal(t, 2, count, "live leases and memo tasks must survive expiry cleanup")
+}
+
+func TestLinkMetadataTemporaryCleanupRaceReregistersRequest(t *testing.T) {
+	if getDriverFromEnv() != "sqlite" {
+		t.Skip("SQLite triggers deterministically inject cleanup before lookup or claim")
+	}
+	for _, moment := range []string{"AFTER INSERT", "BEFORE UPDATE"} {
+		t.Run(moment, func(t *testing.T) {
+			ctx := context.Background()
+			s := NewTestingStore(ctx, t)
+			t.Cleanup(func() { s.Close() })
+			// Inject exactly one deletion where expiry cleanup could remove a
+			// temporary job between registration, state lookup, and claiming.
+			_, err := s.GetDriver().GetDB().ExecContext(ctx, fmt.Sprintf(`CREATE TABLE link_metadata_cleanup_test (id INTEGER PRIMARY KEY);
+CREATE TRIGGER expire_first_preview %s ON link_metadata_job
+WHEN NOT EXISTS (SELECT 1 FROM link_metadata_cleanup_test)
+BEGIN
+  INSERT INTO link_metadata_cleanup_test (id) VALUES (1);
+  DELETE FROM link_metadata_job WHERE url_hash = NEW.url_hash;
+END;`, moment))
+			require.NoError(t, err)
+			requestCtx, cancel := context.WithTimeout(ctx, time.Second)
+			defer cancel()
+			calls := 0
+			value, err := s.FetchLinkMetadata(requestCtx, "https://example.com/cleanup-race", func(context.Context, string) (*store.LinkMetadata, error) {
+				calls++
+				return &store.LinkMetadata{Title: "registered again"}, nil
+			})
+			require.NoError(t, err)
+			require.Equal(t, "registered again", value.Title)
+			require.Equal(t, 1, calls)
+		})
+	}
 }
 
 func TestLinkMetadataExpiredLeaseFencesOldWorker(t *testing.T) {

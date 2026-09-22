@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -73,6 +74,34 @@ func TestLinkMetadataInvalidURLsAreNotQueued(t *testing.T) {
 		})
 	}
 	var jobs int
+	require.NoError(t, service.Store.GetDriver().GetDB().QueryRowContext(ctx, "SELECT COUNT(*) FROM link_metadata_job").Scan(&jobs))
+	require.Zero(t, jobs)
+}
+
+func TestLinkMetadataPublicFailuresOnlyCreateTemporaryRequests(t *testing.T) {
+	service := newIntegrationService(t)
+	original := fetchHTMLMetaWithContext
+	t.Cleanup(func() { fetchHTMLMetaWithContext = original })
+	fetchHTMLMetaWithContext = func(context.Context, string) (*httpgetter.HTMLMeta, error) {
+		return nil, errors.New("preview unavailable")
+	}
+	ctx := context.Background()
+	_, err := service.GetLinkMetadata(ctx, &v1pb.GetLinkMetadataRequest{Url: "https://example.com/public-preview"})
+	require.Equal(t, codes.Unavailable, status.Code(err))
+	_, err = service.BatchGetLinkMetadata(ctx, &v1pb.BatchGetLinkMetadataRequest{Urls: []string{"https://example.com/public-batch-preview"}})
+	require.Equal(t, codes.Unavailable, status.Code(err))
+	var jobs int
+	require.NoError(t, service.Store.GetDriver().GetDB().QueryRowContext(ctx, "SELECT COUNT(*) FROM link_metadata_job WHERE expires_ts > 0").Scan(&jobs))
+	require.Equal(t, 2, jobs)
+	_, err = service.Store.GetDriver().GetDB().ExecContext(ctx, "UPDATE link_metadata_job SET next_attempt_ts = 0")
+	require.NoError(t, err)
+	urls, err := service.Store.ListDueLinkMetadata(ctx, 8)
+	require.NoError(t, err)
+	require.Empty(t, urls, "unreferenced public previews must not become background retry work")
+	_, err = service.Store.GetDriver().GetDB().ExecContext(ctx, "UPDATE link_metadata_job SET expires_ts = 1")
+	require.NoError(t, err)
+	_, err = service.Store.ListDueLinkMetadata(ctx, 8)
+	require.NoError(t, err)
 	require.NoError(t, service.Store.GetDriver().GetDB().QueryRowContext(ctx, "SELECT COUNT(*) FROM link_metadata_job").Scan(&jobs))
 	require.Zero(t, jobs)
 }
