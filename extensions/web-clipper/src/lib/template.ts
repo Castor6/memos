@@ -17,8 +17,8 @@ export function splitTemplateTokens(text: string): string[] {
 
 /**
  * The out-of-the-box template: the user's note / quoted selection first, the page's own
- * description second, provenance last. Default tags are literal #tags users add here —
- * there is no per-clip tag input. Empty-variable lines drop, so every combination stays clean.
+ * description second, provenance last. Tags in the capture workspace are independent;
+ * literal #tags in templates remain body text. Empty-variable lines drop cleanly.
  */
 export const DEFAULT_TEMPLATE = `{{content}}
 

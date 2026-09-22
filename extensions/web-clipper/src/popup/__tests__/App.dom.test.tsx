@@ -31,6 +31,7 @@ function wireSaveResult(
     if (type === "GET_POPUP_STATE") return popupState;
     if (type === "GET_CAPTURE_CAPABILITIES") return { ok: true, supported: true, contentMaxBytes: 8192 };
     if (type === "GET_CLIP_STATUS") return savedClip;
+    if (type === "GET_MEMO_TAGS") return { ok: true, tags: ["阅读", "项目/灵感"] };
     if (type === "SAVE_MEMO") return result;
     return undefined;
   });
@@ -121,7 +122,28 @@ describe("App — manual capture workspace", () => {
       .find((r) => r.type === "SAVE_MEMO")!;
     expect(save.content.indexOf("This is the insight")).toBeLessThan(save.content.indexOf("Captured body"));
     expect(save.clip.capture).toMatchObject({ kind: "STAR", platform: "WEB", comment: "This is the insight I noticed." });
+    expect(save.tags).toEqual(["star"]);
     expect(screen.getByRole("link", { name: /open memo/i })).toHaveAttribute("href", "https://memos.example.com/memos/1");
+  });
+
+  it("saves selected and new independent tags and renders the final Markdown preview", async () => {
+    const { user } = await startStar();
+    expect(screen.getByRole("button", { name: "移除标签 star" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /添加标签/ }));
+    await user.click(await screen.findByRole("option", { name: "阅读" }));
+    await user.click(screen.getByRole("button", { name: /添加标签/ }));
+    await user.type(screen.getByRole("combobox", { name: "搜索或新建标签" }), "自己的想法{Enter}");
+    await user.type(screen.getByRole("textbox", { name: "我的思考" }), "**值得回顾**");
+    await user.click(screen.getByText("预览完整保存内容"));
+    expect(screen.getByRole("heading", { name: "我的思考" })).toBeInTheDocument();
+    expect(screen.getByText("值得回顾").tagName).toBe("STRONG");
+    await user.click(screen.getByRole("button", { name: /save to memos/i }));
+    await screen.findByRole("button", { name: /saved to memos/i });
+    const save = browserMock.runtime.sendMessage.mock.calls
+      .map(([request]) => request as Record<string, unknown>)
+      .find((r) => r.type === "SAVE_MEMO")!;
+    expect(save.tags).toEqual(["star", "阅读", "自己的想法"]);
+    expect(String(save.content)).not.toContain("#star");
   });
 
   it("rejects Pick up away from an X detail page without injecting scripts", async () => {
@@ -149,6 +171,49 @@ describe("App — manual capture workspace", () => {
     const { user } = await startStar();
     await user.click(screen.getByRole("button", { name: /save to memos/i }));
     expect(await screen.findByText(/2 images weren't attached/i)).toBeInTheDocument();
+  });
+
+  it("shows persistent image failure details safely and clears them when editing", async () => {
+    const embedded = `data:image/png;base64,${"a".repeat(300)}`;
+    wireSaveResult({
+      ok: true,
+      webUrl: "https://memos.example.com/memos/1",
+      failedImages: 2,
+      failedImageDetails: [
+        { url: "https://example.com/missing.png", reason: "图片下载失败" },
+        { url: embedded, reason: "图片超过大小限制" },
+      ],
+    });
+    const { user } = await startStar();
+    await user.click(screen.getByRole("button", { name: /save to memos/i }));
+    await user.click(await screen.findByText("未转存的图片（已保留原链接）"));
+    expect(screen.getByText("图片下载失败")).toBeVisible();
+    expect(screen.getByTitle("https://example.com/missing.png").tagName).toBe("P");
+    const embeddedLabel = screen.getByTitle(embedded);
+    expect(embeddedLabel.textContent!.length).toBeLessThan(180);
+    expect(embeddedLabel).not.toHaveAttribute("href");
+    await waitFor(() => expect(screen.queryByRole("button", { name: /saved to memos/i })).not.toBeInTheDocument(), {
+      timeout: 2500,
+    });
+    expect(screen.getByText("图片下载失败")).toBeVisible();
+    await user.type(screen.getByRole("textbox", { name: "我的思考" }), "Updated thought");
+    expect(screen.queryByText("未转存的图片（已保留原链接）")).not.toBeInTheDocument();
+    expect(screen.queryByText(/2 images weren't attached/i)).not.toBeInTheDocument();
+  });
+
+  it("clears image failures when starting another capture mode", async () => {
+    wireSaveResult({
+      ok: true,
+      webUrl: "https://memos.example.com/memos/1",
+      failedImages: 1,
+      failedImageDetails: [{ url: "https://example.com/missing.png", reason: "图片下载失败" }],
+    });
+    const { user } = await startStar();
+    await user.click(screen.getByRole("button", { name: /save to memos/i }));
+    await screen.findByText("未转存的图片（已保留原链接）");
+    await user.click(screen.getByRole("button", { name: "Pick up" }));
+    expect(screen.queryByText("未转存的图片（已保留原链接）")).not.toBeInTheDocument();
+    expect(screen.queryByText(/weren't attached/i)).not.toBeInTheDocument();
   });
 
   it("retries the same save after a timeout without recapturing", async () => {

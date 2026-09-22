@@ -10,6 +10,8 @@ export type BackgroundRequest = Extract<
     type:
       | "GET_POPUP_STATE"
       | "GET_CAPTURE_CAPABILITIES"
+      | "GET_MEMO_TAGS"
+      | "GET_ATTACHMENT_PREVIEW"
       | "OPEN_SIGN_IN"
       | "SIGN_OUT"
       | "SELECT_USEMEMOS_SOURCE"
@@ -109,9 +111,15 @@ export function parseBackgroundRequest(value: unknown): BackgroundRequest | null
       ...(request.source !== undefined ? { source: request.source } : {}),
     };
   }
-  if (request.type === "GET_CAPTURE_CAPABILITIES") {
+  if (request.type === "GET_CAPTURE_CAPABILITIES" || request.type === "GET_MEMO_TAGS") {
     const expected = parseExpectedConnection(request);
-    return expected ? { type: "GET_CAPTURE_CAPABILITIES", ...expected } : null;
+    return expected ? { type: request.type, ...expected } : null;
+  }
+  if (request.type === "GET_ATTACHMENT_PREVIEW") {
+    const expected = parseExpectedConnection(request);
+    return expected && typeof request.path === "string" && request.path.length <= 8192
+      ? { type: request.type, path: request.path, ...expected }
+      : null;
   }
   if (request.type === "GET_CLIP_STATUS") {
     if (typeof request.sourceUrl !== "string" || request.sourceUrl.length > MAX_CLIP_SOURCE_URL_CHARS) return null;
@@ -142,7 +150,24 @@ export function parseBackgroundRequest(value: unknown): BackgroundRequest | null
   ) {
     return null;
   }
+  if (request.inlineImages !== undefined && typeof request.inlineImages !== "boolean") return null;
   if (request.saveIsRetry !== undefined && typeof request.saveIsRetry !== "boolean") return null;
+  if (request.tags !== undefined) {
+    if (
+      !Array.isArray(request.tags) ||
+      request.tags.length > 100 ||
+      !request.tags.every(
+        (tag) =>
+          typeof tag === "string" &&
+          tag.length > 0 &&
+          tag.trim() === tag &&
+          new TextEncoder().encode(tag).byteLength <= 256 &&
+          !["\n", "\r", "\u0000", "\u001f"].some((character) => tag.includes(character)),
+      ) ||
+      new Set(request.tags).size !== request.tags.length
+    )
+      return null;
+  }
   if (request.images !== undefined) {
     if (!Array.isArray(request.images) || request.images.length > 100 || !request.images.every((image) => typeof image === "string")) {
       return null;
@@ -164,6 +189,8 @@ export function parseBackgroundRequest(value: unknown): BackgroundRequest | null
     visibility: request.visibility as Visibility,
     ...expected,
     ...(clip ? { clip } : {}),
+    ...(request.tags !== undefined ? { tags: request.tags as string[] } : {}),
+    ...(request.inlineImages !== undefined ? { inlineImages: request.inlineImages } : {}),
     ...(request.images ? { images: request.images as string[] } : {}),
     ...(request.saveRequestId ? { saveRequestId: request.saveRequestId } : {}),
     ...(request.saveStartedAt ? { saveStartedAt: request.saveStartedAt } : {}),
@@ -197,7 +224,12 @@ export function isTrustedBackgroundRequest(request: BackgroundRequest, sender: R
   ) {
     return path === "/src/options/index.html";
   }
-  if (request.type === "OPEN_SIGN_IN" || request.type === "SIGN_OUT" || request.type === "GET_AUTH_USER") {
+  if (
+    request.type === "OPEN_SIGN_IN" ||
+    request.type === "SIGN_OUT" ||
+    request.type === "GET_AUTH_USER" ||
+    request.type === "GET_ATTACHMENT_PREVIEW"
+  ) {
     return path === "/src/popup/index.html" || path === "/src/options/index.html";
   }
   return path === "/src/popup/index.html";

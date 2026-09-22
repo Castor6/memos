@@ -125,6 +125,215 @@ describe("background — SAVE_MEMO message", () => {
     clip: { sourceUrl: starCapture.sourceUrl, sourceTitle: "Title", imageCount: images.length, capture: starCapture },
   });
 
+  function inlineArchiveServer(options: { loseMemoResponse?: boolean; loseSecondUpload?: boolean; failDownload?: boolean } = {}) {
+    const attachments = new Map<string, { name: string; filename: string }>();
+    const attachmentPosts: string[] = [];
+    const downloads: string[] = [];
+    let saved: Record<string, unknown> | null = null;
+    let memoPosts = 0;
+    let attachmentReadsBlocked = !!options.loseSecondUpload;
+    const timeout = () => Promise.reject(Object.assign(new Error("response lost"), { name: "TimeoutError" }));
+    const fetchMock = vi.fn((value: unknown, init?: RequestInit) => {
+      const url = new URL(String(value));
+      if (url.pathname.endsWith("/instance/profile")) return Promise.resolve(jsonResponse({ version: "dev", webClipperSupported: true }));
+      if (url.pathname.endsWith("/auth/me")) return Promise.resolve(jsonResponse({ user: { name: "users/steven" } }));
+      if (url.hostname === "cdn.example.org") {
+        downloads.push(url.href);
+        return Promise.resolve(
+          options.failDownload
+            ? new Response(null, { status: 404 })
+            : new Response(new Uint8Array([1, 2, 3]), { headers: { "content-type": "image/png" } }),
+        );
+      }
+      if (url.pathname.endsWith("/attachments") && init?.method === "POST") {
+        const id = url.searchParams.get("attachmentId")!;
+        const body = JSON.parse(String(init.body));
+        const attachment = { name: `attachments/${id}`, filename: body.filename };
+        attachmentPosts.push(id);
+        attachments.set(id, attachment);
+        if (options.loseSecondUpload && attachmentPosts.length === 2) return timeout();
+        return Promise.resolve(jsonResponse(attachment));
+      }
+      if (url.pathname.includes("/attachments/")) {
+        if (attachmentReadsBlocked) return timeout();
+        const attachment = attachments.get(url.pathname.split("/").pop()!);
+        return Promise.resolve(attachment ? jsonResponse(attachment) : jsonResponse({}, 404));
+      }
+      if (url.pathname.endsWith("/memos") && init?.method === "POST") {
+        memoPosts += 1;
+        const body = JSON.parse(String(init.body));
+        saved = {
+          ...body,
+          name: `memos/${url.searchParams.get("memoId")}`,
+          creator: "users/steven",
+          createTime: new Date().toISOString(),
+          attachments: (body.attachments ?? []).map(({ name }: { name: string }) => attachments.get(name.split("/").pop()!)),
+        };
+        return options.loseMemoResponse ? timeout() : Promise.resolve(jsonResponse(saved));
+      }
+      if (url.pathname.endsWith("/memos")) return Promise.resolve(jsonResponse({ memos: saved ? [saved] : [] }));
+      return Promise.resolve(saved ? jsonResponse(saved) : jsonResponse({}, 404));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    return {
+      attachments,
+      attachmentPosts,
+      downloads,
+      saved: () => saved,
+      memoPosts: () => memoPosts,
+      allowAttachmentReads: () => {
+        attachmentReadsBlocked = false;
+      },
+    };
+  }
+
+  it("archives inline images in place once per source and ignores removed legacy image candidates", async () => {
+    const server = inlineArchiveServer();
+    const image = "https://cdn.example.org/image.png";
+    const request = {
+      ...captureRequest("inline_positions", ["https://cdn.example.org/deleted.png"]),
+      inlineImages: true,
+      content: `Before\n\n![first](${image})\n\nBetween\n\n![second](<${image}>)\n\nAfter`,
+    };
+    expect(await emitRuntime(request)).toMatchObject({ ok: true });
+    expect(server.downloads).toEqual([image]);
+    expect(server.attachmentPosts).toHaveLength(1);
+    const attachment = [...server.attachments.values()][0]!;
+    const path = `/file/${attachment.name}/${attachment.filename}`;
+    expect(server.saved()?.content).toBe(`Before\n\n![first](${path})\n\nBetween\n\n![second](<${path}>)\n\nAfter`);
+    vi.unstubAllGlobals();
+  });
+
+  it("keeps failed inline image links and reports the specific image after saving text", async () => {
+    const server = inlineArchiveServer({ failDownload: true });
+    const image = "https://cdn.example.org/missing.png";
+    const request = { ...captureRequest("inline_failed"), inlineImages: true, content: `Text\n\n![missing](${image})` };
+    expect(await emitRuntime(request)).toMatchObject({
+      ok: true,
+      failedImages: 1,
+      failedImageDetails: [{ url: image, reason: expect.any(String) }],
+    });
+    expect(server.saved()?.content).toBe(request.content);
+    expect(server.attachmentPosts).toHaveLength(0);
+    vi.unstubAllGlobals();
+  });
+
+  it.each([false, true])("reconciles rewritten inline content after a lost memo response (cache cleared: %s)", async (clearCache) => {
+    const server = inlineArchiveServer({ loseMemoResponse: true });
+    const request = {
+      ...captureRequest(clearCache ? "inline_no_cache" : "inline_retry"),
+      inlineImages: true,
+      content: "Text\n\n![photo](https://cdn.example.org/image.png)",
+    };
+    expect(await emitRuntime(request)).toEqual({ ok: false, errorKind: "timeout" });
+    if (clearCache) await browserMock.storage.local.remove(SAVE_ATTEMPTS_KEY);
+    expect(await emitRuntime({ ...request, saveIsRetry: true })).toMatchObject({ ok: true });
+    expect(server.attachmentPosts).toHaveLength(1);
+    expect(server.downloads).toHaveLength(1);
+    expect(server.memoPosts()).toBe(1);
+    expect(server.saved()?.content).toContain("/file/attachments/clip");
+    vi.unstubAllGlobals();
+  });
+
+  it("resumes an unknown second upload without repeating the first or abandoning an uncreated memo", async () => {
+    const server = inlineArchiveServer({ loseSecondUpload: true });
+    const request = {
+      ...captureRequest("inline_upload_resume"),
+      inlineImages: true,
+      content: "![first](https://cdn.example.org/first.png)\n\n![second](https://cdn.example.org/second.png)",
+    };
+    expect(await emitRuntime(request)).toEqual({ ok: false, errorKind: "timeout" });
+    expect(server.memoPosts()).toBe(0);
+    server.allowAttachmentReads();
+    expect(await emitRuntime({ ...request, saveIsRetry: true })).toMatchObject({ ok: true });
+    expect(server.attachmentPosts).toHaveLength(2);
+    expect(new Set(server.attachmentPosts).size).toBe(2);
+    expect(server.downloads).toHaveLength(2);
+    expect(server.memoPosts()).toBe(1);
+    expect(String(server.saved()?.content).match(/\/file\/attachments\/clip/g)).toHaveLength(2);
+    vi.unstubAllGlobals();
+  });
+
+  it("saves explicit tags and refuses changed tags under the same request id", async () => {
+    const fetchMock = vi.fn((value: unknown, init?: RequestInit) => {
+      if (String(value).endsWith("/instance/profile")) return Promise.resolve(jsonResponse({ version: "dev", webClipperSupported: true }));
+      if (init?.method === "POST") return Promise.resolve(jsonResponse({ name: "memos/tagged_capture" }));
+      return Promise.resolve(jsonResponse({}, 404));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const request = { ...captureRequest("tagged_capture"), tags: ["Star", "中文"] };
+    expect(await emitRuntime(request)).toMatchObject({ ok: true });
+    const post = fetchMock.mock.calls.find(([, init]) => init?.method === "POST");
+    expect(JSON.parse(String(post?.[1]?.body))).toMatchObject({ tags: ["Star", "中文"], explicitTags: true });
+    expect(await emitRuntime({ ...request, tags: ["Star", "changed"] })).toMatchObject({ ok: false });
+    expect(fetchMock.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(1);
+    vi.unstubAllGlobals();
+  });
+
+  it.each([
+    { confirmed: true, sameSnapshot: true, recovered: true },
+    { confirmed: false, sameSnapshot: true, recovered: false },
+    { confirmed: true, sameSnapshot: false, recovered: false },
+  ])("reconciles later tag edits only for a confirmed matching capture: %j", async ({ confirmed, sameSnapshot, recovered }) => {
+    let remote: Record<string, unknown> | null = null;
+    const fetchMock = vi.fn((value: unknown, init?: RequestInit) => {
+      const url = String(value);
+      if (url.endsWith("/instance/profile")) return Promise.resolve(jsonResponse({ version: "dev", webClipperSupported: true }));
+      if (url.endsWith("/auth/me")) return Promise.resolve(jsonResponse({ user: { name: "users/steven" } }));
+      if (init?.method === "POST") {
+        remote = {
+          ...JSON.parse(String(init.body)),
+          name: "memos/edited_tags_retry",
+          creator: "users/steven",
+          createTime: new Date().toISOString(),
+        };
+        return confirmed
+          ? Promise.resolve(jsonResponse(remote))
+          : Promise.reject(Object.assign(new Error("response lost"), { name: "TimeoutError" }));
+      }
+      return Promise.resolve(remote ? jsonResponse(remote) : jsonResponse({}, 404));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const request = { ...captureRequest("edited_tags_retry"), tags: ["star"] };
+    expect(await emitRuntime(request)).toMatchObject(confirmed ? { ok: true } : { ok: false, errorKind: "timeout" });
+    remote = {
+      ...remote!,
+      tags: ["read"],
+      capture: sameSnapshot ? starCapture : { ...starCapture, comment: "Different capture" },
+    };
+    expect(await emitRuntime({ ...request, saveIsRetry: true })).toMatchObject(
+      recovered ? { ok: true } : { ok: false, errorKind: "invalid-content" },
+    );
+    expect(fetchMock.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(1);
+  });
+
+  it.each([{ tags: ["Star"] }, { tags: ["Other"] }, { tags: [] }])("reconciles exact tags after local state is lost: %j", async ({
+    tags,
+  }) => {
+    const fetchMock = vi.fn((value: unknown, _init?: RequestInit) => {
+      const url = String(value);
+      if (url.endsWith("/instance/profile")) return Promise.resolve(jsonResponse({ version: "dev", webClipperSupported: true }));
+      if (url.endsWith("/auth/me")) return Promise.resolve(jsonResponse({ user: { name: "users/steven" } }));
+      return Promise.resolve(
+        jsonResponse({
+          name: "memos/tags_reconcile",
+          creator: "users/steven",
+          createTime: new Date().toISOString(),
+          content: "body",
+          visibility: "PRIVATE",
+          capture: starCapture,
+          tags,
+        }),
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await emitRuntime({ ...captureRequest("tags_reconcile"), tags: ["Star"], saveIsRetry: true })).toMatchObject(
+      tags[0] === "Star" ? { ok: true } : { ok: false, errorKind: "invalid-content" },
+    );
+    expect(fetchMock.mock.calls.every(([, init]) => init?.method !== "POST")).toBe(true);
+    vi.unstubAllGlobals();
+  });
+
   it("rejects an existing id with changed thoughts instead of accepting a matching source alone", async () => {
     const fetchMock = vi.fn((value: unknown, _init?: RequestInit) => {
       const url = String(value);
@@ -528,7 +737,7 @@ describe("background — SAVE_MEMO message", () => {
     vi.unstubAllGlobals();
   });
 
-  it("uploads popup-captured images as attachments and associates them in the memo POST", async () => {
+  it("preserves legacy attachment-only behavior when inlineImages is absent", async () => {
     const fetchMock = vi.fn((url: unknown, _init?: unknown) => {
       const u = String(url);
       if (u === "https://cdn.example.com/x.png") {
@@ -542,7 +751,7 @@ describe("background — SAVE_MEMO message", () => {
 
     const result = await emitRuntime({
       type: "SAVE_MEMO",
-      content: "hello",
+      content: "hello\n\n![](https://cdn.example.com/x.png)",
       visibility: "PRIVATE",
       ...expected,
       images: ["https://cdn.example.com/x.png"],
@@ -553,6 +762,7 @@ describe("background — SAVE_MEMO message", () => {
       ([u, init]) => String(u).endsWith("/api/v1/memos") && (init as { method: string }).method === "POST",
     );
     expect(JSON.parse((memoPost![1] as { body: string }).body).attachments).toEqual([{ name: "attachments/9" }]);
+    expect(JSON.parse((memoPost![1] as { body: string }).body).content).toBe("hello\n\n![](https://cdn.example.com/x.png)");
     vi.unstubAllGlobals();
   });
 
@@ -1123,10 +1333,10 @@ describe("background — context menu quick save", () => {
 
   it("ready + text/image selection → saves the text and attaches the image to the memo", async () => {
     ready();
-    // Content script returns the rendered selection: text as markdown + the image pulled out.
+    // Content script preserves the selected image in Markdown.
     browserMock.tabs.sendMessage.mockImplementation(async (_id: number, msg: unknown) => {
       if ((msg as { type: string }).type === "GET_SELECTION") {
-        return { markdown: "hello world", images: ["https://cdn.example.com/x.png"] };
+        return { markdown: "hello world\n\n![](https://cdn.example.com/x.png)", images: ["https://cdn.example.com/x.png"] };
       }
       return undefined;
     });
@@ -1135,7 +1345,11 @@ describe("background — context menu quick save", () => {
       if (u === "https://cdn.example.com/x.png") {
         return Promise.resolve(new Response(new Uint8Array([1, 2, 3]), { headers: { "content-type": "image/png" } }));
       }
-      if (u.endsWith("/api/v1/attachments")) return Promise.resolve(jsonResponse({ name: "attachments/9" }));
+      if (new URL(u).pathname.endsWith("/api/v1/attachments")) {
+        const id = new URL(u).searchParams.get("attachmentId");
+        const body = JSON.parse(String((_init as RequestInit)?.body));
+        return Promise.resolve(jsonResponse({ name: `attachments/${id}`, filename: body.filename }));
+      }
       if (u.endsWith("/api/v1/memos")) return Promise.resolve(jsonResponse({ name: "memos/7", uid: "xy" }));
       return Promise.resolve(new Response(null, { status: 404 }));
     });
@@ -1146,12 +1360,15 @@ describe("background — context menu quick save", () => {
       { id: 5, title: "Post" },
     );
 
-    // The memo body is the text (image is not inline), and the image is associated atomically.
+    // The selected image keeps its inline location and is associated atomically.
     const memoPost = fetchMock.mock.calls.find(
       ([u, init]) => String(u).endsWith("/api/v1/memos") && (init as { method: string }).method === "POST",
     );
     expect(JSON.parse((memoPost![1] as { body: string }).body).content).toContain("hello world");
-    expect(JSON.parse((memoPost![1] as { body: string }).body).attachments).toEqual([{ name: "attachments/9" }]);
+    expect(JSON.parse((memoPost![1] as { body: string }).body).attachments).toEqual([
+      { name: expect.stringMatching(/^attachments\/clip/) },
+    ]);
+    expect(JSON.parse((memoPost![1] as { body: string }).body).content).toContain("/file/attachments/clip");
     expect(fetchMock.mock.calls.some(([u]) => String(u).endsWith("/api/v1/memos/7/attachments"))).toBe(false);
     expect(browserMock.action.setBadgeText).toHaveBeenCalledWith({ text: "✓" });
     vi.unstubAllGlobals();
@@ -1185,7 +1402,11 @@ describe("background — context menu quick save", () => {
       if (u === "https://cdn.example.com/pic.png") {
         return Promise.resolve(new Response(new Uint8Array([1, 2, 3]), { headers: { "content-type": "image/png" } }));
       }
-      if (u.endsWith("/api/v1/attachments")) return Promise.resolve(jsonResponse({ name: "attachments/9" }));
+      if (new URL(u).pathname.endsWith("/api/v1/attachments")) {
+        const id = new URL(u).searchParams.get("attachmentId");
+        const body = JSON.parse(String((_init as RequestInit)?.body));
+        return Promise.resolve(jsonResponse({ name: `attachments/${id}`, filename: body.filename }));
+      }
       if (u.endsWith("/api/v1/memos")) return Promise.resolve(jsonResponse({ name: "memos/7", uid: "xy" }));
       return Promise.resolve(new Response(null, { status: 404 }));
     });
@@ -1197,14 +1418,17 @@ describe("background — context menu quick save", () => {
     );
 
     expect(browserMock.action.setBadgeText).toHaveBeenCalledWith({ text: "✓" });
-    const attach = fetchMock.mock.calls.find(([u]) => String(u).endsWith("/api/v1/attachments"));
+    const attach = fetchMock.mock.calls.find(([u]) => new URL(String(u)).pathname.endsWith("/api/v1/attachments"));
     const attachBody = JSON.parse((attach![1] as { body: string }).body);
     expect(attachBody.type).toBe("image/png");
     expect(typeof attachBody.content).toBe("string"); // base64
     const memoPost = fetchMock.mock.calls.find(
       ([u, init]) => String(u).endsWith("/api/v1/memos") && (init as { method: string }).method === "POST",
     );
-    expect(JSON.parse((memoPost![1] as { body: string }).body).attachments).toEqual([{ name: "attachments/9" }]);
+    expect(JSON.parse((memoPost![1] as { body: string }).body).attachments).toEqual([
+      { name: expect.stringMatching(/^attachments\/clip/) },
+    ]);
+    expect(JSON.parse((memoPost![1] as { body: string }).body).content).toContain("/file/attachments/clip");
     vi.unstubAllGlobals();
   });
 
@@ -1218,5 +1442,30 @@ describe("background — context menu quick save", () => {
   it("ignores clicks on other menu items", async () => {
     await browserMock.contextMenus.onClicked.emit({ menuItemId: "something-else", selectionText: "x" }, { id: 5 });
     expect(browserMock.action.setBadgeText).not.toHaveBeenCalled();
+  });
+});
+
+describe("background — GET_MEMO_TAGS", () => {
+  beforeEach(ready);
+  it("rejects stale lookup identities before fetching", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await emitRuntime({ type: "GET_MEMO_TAGS", ...expected, expectedConnectionId: "stale" })).toEqual({
+      ok: false,
+      errorKind: "auth-changed",
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it("drops tag results if credentials change while loading", async () => {
+    const fetchMock = vi.fn(async (value: unknown) => {
+      if (String(value).endsWith("/auth/me")) return jsonResponse({ user: { name: "users/steven" } });
+      mockUser = { id: "user_123", unsafeMetadata: memos({ accessToken: "replaced" }) };
+      return jsonResponse({});
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await emitRuntime({ type: "GET_MEMO_TAGS", ...expected })).toEqual({ ok: false, errorKind: "auth-changed" });
+    vi.unstubAllGlobals();
   });
 });

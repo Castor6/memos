@@ -1,4 +1,5 @@
 import { htmlToMarkdown } from "./format";
+import { normalizeImageSources } from "./image-sources";
 
 /**
  * Below this, whatever was found is navigation, a paywall stub, or a card grid — not an article.
@@ -39,9 +40,7 @@ function applyBaseUrl(doc: Document, pageUrl: string): void {
  * clip started from a selection never needs it — keeping it out of the popup's initial parse is
  * the difference between the popup opening instantly and opening noticeably.
  *
- * Images are dropped rather than kept. The clipper uploads images as memo attachments and never
- * hotlinks them, and a long article can carry dozens — uploading them all on every clip is a
- * separate decision from extracting the text. Figure captions survive, so the prose still reads.
+ * Images remain in the article flow; the save pipeline archives their sources in place.
  */
 export async function extractArticle(pageHtml: string, pageUrl: string): Promise<string | null> {
   if (!pageHtml.trim()) return null;
@@ -52,9 +51,10 @@ export async function extractArticle(pageHtml: string, pageUrl: string): Promise
     if (!doc.head || !doc.body) return null;
     for (const element of doc.querySelectorAll(NON_CONTENT_SELECTOR)) element.remove();
     applyBaseUrl(doc, pageUrl);
+    normalizeImageSources(doc, doc.baseURI);
 
     const { default: Defuddle } = await import("defuddle");
-    const markdown = htmlToMarkdown(new Defuddle(doc, { url: pageUrl, removeImages: true }).parse()?.content ?? "");
+    const markdown = htmlToMarkdown(new Defuddle(doc, { url: pageUrl, removeImages: false }).parse()?.content ?? "");
     return markdown.length < MIN_ARTICLE_CHARS ? null : markdown;
   } catch {
     // Extraction is an enhancement layered on the link capture. A page that defeats it — or an

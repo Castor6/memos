@@ -11,6 +11,33 @@ const save = {
 } as const;
 
 describe("background protocol", () => {
+  it("preserves independent tags including explicit empty selection and requires a bound tags lookup", () => {
+    for (const tags of [[], ["Star", "Pick up", "中文/标签"]]) {
+      expect(parseBackgroundRequest({ ...save, tags })).toEqual({ ...save, tags });
+    }
+    const request = { ...save, type: "GET_MEMO_TAGS" };
+    expect(parseBackgroundRequest(request)).toMatchObject({ type: "GET_MEMO_TAGS", expectedConnectionId: save.expectedConnectionId });
+    expect(parseBackgroundRequest({ ...request, expectedConnectionId: "" })).toBeNull();
+    expect(isTrustedBackgroundRequest(parseBackgroundRequest(request)!, { id: "ext", url: "https://example.com" }, "ext")).toBe(false);
+  });
+
+  it.each(
+    [
+      null,
+      "Star",
+      [1],
+      [""],
+      [" Star"],
+      ["Star", "Star"],
+      ["line\nbreak"],
+      ["bad\u001ftag"],
+      ["中".repeat(86)],
+      Array.from({ length: 101 }, (_, i) => String(i)),
+    ].map((tags) => ({ tags })),
+  )("rejects tags outside the server constraints: %j", ({ tags }) => {
+    expect(parseBackgroundRequest({ ...save, tags })).toBeNull();
+  });
+
   it("preserves explicit first-save and retry flags and rejects non-boolean values", () => {
     expect(parseBackgroundRequest({ ...save, saveIsRetry: true })).toEqual({ ...save, saveIsRetry: true });
     expect(parseBackgroundRequest({ ...save, saveIsRetry: false })).toEqual({ ...save, saveIsRetry: false });
@@ -72,6 +99,7 @@ describe("background protocol", () => {
       expectedInstanceUrl: "https://x",
     },
     { ...save, visibility: "SECRET" },
+    { ...save, inlineImages: "true" },
     { ...save, expectedSource: "other" },
     { ...save, expectedConnectionId: "" },
     { ...save, images: ["ok", 2] },

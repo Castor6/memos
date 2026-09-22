@@ -5,6 +5,7 @@ import { composeCaptureMemo, formatCapturedPosts, utf8Bytes } from "@/lib/captur
 import { type CaptureData, type CaptureKind, type ClipSaveStatus, normalizeClipSourceUrl } from "@/lib/clip-records";
 import type { ConnectionSource } from "@/lib/connection-config";
 import { composeMemoContent } from "@/lib/format";
+import { estimatedArchivedBytes, markdownImageUrls } from "@/lib/markdown-images";
 import type { Visibility } from "@/lib/memos-client";
 import type { SaveResult } from "@/lib/messages";
 import { sendBackgroundRequest } from "@/lib/runtime-client";
@@ -13,13 +14,15 @@ import { captureXPage, type XCaptureResult } from "@/lib/x-capture";
 import { captureActivePage } from "./page-capture";
 
 type SaveExpectation = { source: ConnectionSource; connectionId: string; instanceUrl: string };
-type SaveOperation = { requestId: string; startedAt: number };
+type SaveOperation = { requestId: string; startedAt: number; content?: string; legacyTags?: boolean; inlineImages?: boolean };
 type Tab = { id?: number; title?: string; url?: string };
 export type Draft = {
   capture: CaptureData;
   title: string;
   original: string;
   images: string[];
+  imageLayout?: "inline";
+  tags: string[];
   warnings: string[];
   confirmed: boolean;
   visibility: Visibility;
@@ -29,6 +32,23 @@ export type Draft = {
 const STORAGE_ERROR = "草稿未能写入本机存储，请保留当前窗口并重试；未落盘的输入在关闭窗口后可能丢失。";
 const AMBIGUOUS_ERRORS = new Set(["timeout", "unreachable", "cors", "bad-response", "extension-error"]);
 const validVisibility = (value: unknown): value is Visibility => ["PRIVATE", "PROTECTED", "PUBLIC"].includes(String(value));
+const defaultTags = (mode: CaptureKind) => [mode === "PICK_UP" ? "pick up" : "star"];
+
+/** Older drafts only kept a separate image list. Preserve those images without replacing edited text. */
+function upgradeDraftImages(draft: Draft): Draft {
+  if (draft.imageLayout === "inline") return draft;
+  const existing = new Set(markdownImageUrls(composeCaptureMemo(draft.capture, draft.original)));
+  const missing = [...new Set(draft.images)].filter((source) => !existing.has(source));
+  return {
+    ...draft,
+    imageLayout: "inline",
+    original: [
+      draft.original,
+      ...missing.map((source) => `![](<${source.replace(/[<>\s\\]/g, (character) => encodeURIComponent(character))}>)`),
+    ].join("\n\n"),
+    warnings: missing.length ? [...draft.warnings, "旧草稿的图片已补到原内容末尾；重新提取可恢复图文位置。"] : draft.warnings,
+  };
+}
 
 async function bounded<T>(promise: Promise<T>, message: string, milliseconds: number): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -66,23 +86,36 @@ function restoreDraft(value: unknown, mode: CaptureKind, pageUrl: string): Draft
   if (!validVisibility(raw.visibility)) return null;
   if (!Array.isArray(raw.images) || !raw.images.every((image) => typeof image === "string")) return null;
   if (!Array.isArray(raw.warnings) || !raw.warnings.every((warning) => typeof warning === "string")) return null;
+  if (raw.tags !== undefined && (!Array.isArray(raw.tags) || !raw.tags.every((tag) => typeof tag === "string"))) return null;
   let operation: SaveOperation | null = null;
   if (raw.operation !== null && raw.operation !== undefined) {
     const saved = raw.operation as Partial<SaveOperation>;
     if (typeof saved.requestId !== "string" || !/^[a-zA-Z0-9_-]{8,128}$/.test(saved.requestId)) return null;
     if (typeof saved.startedAt !== "number" || !Number.isFinite(saved.startedAt) || saved.startedAt <= 0) return null;
-    operation = { requestId: saved.requestId, startedAt: saved.startedAt };
+    if (saved.content !== undefined && typeof saved.content !== "string") return null;
+    if (saved.legacyTags !== undefined && typeof saved.legacyTags !== "boolean") return null;
+    if (saved.inlineImages !== undefined && typeof saved.inlineImages !== "boolean") return null;
+    operation = {
+      requestId: saved.requestId,
+      startedAt: saved.startedAt,
+      content: saved.content ?? composeCaptureMemo(capture, raw.original, raw.tags === undefined, false),
+      legacyTags: saved.legacyTags ?? raw.tags === undefined,
+      inlineImages: saved.inlineImages ?? false,
+    };
   }
-  return {
+  const draft: Draft = {
     capture,
     title: raw.title,
     original: raw.original,
     images: raw.images,
+    ...(raw.imageLayout === "inline" ? { imageLayout: "inline" } : {}),
+    tags: (raw.tags as string[] | undefined) ?? defaultTags(mode),
     warnings: raw.warnings,
     confirmed: raw.confirmed,
     visibility: raw.visibility,
     operation,
   };
+  return operation ? draft : upgradeDraftImages(draft);
 }
 
 /** Manual capture with account-scoped drafts and durable, retryable save operations. */
@@ -100,6 +133,10 @@ export function useClipper(expectation: SaveExpectation | null, template: string
   const [savedClip, setSavedClip] = useState<ClipSaveStatus | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
   const [capabilityRetry, setCapabilityRetry] = useState(0);
+  const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
+  const [tagsLoading, setTagsLoading] = useState(false);
+  const [tagsError, setTagsError] = useState<string | null>(null);
+  const [tagsRetry, setTagsRetry] = useState(0);
   const accountKey = expectation
     ? JSON.stringify([expectation.source, expectation.connectionId, expectation.instanceUrl.replace(/\/+$/, "")])
     : "";
@@ -289,6 +326,37 @@ export function useClipper(expectation: SaveExpectation | null, template: string
     };
   }, [scope, accountKey, ready, draft?.capture.kind, draft?.capture.sourceUrl]);
 
+  useEffect(() => {
+    let active = true;
+    setTagSuggestions([]);
+    setTagsError(null);
+    setTagsLoading(false);
+    if (!expectation || !draft || !capabilities?.supported) return;
+    setTagsLoading(true);
+    void sendBackgroundRequest({
+      type: "GET_MEMO_TAGS",
+      expectedSource: expectation.source,
+      expectedConnectionId: expectation.connectionId,
+      expectedInstanceUrl: expectation.instanceUrl,
+    })
+      .then((result) => {
+        if (!active || accountRef.current !== accountKey) return;
+        if (!result?.ok || !Array.isArray(result.tags) || !result.tags.every((tag) => typeof tag === "string")) {
+          throw new Error("tags unavailable");
+        }
+        setTagSuggestions(result.tags);
+      })
+      .catch(() => {
+        if (active && accountRef.current === accountKey) setTagsError("已有标签读取失败");
+      })
+      .finally(() => {
+        if (active && accountRef.current === accountKey) setTagsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [accountKey, !!draft, capabilities?.supported, tagsRetry]);
+
   const update = useCallback(
     (change: Partial<Draft>, fields?: Partial<CaptureData>) => {
       const current = draftRef.current;
@@ -355,6 +423,8 @@ export function useClipper(expectation: SaveExpectation | null, template: string
             title: captured.title,
             original,
             images: captured.images,
+            imageLayout: "inline",
+            tags: existing?.tags ?? defaultTags(mode),
             warnings: captured.fallbackReason ? ["页面正文未能完整提取，请核对原内容；必要时选择正文后重新提取。"] : [],
             confirmed: true,
             visibility: existing?.visibility ?? defaultVisibility.current,
@@ -385,6 +455,8 @@ export function useClipper(expectation: SaveExpectation | null, template: string
                 ? `${formatCapturedPosts(result.capture)}\n\n[来源](${result.capture.sourceUrl})`
                 : formatCapturedPosts(result.capture),
             images: result.images,
+            imageLayout: "inline",
+            tags: existing?.tags ?? defaultTags(mode),
             warnings: result.warnings,
             confirmed: mode === "STAR" || result.isOwnPost === true || existing?.confirmed === true,
             visibility: existing?.visibility ?? defaultVisibility.current,
@@ -411,8 +483,8 @@ export function useClipper(expectation: SaveExpectation | null, template: string
     [expectation, accountKey, scope, pageUrl, tab, template, applyDraft, persist],
   );
 
-  const content = draft ? composeCaptureMemo(draft.capture, draft.original) : "";
-  const contentBytes = utf8Bytes(content);
+  const content = draft ? (draft.operation?.content ?? composeCaptureMemo(draft.capture, draft.original)) : "";
+  const contentBytes = draft?.operation && !draft.operation.inlineImages ? utf8Bytes(content) : estimatedArchivedBytes(content);
   const overLimit = !!capabilities && capabilities.contentMaxBytes > 0 && contentBytes > capabilities.contentMaxBytes;
 
   const save = useCallback(async (): Promise<SaveResult> => {
@@ -423,12 +495,15 @@ export function useClipper(expectation: SaveExpectation | null, template: string
     if (!capabilities?.supported) return { ok: false, errorKind: "capture-unsupported", message: "请先确认服务器支持同步记录。" };
     if (current.capture.kind === "PICK_UP" && !current.confirmed)
       return { ok: false, errorKind: "invalid-content", message: "请先确认这条评论属于你。" };
-    const memo = composeCaptureMemo(current.capture, current.original);
-    if (capabilities.contentMaxBytes > 0 && utf8Bytes(memo) > capabilities.contentMaxBytes)
+    const memo = current.operation?.content ?? composeCaptureMemo(current.capture, current.original);
+    const saveBytes = current.operation && !current.operation.inlineImages ? utf8Bytes(memo) : estimatedArchivedBytes(memo);
+    if (capabilities.contentMaxBytes > 0 && saveBytes > capabilities.contentMaxBytes)
       return { ok: false, errorKind: "content-too-large", contentMaxBytes: capabilities.contentMaxBytes };
-    const operation = current.operation ?? {
+    const operation: SaveOperation = current.operation ?? {
       requestId: globalThis.crypto?.randomUUID?.() ?? `clip_${Date.now()}_${Math.random().toString(36).slice(2)}`,
       startedAt: Date.now(),
+      content: memo,
+      inlineImages: true,
     };
     const pending = { ...current, operation };
     busyRef.current = true;
@@ -453,11 +528,13 @@ export function useClipper(expectation: SaveExpectation | null, template: string
           saveRequestId: operation.requestId,
           saveStartedAt: operation.startedAt,
           saveIsRetry: Boolean(current.operation),
-          images: current.images,
+          images: operation.inlineImages ? [] : current.images,
+          inlineImages: operation.inlineImages,
+          ...(operation.legacyTags ? {} : { tags: current.tags }),
           clip: {
             sourceUrl: current.capture.sourceUrl,
             sourceTitle: current.title,
-            imageCount: current.images.length,
+            imageCount: Math.min(current.images.length, 100),
             capture: current.capture,
           },
         });
@@ -467,7 +544,7 @@ export function useClipper(expectation: SaveExpectation | null, template: string
       }
       if (!mounted.current || scopeRef.current !== scope || accountRef.current !== accountKey) return result;
       if (result.ok || !AMBIGUOUS_ERRORS.has(result.errorKind)) {
-        const finished = { ...pending, operation: null };
+        const finished = upgradeDraftImages({ ...pending, operation: null });
         applyDraft(finished);
         await persist(finished, scope);
       }
@@ -512,5 +589,9 @@ export function useClipper(expectation: SaveExpectation | null, template: string
     save,
     awaitingConfirmation: !!draft?.operation && !busy,
     retryCapabilities: () => setCapabilityRetry((value) => value + 1),
+    tagSuggestions,
+    tagsLoading,
+    tagsError,
+    retryTags: () => setTagsRetry((value) => value + 1),
   };
 }

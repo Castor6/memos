@@ -188,7 +188,15 @@ export type CreatedMemo = { name: string; uid?: string };
 
 export async function createMemo(
   creds: MemosCredentials,
-  input: { content: string; visibility: Visibility; memoId?: string; attachments?: Array<{ name: string }>; capture?: CaptureData },
+  input: {
+    content: string;
+    visibility: Visibility;
+    memoId?: string;
+    attachments?: Array<{ name: string; filename?: string }>;
+    capture?: CaptureData;
+    tags?: string[];
+    explicitTags?: boolean;
+  },
   deps?: InstanceFetchDeps,
 ): Promise<CreatedMemo> {
   const { memoId, ...body } = input;
@@ -207,7 +215,8 @@ export type MemoSummary = CreatedMemo & {
   createTime: string;
   state?: "NORMAL" | "ARCHIVED";
   capture?: CaptureData;
-  attachments?: Array<{ name: string }>;
+  tags?: string[];
+  attachments?: Array<{ name: string; filename?: string }>;
 };
 
 function parseMemo(value: unknown): MemoSummary {
@@ -224,6 +233,7 @@ function parseMemo(value: unknown): MemoSummary {
     !Number.isFinite(Date.parse(memo.createTime))
   )
     return badResponse();
+  if (memo.tags !== undefined && (!Array.isArray(memo.tags) || !memo.tags.every((tag) => typeof tag === "string"))) return badResponse();
   const capture = memo.capture === undefined ? undefined : parseCaptureData(memo.capture);
   if (memo.capture !== undefined && !capture) return badResponse();
   if (
@@ -241,7 +251,15 @@ function parseMemo(value: unknown): MemoSummary {
     ...(typeof memo.uid === "string" && memo.uid ? { uid: memo.uid } : {}),
     ...(memo.state === "NORMAL" || memo.state === "ARCHIVED" ? { state: memo.state } : {}),
     ...(capture ? { capture } : {}),
-    ...(Array.isArray(memo.attachments) ? { attachments: memo.attachments.map((attachment) => ({ name: String(attachment.name) })) } : {}),
+    ...(Array.isArray(memo.tags) ? { tags: memo.tags as string[] } : {}),
+    ...(Array.isArray(memo.attachments)
+      ? {
+          attachments: memo.attachments.map((attachment) => ({
+            name: String(attachment.name),
+            ...(typeof attachment.filename === "string" ? { filename: attachment.filename } : {}),
+          })),
+        }
+      : {}),
   };
 }
 
@@ -324,8 +342,11 @@ export async function listRecentMemos(
         return badResponse();
       }
       if (!CLIPPER_VISIBILITIES.has(memo.visibility)) return [];
+      if (memo.tags !== undefined && (!Array.isArray(memo.tags) || !memo.tags.every((tag) => typeof tag === "string")))
+        return badResponse();
       return [
         {
+          ...(Array.isArray(memo.tags) ? { tags: memo.tags as string[] } : {}),
           name: memo.name,
           uid: typeof memo.uid === "string" && memo.uid ? memo.uid : undefined,
           creator: memo.creator,
@@ -338,19 +359,43 @@ export async function listRecentMemos(
     .filter((memo) => !creator || memo.creator === creator);
 }
 
-export type CreatedAttachment = { name: string };
+export type CreatedAttachment = { name: string; filename: string };
+
+function parseAttachment(raw: unknown, fallbackFilename?: string): CreatedAttachment {
+  if (!raw || typeof raw !== "object") return badResponse();
+  const obj = raw as Record<string, unknown>;
+  const filename = typeof obj.filename === "string" && obj.filename ? obj.filename : fallbackFilename;
+  if (typeof obj.name !== "string" || !/^attachments\/[a-zA-Z0-9_-]+$/.test(obj.name) || !filename) return badResponse();
+  return { name: obj.name, filename };
+}
+
+/** Read a known attachment to reconcile an upload whose response was lost. */
+export async function getAttachment(creds: MemosCredentials, id: string, deps?: InstanceFetchDeps): Promise<CreatedAttachment | null> {
+  try {
+    return parseAttachment(await instanceFetchJson(creds, `/api/v1/attachments/${encodeURIComponent(id)}`, { method: "GET" }, deps));
+  } catch (error) {
+    if (error instanceof InstanceError && error.kind === "not-found") return null;
+    throw error;
+  }
+}
+
+/** Stable file route also resolves S3 storage without persisting an expiring signed URL. */
+export function attachmentMarkdownUrl(attachment: CreatedAttachment): string {
+  return `/file/${attachment.name}/${encodeURIComponent(attachment.filename)}`;
+}
 
 /** Uploads bytes as a Memos attachment. `content` is base64-encoded (the API's bytes format). */
 export async function createAttachment(
   creds: MemosCredentials,
-  input: { filename: string; type: string; content: string },
+  input: { filename: string; type: string; content: string; attachmentId?: string },
   deps?: InstanceFetchDeps,
 ): Promise<CreatedAttachment> {
-  const raw = await instanceFetchJson(creds, "/api/v1/attachments", { method: "POST", body: input }, deps);
-  if (typeof raw !== "object" || raw === null) return badResponse();
-  const obj = raw as Record<string, unknown>;
-  if (typeof obj.name !== "string" || !obj.name.trim()) return badResponse();
-  return { name: obj.name };
+  const { attachmentId, ...attachment } = input;
+  const query = attachmentId ? `?attachmentId=${encodeURIComponent(attachmentId)}` : "";
+  return parseAttachment(
+    await instanceFetchJson(creds, `/api/v1/attachments${query}`, { method: "POST", body: attachment }, deps),
+    input.filename,
+  );
 }
 
 export function memoWebUrl(instanceUrl: string, memo: CreatedMemo): string {
@@ -358,4 +403,23 @@ export function memoWebUrl(instanceUrl: string, memo: CreatedMemo): string {
   // Modern Memos routes memo detail at /memos/{uid}; `name` is "memos/{uid}", so its id is the uid.
   const id = memo.uid || memo.name.split("/").pop();
   return id ? `${base}/memos/${id}` : base;
+}
+
+/** Lists both used and configured tags for the authenticated user's personal space. */
+export async function getMemoTags(creds: MemosCredentials, deps?: InstanceFetchDeps): Promise<string[]> {
+  const user = await getCurrentUser(creds, deps);
+  if (!/^users\/[^/]+$/.test(user.name)) return badResponse();
+  const resource = `users/${encodeURIComponent(user.name.slice("users/".length))}`;
+  const [stats, setting] = await Promise.all([
+    instanceFetchJson(creds, `/api/v1/${resource}:getStats`, { method: "GET" }, deps),
+    instanceFetchJson(creds, `/api/v1/${resource}/settings/TAGS`, { method: "GET" }, deps),
+  ]);
+  if (!stats || typeof stats !== "object" || !setting || typeof setting !== "object") return badResponse();
+  const counts = (stats as { tagCount?: unknown }).tagCount ?? {};
+  const tagsSetting = (setting as { tagsSetting?: unknown }).tagsSetting;
+  if (tagsSetting !== undefined && (!tagsSetting || typeof tagsSetting !== "object" || Array.isArray(tagsSetting))) return badResponse();
+  const configured = (tagsSetting as { tags?: unknown } | undefined)?.tags ?? {};
+  if (typeof counts !== "object" || Array.isArray(counts) || typeof configured !== "object" || Array.isArray(configured))
+    return badResponse();
+  return [...new Set([...Object.keys(counts), ...Object.keys(configured)])];
 }

@@ -45,9 +45,9 @@ describe("ClipHistory", () => {
 
     expect(await screen.findByRole("heading", { name: "Saved clips" })).toBeInTheDocument();
     expect(await screen.findByRole("heading", { name: "A practical guide to web clipping" })).toBeInTheDocument();
-    expect(screen.getAllByText("Keep the thing the user deliberately selected.")).toHaveLength(2);
+    expect(screen.getAllByText("Keep the thing the user deliberately selected.")).toHaveLength(3);
     expect(screen.getByText(/2 selected images/i)).toBeInTheDocument();
-    expect(screen.getByText((content) => content.includes("[A practical guide](https://example.com)"))).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "A practical guide" })).toHaveAttribute("href", "https://example.com");
     expect(screen.getByRole("link", { name: /open source/i })).toHaveAttribute("href", "https://example.com/articles/web-clipping");
     expect(screen.getByRole("link", { name: /open memo/i })).toHaveAttribute("href", "https://memos.example.com/m/42");
 

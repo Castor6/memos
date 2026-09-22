@@ -1,10 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import type { InstanceError } from "@/lib/errors";
 import {
+  attachmentMarkdownUrl,
   createAttachment,
   createMemo,
+  getAttachment,
   getCurrentUser,
   getInstanceProfile,
+  getMemoTags,
   isValidInstanceUrl,
   listRecentMemos,
   memoWebUrl,
@@ -249,6 +252,25 @@ describe("isValidInstanceUrl", () => {
 });
 
 describe("attachments", () => {
+  it("sends stable attachment IDs as query parameters and reads their file metadata for recovery", async () => {
+    const fetchImpl = vi.fn().mockImplementation(async () => jsonResponse({ name: "attachments/clip123", filename: "一张图.webp" }));
+    const attachment = await createAttachment(
+      creds,
+      {
+        filename: "photo.webp",
+        type: "image/webp",
+        content: "AAAA",
+        attachmentId: "clip123",
+      },
+      { fetchImpl },
+    );
+    expect(fetchImpl.mock.calls[0]?.[0]).toBe("https://memos.example.com/api/v1/attachments?attachmentId=clip123");
+    expect(JSON.parse(fetchImpl.mock.calls[0]?.[1].body)).toEqual({ filename: "photo.webp", type: "image/webp", content: "AAAA" });
+    expect(attachmentMarkdownUrl(attachment)).toBe("/file/attachments/clip123/%E4%B8%80%E5%BC%A0%E5%9B%BE.webp");
+    expect(await getAttachment(creds, "clip123", { fetchImpl })).toEqual(attachment);
+    expect(fetchImpl.mock.calls[1]?.[0]).toBe("https://memos.example.com/api/v1/attachments/clip123");
+    expect(await getAttachment(creds, "missing", { fetchImpl: async () => jsonResponse({}, 404) })).toBeNull();
+  });
   it("createAttachment POSTs filename/type/content and returns the name", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({ name: "attachments/9" }));
     const att = await createAttachment(creds, { filename: "x.png", type: "image/png", content: "AAAA" }, { fetchImpl });
@@ -295,6 +317,7 @@ describe("published OpenAPI compatibility", () => {
     await expect(getCurrentUser(creds, { fetchImpl })).resolves.toEqual({ name: "users/steven" });
     await expect(createAttachment(creds, { filename: "page.png", type: "image/png", content: "AAAA" }, { fetchImpl })).resolves.toEqual({
       name: "attachments/9",
+      filename: "page.png",
     });
     await expect(
       createMemo(
@@ -309,5 +332,32 @@ describe("published OpenAPI compatibility", () => {
       ),
     ).resolves.toEqual({ name: "memos/save-123", uid: undefined });
     await expect(listRecentMemos(creds, 20, "users/steven", { fetchImpl })).resolves.toHaveLength(1);
+  });
+});
+
+describe("getMemoTags", () => {
+  it("combines current-user counts with configured unused tags without duplicates", async () => {
+    const fetchImpl = vi.fn(async (url: RequestInfo | URL) => {
+      if (String(url).endsWith("/auth/me")) return jsonResponse({ user: { name: "users/steven" } });
+      if (String(url).endsWith("users/steven:getStats")) return jsonResponse({ tagCount: { Star: 2 } });
+      if (String(url).endsWith("users/steven/settings/TAGS")) return jsonResponse({ tagsSetting: { tags: { Star: {}, "Pick up": {} } } });
+      throw new Error("Unexpected endpoint");
+    });
+    await expect(getMemoTags(creds, { fetchImpl })).resolves.toEqual(["Star", "Pick up"]);
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+  });
+
+  it("supports empty settings and rejects malformed tag maps", async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ user: { name: "users/steven" } }))
+      .mockResolvedValueOnce(jsonResponse({}))
+      .mockResolvedValueOnce(jsonResponse({}));
+    await expect(getMemoTags(creds, { fetchImpl })).resolves.toEqual([]);
+    fetchImpl
+      .mockResolvedValueOnce(jsonResponse({ user: { name: "users/steven" } }))
+      .mockResolvedValueOnce(jsonResponse({ tagCount: [] }))
+      .mockResolvedValueOnce(jsonResponse({}));
+    await expect(getMemoTags(creds, { fetchImpl })).rejects.toMatchObject({ kind: "bad-response" });
   });
 });

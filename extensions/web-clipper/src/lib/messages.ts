@@ -11,7 +11,7 @@ export type CapturePayload = {
   selectionHtml?: string;
   /** The page's own summary (og:description / meta description). */
   description?: string;
-  /** Absolute URLs of images found in the selection — uploaded as attachments, never hotlinked. */
+  /** Absolute URLs of selected images; successful saves replace inline sources with attachments. */
   images?: string[];
   /**
    * A serialized copy of the page, sent only when there is no selection, for the popup to run
@@ -20,12 +20,14 @@ export type CapturePayload = {
   documentHtml?: string;
 };
 
-/** The current selection rendered for the context-menu save: text as markdown, images pulled out
- * so the background can upload them as memo attachments (absolute URLs; markdown has no `<img>`).
- * Carries the page description so both capture paths compose identically. */
+/** Selection Markdown preserves inline images. The image list also supports legacy image-only clips. */
 export type SelectionClip = { markdown: string; images: string[]; description?: string };
 
+export type PreviewConnection = { expectedSource: ConnectionSource; expectedConnectionId: string; expectedInstanceUrl: string };
+export type AttachmentPreviewResult = { ok: true; dataUrl: string } | { ok: false };
+
 export type Request =
+  | ({ type: "GET_ATTACHMENT_PREVIEW"; path: string } & PreviewConnection)
   | { type: "GET_SELECTION" } // background → content script: markdown + image URLs for the selection
   | { type: "CLEAR_SELECTION" } // background → content script: drop the page selection after a save
   | { type: "SHOW_SAVE_RESULT"; ok: boolean; title: string; webUrl?: string; openLabel?: string; direction?: "ltr" | "rtl" } // background → content script: in-page toast
@@ -38,6 +40,7 @@ export type Request =
   | { type: "GET_AUTH_USER" }
   | { type: "GET_CONNECTION_STATE"; refresh?: boolean; source?: "active" | "usememos" }
   | { type: "GET_POPUP_STATE" }
+  | { type: "GET_MEMO_TAGS"; expectedSource: ConnectionSource; expectedConnectionId: string; expectedInstanceUrl: string }
   | { type: "GET_CAPTURE_CAPABILITIES"; expectedSource: ConnectionSource; expectedConnectionId: string; expectedInstanceUrl: string }
   | {
       type: "GET_CLIP_STATUS";
@@ -55,6 +58,9 @@ export type Request =
       content: string;
       visibility: Visibility;
       images?: string[];
+      /** New saves archive images in the final Markdown; omitted for pre-upgrade pending operations. */
+      inlineImages?: boolean;
+      tags?: string[];
       expectedSource: ConnectionSource;
       expectedConnectionId: string;
       expectedInstanceUrl: string;
@@ -89,7 +95,10 @@ export type ConnectionActionResult = { ok: true; state: ConnectionStateResult } 
 
 export type SaveResult =
   // failedImages: how many captured images could not be uploaded — surfaced so success is never silently partial.
-  { ok: true; webUrl: string; failedImages?: number } | { ok: false; errorKind: SaveErrorKind; message?: string; contentMaxBytes?: number };
+  | { ok: true; webUrl: string; failedImages?: number; failedImageDetails?: Array<{ url: string; reason: string }> }
+  | { ok: false; errorKind: SaveErrorKind; message?: string; contentMaxBytes?: number };
 
 export type CaptureCapabilitiesResult = { ok: true; supported: boolean; contentMaxBytes: number } | { ok: false; errorKind: SaveErrorKind };
 export type ClipRecordsResult = { ok: true; records: ClipRecord[] } | { ok: false; errorKind: SaveErrorKind };
+
+export type MemoTagsResult = { ok: true; tags: string[] } | { ok: false; errorKind: SaveErrorKind };

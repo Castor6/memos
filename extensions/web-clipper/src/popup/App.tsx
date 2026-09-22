@@ -14,6 +14,8 @@ import { useEffect, useRef, useState } from "react";
 import browser from "webextension-polyfill";
 import { AccountBadge } from "@/components/account-badge";
 import { AppBrand } from "@/components/app-brand";
+import { MarkdownPreview } from "@/components/markdown-preview";
+import { TagEditor } from "@/components/tag-editor";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -204,6 +206,7 @@ function SignedInView({ c, state, blocked }: { c: ClipperState; state: ReadyPopu
   const [error, setError] = useState<SaveErrorDetail | null>(null);
   const [saved, setSaved] = useState(false);
   const [failedImages, setFailedImages] = useState(0);
+  const [failedImageDetails, setFailedImageDetails] = useState<Array<{ url: string; reason: string }>>([]);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(
     () => () => {
@@ -215,21 +218,28 @@ function SignedInView({ c, state, blocked }: { c: ClipperState; state: ReadyPopu
   const isPickup = draft?.capture.kind === "PICK_UP";
   const disabled = c.busy || c.extracting || !!blocked;
   const editingDisabled = disabled || c.awaitingConfirmation;
+  const clearFeedback = () => {
+    setSaved(false);
+    setError(null);
+    setFailedImages(0);
+    setFailedImageDetails([]);
+  };
   const onSave = async () => {
     setSaved(false);
     setFailedImages(0);
+    setFailedImageDetails([]);
     const result = await c.save();
     if (result.ok) {
       setError(null);
       setSaved(true);
       setFailedImages(result.failedImages ?? 0);
+      setFailedImageDetails(result.failedImageDetails ?? []);
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(() => setSaved(false), SAVED_CONFIRMATION_MS);
     } else setError(describeSaveError(result.errorKind, state.source));
   };
   const edit = (change: Parameters<ClipperState["update"]>[0], fields?: Parameters<ClipperState["update"]>[1]) => {
-    setSaved(false);
-    setError(null);
+    clearFeedback();
     c.update(change, fields);
   };
   const visibilityItems = { PRIVATE: t("commonPrivate"), PROTECTED: t("commonProtected"), PUBLIC: t("commonPublic") };
@@ -244,8 +254,7 @@ function SignedInView({ c, state, blocked }: { c: ClipperState; state: ReadyPopu
             variant={draft?.capture.kind === "STAR" ? "default" : "outline"}
             disabled={!c.ready || disabled}
             onClick={() => {
-              setError(null);
-              setSaved(false);
+              clearFeedback();
               void c.start("STAR");
             }}
           >
@@ -255,8 +264,7 @@ function SignedInView({ c, state, blocked }: { c: ClipperState; state: ReadyPopu
             variant={isPickup ? "default" : "outline"}
             disabled={!c.ready || disabled}
             onClick={() => {
-              setError(null);
-              setSaved(false);
+              clearFeedback();
               void c.start("PICK_UP");
             }}
           >
@@ -315,15 +323,32 @@ function SignedInView({ c, state, blocked }: { c: ClipperState; state: ReadyPopu
               >
                 {draft.title || draft.capture.sourceUrl}
               </a>
-              <Button size="xs" variant="ghost" disabled={editingDisabled} onClick={() => void c.start(draft.capture.kind, true)}>
+              <Button
+                size="xs"
+                variant="ghost"
+                disabled={editingDisabled}
+                onClick={() => {
+                  clearFeedback();
+                  void c.start(draft.capture.kind, true);
+                }}
+              >
                 重新提取原内容
               </Button>
             </div>
+            <TagEditor
+              tags={draft.tags}
+              suggestions={c.tagSuggestions}
+              onChange={(tags) => edit({ tags })}
+              disabled={editingDisabled}
+              loading={c.tagsLoading}
+              error={c.tagsError}
+              onRetry={c.retryTags}
+            />
             <label htmlFor="capture-comment" className="flex flex-col gap-1.5 text-sm font-medium">
-              {isPickup ? "我的评论" : "我的思考"}
+              {isPickup ? "Pick up" : "我的思考"}
               <Textarea
                 id="capture-comment"
-                aria-label={isPickup ? "我的评论" : "我的思考"}
+                aria-label={isPickup ? "Pick up" : "我的思考"}
                 value={draft.capture.comment}
                 readOnly={isPickup}
                 disabled={editingDisabled}
@@ -334,7 +359,7 @@ function SignedInView({ c, state, blocked }: { c: ClipperState; state: ReadyPopu
             </label>
             {isPickup ? (
               <>
-                <p className="text-[11px] text-muted-foreground">保留已发表的原话；新的想法写在下方。</p>
+                <p className="text-[11px] text-muted-foreground">保留已发表的原话；下方可记录形成这条评论的背景、线索与思考过程。</p>
                 {!draft.confirmed ? (
                   <label className="flex items-start gap-2 text-xs">
                     <input
@@ -347,14 +372,14 @@ function SignedInView({ c, state, blocked }: { c: ClipperState; state: ReadyPopu
                   </label>
                 ) : null}
                 <label htmlFor="capture-context" className="flex flex-col gap-1.5 text-sm font-medium">
-                  补充背景（可选）
+                  Context & thinking（可选）
                   <Textarea
                     id="capture-context"
-                    aria-label="补充背景"
+                    aria-label="Context & thinking"
                     value={draft.capture.context}
                     disabled={editingDisabled}
                     className="min-h-20 max-h-40 resize-y text-sm field-sizing-fixed"
-                    placeholder="当时为什么回复？有什么背景、链接或后来的感想？"
+                    placeholder="哪些背景、线索和思考促成了这条评论？"
                     onChange={(event) => edit({}, { context: event.target.value })}
                   />
                 </label>
@@ -368,7 +393,7 @@ function SignedInView({ c, state, blocked }: { c: ClipperState; state: ReadyPopu
               </ul>
             ) : null}
             <details className="rounded-md border p-2">
-              <summary className="cursor-pointer text-sm font-medium">{isPickup ? "回应内容与上文" : "原内容"} · 点击展开</summary>
+              <summary className="cursor-pointer text-sm font-medium">{isPickup ? "What they put down" : "原内容"} · 点击展开</summary>
               <Textarea
                 aria-label="原内容"
                 className="mt-2 min-h-40 max-h-64 resize-y text-xs field-sizing-fixed"
@@ -380,11 +405,20 @@ function SignedInView({ c, state, blocked }: { c: ClipperState; state: ReadyPopu
             </details>
             <details className="rounded-md border p-2">
               <summary className="cursor-pointer text-xs">预览完整保存内容</summary>
-              <pre className="mt-2 whitespace-pre-wrap break-words text-xs">{c.content}</pre>
+              <div className="mt-2">
+                <MarkdownPreview
+                  content={c.content}
+                  connection={{
+                    expectedSource: state.source,
+                    expectedConnectionId: state.identity.userId,
+                    expectedInstanceUrl: state.instanceUrl,
+                  }}
+                />
+              </div>
             </details>
             {draft.images.length ? <p className="text-xs text-muted-foreground">{draft.images.length} 张图片将尝试保存为附件。</p> : null}
             <p role={c.overLimit ? "alert" : "status"} className={`text-xs ${c.overLimit ? "text-destructive" : "text-muted-foreground"}`}>
-              正文 {c.contentBytes.toLocaleString()} 字节
+              预计正文 {c.contentBytes.toLocaleString()} 字节
               {c.capabilities ? ` / 上限 ${c.capabilities.contentMaxBytes.toLocaleString()} 字节` : " · 正在读取服务器限制…"}
               {c.overLimit ? "。已超限，请精简原内容，或在 Memos 实例设置中调整正文上限。草稿会保留。" : ""}
             </p>
@@ -407,6 +441,21 @@ function SignedInView({ c, state, blocked }: { c: ClipperState; state: ReadyPopu
               <p role="status" className="text-xs text-destructive">
                 {tp("popupFailedImages", failedImages)}
               </p>
+            ) : null}
+            {failedImageDetails.length ? (
+              <details className="min-w-0 rounded-md border p-2 text-xs text-destructive">
+                <summary className="cursor-pointer">未转存的图片（已保留原链接）</summary>
+                <ul className="mt-2 space-y-2">
+                  {failedImageDetails.map(({ url, reason }) => (
+                    <li key={url} className="min-w-0">
+                      <p className="truncate select-text" title={url}>
+                        {url.length > 180 ? `${url.slice(0, 140)}…${url.slice(-24)}` : url}
+                      </p>
+                      <p className="break-words">{reason}</p>
+                    </li>
+                  ))}
+                </ul>
+              </details>
             ) : null}
           </>
         ) : null}

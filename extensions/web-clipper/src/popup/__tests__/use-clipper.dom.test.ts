@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { composeCaptureMemo } from "@/lib/capture-format";
 import { LAST_VISIBILITY_KEY } from "@/lib/visibility";
 import type { XCaptureResult } from "@/lib/x-capture";
 import { browserMock, seedStorage } from "@/test/browser-mock";
@@ -62,6 +63,7 @@ function wireRuntime(overrides: Record<string, unknown> = {}) {
   const responses: Record<string, unknown> = {
     GET_CAPTURE_CAPABILITIES: { ok: true, supported: true, contentMaxBytes: 8192 },
     GET_CLIP_STATUS: null,
+    GET_MEMO_TAGS: { ok: true, tags: ["阅读", "项目/灵感"] },
     SAVE_MEMO: { ok: true, webUrl: "https://memos.example.com/memos/1" },
     ...overrides,
   };
@@ -121,7 +123,9 @@ describe("useClipper manual capture and durable drafts", () => {
     });
     expect(saves()[0]).toMatchObject({
       content: result.current.content,
-      images: page.images,
+      images: [],
+      inlineImages: true,
+      tags: ["star"],
       expectedSource: "direct",
       expectedConnectionId: "user_123",
       expectedInstanceUrl: expectation.instanceUrl,
@@ -134,14 +138,129 @@ describe("useClipper manual capture and durable drafts", () => {
     const first = renderHook(useReadyClipper);
     await waitReady(first.result);
     await act(async () => first.result.current.start("STAR"));
-    await act(async () => first.result.current.update({ original: "Edited source" }, { comment: "Keep my thoughts" }));
+    await act(async () =>
+      first.result.current.update({ original: "Edited source", tags: ["star", "阅读"] }, { comment: "Keep my thoughts" }),
+    );
     first.unmount();
     vi.mocked(captureActivePage).mockClear();
     const reopened = renderHook(useReadyClipper);
     await waitReady(reopened.result);
     expect(reopened.result.current.draft?.capture.comment).toBe("Keep my thoughts");
     expect(reopened.result.current.draft?.original).toBe("Edited source");
+    expect(reopened.result.current.draft?.tags).toEqual(["star", "阅读"]);
     expect(captureActivePage).not.toHaveBeenCalled();
+  });
+
+  it("preserves an explicitly empty tag list when refreshing and reopening", async () => {
+    const first = renderHook(useReadyClipper);
+    await waitReady(first.result);
+    await act(async () => first.result.current.start("STAR"));
+    await waitFor(() => expect(first.result.current.tagSuggestions).toEqual(["阅读", "项目/灵感"]));
+    await act(async () => first.result.current.update({ tags: [] }));
+    await act(async () => first.result.current.start("STAR", true));
+    expect(first.result.current.draft?.tags).toEqual([]);
+    first.unmount();
+    const reopened = renderHook(useReadyClipper);
+    await waitReady(reopened.result);
+    expect(reopened.result.current.draft?.tags).toEqual([]);
+    await act(async () => reopened.result.current.save());
+    expect(saves()[0]?.tags).toEqual([]);
+  });
+
+  it("keeps legacy pending saves byte-identical and adds default tags only to subsequent saves", async () => {
+    browserMock.tabs.query.mockResolvedValue([{ id: 4, url: xUrl }]);
+    const first = renderHook(useReadyClipper);
+    await waitReady(first.result);
+    await act(async () => first.result.current.start("PICK_UP"));
+    const stored = await browserMock.storage.local.get(null);
+    const key = Object.keys(stored).find((key) => key.endsWith(":PICK_UP"))!;
+    const legacy = { ...(stored[key] as Record<string, unknown>) };
+    delete legacy.tags;
+    legacy.operation = { requestId: "old-pending-operation", startedAt: Date.now() };
+    first.unmount();
+    seedStorage({ [key]: legacy });
+    const reopened = renderHook(useReadyClipper);
+    await waitReady(reopened.result);
+    expect(reopened.result.current.awaitingConfirmation).toBe(true);
+    expect(reopened.result.current.content).toBe(composeCaptureMemo(xResult.capture!, String(legacy.original), true));
+    await act(async () => reopened.result.current.save());
+    expect(saves()[0]).not.toHaveProperty("tags");
+    expect(String(saves()[0]?.content)).toContain("## 我的评论");
+    await act(async () => reopened.result.current.save());
+    expect(saves()[1]?.tags).toEqual(["pick up"]);
+    expect(String(saves()[1]?.content)).toContain("## Pick up");
+  });
+
+  it.each([false, true])("preserves images in pre-inline drafts without changing a pending request (pending=%s)", async (pending) => {
+    const first = renderHook(useReadyClipper);
+    await waitReady(first.result);
+    await act(async () => first.result.current.start("STAR"));
+    const stored = await browserMock.storage.local.get(null);
+    const key = Object.keys(stored).find((key) => key.endsWith(":STAR"))!;
+    const old: Record<string, unknown> = {
+      ...(stored[key] as Record<string, unknown>),
+      original: "User-edited original",
+      images: page.images,
+    };
+    delete old.imageLayout;
+    old.operation = pending ? { requestId: "old-image-operation", startedAt: Date.now(), content: "Frozen old body" } : null;
+    first.unmount();
+    seedStorage({ [key]: old });
+    const reopened = renderHook(useReadyClipper);
+    await waitReady(reopened.result);
+    expect(reopened.result.current.content).toContain(pending ? "Frozen old body" : page.images[0]!);
+    await act(async () => reopened.result.current.save());
+    if (pending) {
+      expect(saves()[0]).toMatchObject({ content: "Frozen old body", images: page.images, inlineImages: false });
+      await act(async () => reopened.result.current.save());
+    }
+    expect(saves().at(-1)).toMatchObject({ inlineImages: true, images: [] });
+    expect(String(saves().at(-1)?.content)).toContain(`User-edited original\n\n![](<${page.images[0]}>)`);
+  });
+
+  it("checks an embedded image against the estimated archived size before allowing the upload", async () => {
+    const dataImage = `data:image/png;base64,${"A".repeat(20_000)}`;
+    vi.mocked(captureActivePage).mockResolvedValue({
+      ...page,
+      images: [dataImage],
+      selectionMarkdown: `Before\n\n![image](${dataImage})\n\nAfter`,
+    });
+    const { result } = renderHook(useReadyClipper);
+    await waitReady(result);
+    await act(async () => result.current.start("STAR"));
+    expect(result.current.content.length).toBeGreaterThan(20_000);
+    expect(result.current.contentBytes).toBeLessThan(8192);
+    expect(result.current.overLimit).toBe(false);
+    await act(async () => expect((await result.current.save()).ok).toBe(true));
+    expect(saves()[0]).toMatchObject({ inlineImages: true });
+  });
+
+  it("ignores tag suggestions arriving after switching accounts", async () => {
+    let resolveTags!: (value: unknown) => void;
+    wireRuntime({
+      GET_MEMO_TAGS: new Promise((resolve) => {
+        resolveTags = resolve;
+      }),
+    });
+    const { result, rerender } = renderHook(({ account }) => useClipper(account, null), { initialProps: { account: expectation } });
+    await waitReady(result);
+    await act(async () => result.current.start("STAR"));
+    await waitFor(() => expect(result.current.tagsLoading).toBe(true));
+    rerender({ account: { ...expectation, connectionId: "another_user" } });
+    await waitFor(() => expect(result.current.draft).toBeNull());
+    await act(async () => resolveTags({ ok: true, tags: ["旧账号私有标签"] }));
+    expect(result.current.tagSuggestions).toEqual([]);
+  });
+
+  it("can save new tags while existing tag suggestions are unavailable", async () => {
+    wireRuntime({ GET_MEMO_TAGS: { ok: false, errorKind: "timeout" } });
+    const { result } = renderHook(useReadyClipper);
+    await waitReady(result);
+    await act(async () => result.current.start("STAR"));
+    await waitFor(() => expect(result.current.tagsError).toContain("已有标签读取失败"));
+    await act(async () => result.current.update({ tags: ["star", "新标签"] }));
+    await act(async () => result.current.save());
+    expect(saves()[0]?.tags).toEqual(["star", "新标签"]);
   });
 
   it("keeps Star and Pick up drafts separately on the same page", async () => {
@@ -150,8 +269,10 @@ describe("useClipper manual capture and durable drafts", () => {
     const { result } = renderHook(useReadyClipper);
     await waitReady(result);
     await act(async () => result.current.start("STAR"));
+    expect(result.current.draft?.tags).toEqual(["star"]);
     await act(async () => result.current.update({}, { comment: "Star thoughts" }));
     await act(async () => result.current.start("PICK_UP"));
+    expect(result.current.draft?.tags).toEqual(["pick up"]);
     await act(async () => result.current.update({}, { context: "Why I replied" }));
     expect(result.current.draft?.original).toContain("Their idea");
     expect(result.current.draft?.original).not.toContain("My published reply");
