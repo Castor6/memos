@@ -5,12 +5,12 @@
     <title>Clip to Memos</title>
     <style>
       /* Fix the popup size before JS runs so Chrome opens it at a stable size (no tiny→large jump).
-         Sized for the single-editor layout: header (44) + editor (flex) + footer row (32) + padding. */
+         The scrollable workspace keeps save controls visible beneath capture and thought fields. */
       html,
       body,
       #root {
-        width: 380px;
-        height: 300px;
+        width: 420px;
+        height: 600px;
         margin: 0;
         overflow: hidden;
       }

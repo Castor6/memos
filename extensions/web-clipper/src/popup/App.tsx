@@ -6,7 +6,6 @@ import {
   GlobeIcon,
   HistoryIcon,
   LockIcon,
-  PaperclipIcon,
   SettingsIcon,
   TriangleAlertIcon,
   UsersRoundIcon,
@@ -24,7 +23,6 @@ import { describeSaveError, type SaveErrorDetail } from "@/lib/errors";
 import { formatDateTime, t, tp } from "@/lib/i18n";
 import type { Visibility } from "@/lib/memos-client";
 import type { PopupIdentity, PopupState } from "@/lib/popup-state";
-import { usePageCapture } from "./page-capture";
 import { useClipper } from "./use-clipper";
 import { usePopupState } from "./use-popup-state";
 
@@ -202,225 +200,260 @@ function ReconciliationBar({ state }: { state: BlockedPopupState }) {
   );
 }
 
-function CaptureNotice({
-  reason,
-  hasSelection,
-  hasSource,
-}: {
-  reason: ClipperState["captureFallbackReason"];
-  hasSelection: boolean;
-  hasSource: boolean;
-}) {
-  if (!reason) return null;
-  const text =
-    reason === "restricted"
-      ? t("popupCaptureRestricted")
-      : reason === "timed-out"
-        ? t("popupCaptureTimedOut")
-        : reason === "no-article"
-          ? t("popupCaptureNoArticle")
-          : reason === "no-description"
-            ? hasSelection
-              ? t("popupCaptureNoDescriptionSelection")
-              : t("popupCaptureNoDescription")
-            : hasSource
-              ? t("popupCaptureContentUnavailable")
-              : t("popupCaptureFailed");
-  return (
-    <p role="status" className="text-xs text-muted-foreground">
-      {text}
-    </p>
-  );
-}
-
 function SignedInView({ c, state, blocked }: { c: ClipperState; state: ReadyPopupState; blocked?: BlockedPopupState }) {
   const [error, setError] = useState<SaveErrorDetail | null>(null);
-  const [failedImageCount, setFailedImageCount] = useState<number | null>(null);
-  const [justSaved, setJustSaved] = useState(false);
-  const confirmationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
+  const [saved, setSaved] = useState(false);
+  const [failedImages, setFailedImages] = useState(0);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(
     () => () => {
-      if (confirmationTimer.current) clearTimeout(confirmationTimer.current);
+      if (timer.current) clearTimeout(timer.current);
     },
     [],
   );
-
-  const clearSavedConfirmation = () => {
-    if (confirmationTimer.current) clearTimeout(confirmationTimer.current);
-    confirmationTimer.current = null;
-    setJustSaved(false);
-  };
-  const visibilityOptions = {
-    PRIVATE: {
-      label: t("commonPrivate"),
-      description: t("popupPrivateDescription"),
-      icon: LockIcon,
-    },
-    PROTECTED: {
-      label: t("commonProtected"),
-      description: t("popupProtectedDescription"),
-      icon: UsersRoundIcon,
-    },
-    PUBLIC: {
-      label: t("commonPublic"),
-      description: t("popupPublicDescription"),
-      icon: EarthIcon,
-    },
-  } satisfies Record<Visibility, { label: string; description: string; icon: typeof LockIcon }>;
-  const selectedVisibility = visibilityOptions[c.visibility];
-  const SelectedVisibilityIcon = selectedVisibility.icon;
-  const visibilityValues = Object.keys(visibilityOptions) as Visibility[];
-  const visibilityItems = {
-    PRIVATE: visibilityOptions.PRIVATE.label,
-    PROTECTED: visibilityOptions.PROTECTED.label,
-    PUBLIC: visibilityOptions.PUBLIC.label,
-  };
-
+  const draft = c.draft;
+  const isPickup = draft?.capture.kind === "PICK_UP";
+  const disabled = c.busy || c.extracting || !!blocked;
+  const editingDisabled = disabled || c.awaitingConfirmation;
   const onSave = async () => {
-    clearSavedConfirmation();
-    setFailedImageCount(null);
+    setSaved(false);
+    setFailedImages(0);
     const result = await c.save();
     if (result.ok) {
       setError(null);
-      setFailedImageCount(result.failedImages ?? null);
-      setJustSaved(true);
-      confirmationTimer.current = setTimeout(() => {
-        confirmationTimer.current = null;
-        setJustSaved(false);
-      }, SAVED_CONFIRMATION_MS);
-    } else {
-      // Persistent inline state, not a toast: the error stays until it's acted on.
-      setError(describeSaveError(result.errorKind, state.source));
-    }
+      setSaved(true);
+      setFailedImages(result.failedImages ?? 0);
+      if (timer.current) clearTimeout(timer.current);
+      timer.current = setTimeout(() => setSaved(false), SAVED_CONFIRMATION_MS);
+    } else setError(describeSaveError(result.errorKind, state.source));
   };
-  const savedAt = c.savedClip ? formatDateTime(c.savedClip.savedAt, SAVED_AT_FORMAT) : "";
-  const saveButtonLabel = c.busy
-    ? t("commonSaving")
-    : justSaved
-      ? t("popupSavedToMemos")
-      : c.savedClip
-        ? t("popupSaveAgain")
-        : t("popupSaveToMemos");
-
+  const edit = (change: Parameters<ClipperState["update"]>[0], fields?: Parameters<ClipperState["update"]>[1]) => {
+    setSaved(false);
+    setError(null);
+    c.update(change, fields);
+  };
+  const visibilityItems = { PRIVATE: t("commonPrivate"), PROTECTED: t("commonProtected"), PUBLIC: t("commonPublic") };
+  const visibilityIcons = { PRIVATE: LockIcon, PROTECTED: UsersRoundIcon, PUBLIC: EarthIcon };
+  const VisibilityIcon = visibilityIcons[draft?.visibility ?? "PRIVATE"];
   return (
     <Frame>
       <Header left={<IdentityBadge identity={state.identity} />} instanceUrl={state.instanceUrl} />
-      <div className="flex flex-1 flex-col gap-2.5 p-3">
-        <Textarea
-          aria-label={t("popupMemoContent")}
-          // field-sizing-fixed overrides the component's default `field-sizing-content` (which would
-          // auto-grow with the memo and push Save off the fixed-height popup); flex-1 + min-h-0 give
-          // it a bounded height that scrolls internally instead. The named utility (not the arbitrary
-          // [field-sizing:fixed]) is required: Tailwind emits it after field-sizing-content, so it wins.
-          className="min-h-0 flex-1 resize-none overflow-y-auto text-sm field-sizing-fixed"
-          value={c.content}
-          onChange={(e) => {
-            clearSavedConfirmation();
-            c.setContent(e.target.value);
-            setError(null);
-          }}
-          placeholder={t("popupEmptyCapturePlaceholder")}
-        />
-        <CaptureNotice reason={c.captureFallbackReason} hasSelection={c.hasSelection} hasSource={c.hasSource} />
-        {blocked ? <ReconciliationBar state={blocked} /> : null}
-        {error && <ErrorBar error={error} busy={c.busy} onRetry={onSave} />}
-        {failedImageCount ? (
-          <div
-            role="status"
-            className="flex min-w-0 items-center gap-1.5 rounded-md border border-destructive/20 bg-destructive/5 px-2 py-1.5 text-[11px] leading-4"
-          >
-            <TriangleAlertIcon aria-hidden="true" className="size-3.5 shrink-0 text-destructive" />
-            <span className="min-w-0 flex-1 break-words">{tp("popupFailedImages", failedImageCount)}</span>
-          </div>
-        ) : null}
-        {c.savedClip || c.imageCount > 0 ? (
-          <div className="flex h-4 shrink-0 items-center justify-between gap-3 overflow-hidden text-[11px] leading-4 text-muted-foreground">
-            {c.savedClip ? (
-              <div role="status" className="flex min-w-0 max-w-full items-center gap-1.5 overflow-hidden">
-                <HistoryIcon aria-hidden="true" className="size-3 shrink-0" />
-                <span className="min-w-0 flex-1 truncate">{t("popupSavedAt", savedAt)}</span>
-                <span aria-hidden="true" className="shrink-0">
-                  ·
-                </span>
-                <a
-                  href={c.savedClip.memoUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  title={t("popupOpenMemo")}
-                  className="max-w-[45%] shrink-0 truncate font-medium text-foreground/80 underline-offset-4 hover:text-foreground hover:underline"
-                >
-                  {t("popupOpenMemo")}
-                </a>
-              </div>
-            ) : null}
-            {c.imageCount > 0 ? (
-              <span className="flex shrink-0 items-center gap-1 font-mono" title={tp("popupSelectionImages", c.imageCount)}>
-                <PaperclipIcon aria-hidden="true" className="size-3" />
-                <span aria-hidden="true">{c.imageCount}</span>
-                <span className="sr-only">{tp("popupSelectionImages", c.imageCount)}</span>
-              </span>
-            ) : null}
-          </div>
-        ) : null}
-        <div className="flex items-center gap-2">
-          <Select
-            items={visibilityItems}
-            value={c.visibility}
-            onValueChange={(value) => {
-              clearSavedConfirmation();
-              c.setVisibility(value as Visibility);
+      <main className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
+        <fieldset className="grid grid-cols-2 gap-2" aria-label="保存方式">
+          <Button
+            variant={draft?.capture.kind === "STAR" ? "default" : "outline"}
+            disabled={!c.ready || disabled}
+            onClick={() => {
+              setError(null);
+              setSaved(false);
+              void c.start("STAR");
             }}
           >
-            <SelectTrigger aria-label={t("popupVisibility")} className="w-32 justify-start bg-muted/60 hover:bg-muted">
-              <SelectedVisibilityIcon aria-hidden="true" className="text-muted-foreground" />
+            Star
+          </Button>
+          <Button
+            variant={isPickup ? "default" : "outline"}
+            disabled={!c.ready || disabled}
+            onClick={() => {
+              setError(null);
+              setSaved(false);
+              void c.start("PICK_UP");
+            }}
+          >
+            Pick up
+          </Button>
+        </fieldset>
+        {!draft && !c.extracting ? (
+          <div className="space-y-3 rounded-lg border bg-muted/30 p-4 text-sm">
+            <p>
+              <strong>Star</strong> · 剪藏当前网页，记下你的思考。
+            </p>
+            <p>
+              <strong>Pick up</strong> · 打开你在 x.com 的回复详情，留存评论与回应内容。
+            </p>
+            <p className="text-xs text-muted-foreground">点击后才提取正文。已保存记录同步到你的 Memos，未保存草稿留在当前浏览器。</p>
+          </div>
+        ) : null}
+        {c.extracting ? (
+          <p role="status" className="flex items-center gap-2 text-sm">
+            <Spinner />
+            正在提取页面…
+          </p>
+        ) : null}
+        {c.notice ? (
+          <p role="alert" className="text-sm text-destructive">
+            {c.notice}
+          </p>
+        ) : null}
+        {c.storageError ? (
+          <p role="alert" className="text-sm text-destructive">
+            {c.storageError}
+          </p>
+        ) : null}
+        {blocked ? <ReconciliationBar state={blocked} /> : null}
+        {c.capabilityError ? (
+          <div role="alert" className="space-y-2 text-xs text-destructive">
+            <p>{c.capabilityError}</p>
+            <Button size="xs" variant="outline" onClick={c.retryCapabilities}>
+              重试连接
+            </Button>
+          </div>
+        ) : c.capabilities && !c.capabilities.supported ? (
+          <p role="alert" className="text-xs text-destructive">
+            当前服务器尚不支持 Star / Pick up 记录同步，请先升级 Memos。草稿已留在本地。
+          </p>
+        ) : null}
+        {draft ? (
+          <>
+            <div className="flex items-center justify-between gap-2">
+              <a
+                href={draft.capture.sourceUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="min-w-0 truncate text-xs text-muted-foreground underline"
+                title={draft.title}
+              >
+                {draft.title || draft.capture.sourceUrl}
+              </a>
+              <Button size="xs" variant="ghost" disabled={editingDisabled} onClick={() => void c.start(draft.capture.kind, true)}>
+                重新提取原内容
+              </Button>
+            </div>
+            <label htmlFor="capture-comment" className="flex flex-col gap-1.5 text-sm font-medium">
+              {isPickup ? "我的评论" : "我的思考"}
+              <Textarea
+                id="capture-comment"
+                aria-label={isPickup ? "我的评论" : "我的思考"}
+                value={draft.capture.comment}
+                readOnly={isPickup}
+                disabled={editingDisabled}
+                className="min-h-24 max-h-48 resize-y text-sm field-sizing-fixed"
+                placeholder="什么吸引了你？你认同、质疑或联想到了什么？"
+                onChange={(event) => edit({}, { comment: event.target.value })}
+              />
+            </label>
+            {isPickup ? (
+              <>
+                <p className="text-[11px] text-muted-foreground">保留已发表的原话；新的想法写在下方。</p>
+                {!draft.confirmed ? (
+                  <label className="flex items-start gap-2 text-xs">
+                    <input
+                      type="checkbox"
+                      checked={draft.confirmed}
+                      disabled={editingDisabled}
+                      onChange={(event) => edit({ confirmed: event.target.checked })}
+                    />
+                    页面未能确认登录身份，我确认上方评论由我发表。
+                  </label>
+                ) : null}
+                <label htmlFor="capture-context" className="flex flex-col gap-1.5 text-sm font-medium">
+                  补充背景（可选）
+                  <Textarea
+                    id="capture-context"
+                    aria-label="补充背景"
+                    value={draft.capture.context}
+                    disabled={editingDisabled}
+                    className="min-h-20 max-h-40 resize-y text-sm field-sizing-fixed"
+                    placeholder="当时为什么回复？有什么背景、链接或后来的感想？"
+                    onChange={(event) => edit({}, { context: event.target.value })}
+                  />
+                </label>
+              </>
+            ) : null}
+            {draft.warnings.length ? (
+              <ul className="list-inside list-disc space-y-1 text-xs text-amber-700 dark:text-amber-400">
+                {draft.warnings.map((warning) => (
+                  <li key={warning}>{warning}</li>
+                ))}
+              </ul>
+            ) : null}
+            <details className="rounded-md border p-2">
+              <summary className="cursor-pointer text-sm font-medium">{isPickup ? "回应内容与上文" : "原内容"} · 点击展开</summary>
+              <Textarea
+                aria-label="原内容"
+                className="mt-2 min-h-40 max-h-64 resize-y text-xs field-sizing-fixed"
+                value={draft.original}
+                disabled={editingDisabled}
+                onChange={(event) => edit({ original: event.target.value })}
+              />
+              <p className="mt-1 text-[11px] text-muted-foreground">可编辑保存的正文；Pick up 的原始互动快照另行保留。</p>
+            </details>
+            <details className="rounded-md border p-2">
+              <summary className="cursor-pointer text-xs">预览完整保存内容</summary>
+              <pre className="mt-2 whitespace-pre-wrap break-words text-xs">{c.content}</pre>
+            </details>
+            {draft.images.length ? <p className="text-xs text-muted-foreground">{draft.images.length} 张图片将尝试保存为附件。</p> : null}
+            <p role={c.overLimit ? "alert" : "status"} className={`text-xs ${c.overLimit ? "text-destructive" : "text-muted-foreground"}`}>
+              正文 {c.contentBytes.toLocaleString()} 字节
+              {c.capabilities ? ` / 上限 ${c.capabilities.contentMaxBytes.toLocaleString()} 字节` : " · 正在读取服务器限制…"}
+              {c.overLimit ? "。已超限，请精简原内容，或在 Memos 实例设置中调整正文上限。草稿会保留。" : ""}
+            </p>
+            {c.statusError ? (
+              <p role="status" className="text-xs text-muted-foreground">
+                {c.statusError}
+              </p>
+            ) : null}
+            {c.savedClip ? (
+              <p role="status" className="text-xs text-muted-foreground">
+                {t("popupSavedAt", formatDateTime(c.savedClip.savedAt, SAVED_AT_FORMAT))}
+                {" · "}
+                <a href={c.savedClip.memoUrl} target="_blank" rel="noreferrer" className="underline">
+                  {t("popupOpenMemo")}
+                </a>
+              </p>
+            ) : null}
+            {error ? <ErrorBar error={error} busy={c.busy} onRetry={onSave} /> : null}
+            {failedImages ? (
+              <p role="status" className="text-xs text-destructive">
+                {tp("popupFailedImages", failedImages)}
+              </p>
+            ) : null}
+          </>
+        ) : null}
+      </main>
+      {draft ? (
+        <footer className="flex shrink-0 items-center gap-2 border-t bg-background p-3">
+          <Select
+            items={visibilityItems}
+            value={draft.visibility}
+            onValueChange={(value) => edit({ visibility: value as Visibility })}
+            disabled={editingDisabled}
+          >
+            <SelectTrigger aria-label={t("popupVisibility")} className="w-28">
+              <VisibilityIcon />
               <SelectValue />
             </SelectTrigger>
-            <SelectContent side="top" sideOffset={4} align="start" alignItemWithTrigger={false} className="min-w-64 p-1">
-              {visibilityValues.map((visibility) => {
-                const option = visibilityOptions[visibility];
-                const VisibilityIcon = option.icon;
-                return (
-                  <SelectItem key={visibility} value={visibility} className="items-start py-1.5 pe-8 ps-2">
-                    <VisibilityIcon aria-hidden="true" className="size-4 text-muted-foreground" />
-                    <span className="flex min-w-0 flex-col items-start">
-                      <span className="text-[13px] font-medium leading-4 text-foreground">{option.label}</span>
-                      <span className="text-[11px] leading-4 text-muted-foreground">{option.description}</span>
-                    </span>
-                  </SelectItem>
-                );
-              })}
+            <SelectContent side="top" align="start">
+              {(Object.keys(visibilityItems) as Visibility[]).map((value) => (
+                <SelectItem key={value} value={value}>
+                  {visibilityItems[value]}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <Button
-            className={`min-w-0 flex-1 overflow-hidden ${justSaved ? "disabled:opacity-100" : ""}`}
-            disabled={c.busy || justSaved || !!blocked || !c.content.trim()}
+            className="min-w-0 flex-1"
             onClick={onSave}
-            title={saveButtonLabel}
+            disabled={disabled || saved || !draft.confirmed || !c.capabilities?.supported || c.overLimit || !c.content.trim()}
           >
-            {justSaved ? <CheckCircle2Icon aria-hidden="true" /> : null}
-            <span className="truncate">{saveButtonLabel}</span>
+            {saved ? <CheckCircle2Icon /> : null}
+            {c.busy ? t("commonSaving") : saved ? t("popupSavedToMemos") : c.savedClip ? t("popupSaveAgain") : t("popupSaveToMemos")}
           </Button>
-        </div>
-      </div>
+        </footer>
+      ) : null}
     </Frame>
   );
 }
 
 export function App() {
-  const capture = usePageCapture();
   const state = usePopupState();
   const lastReady = useRef<ReadyPopupState | null>(null);
   if (state?.status === "ready") lastReady.current = state;
-  const templateReady = state !== null && state.status !== "signed-out";
   const template = state && state.status !== "signed-out" ? state.template : null;
   const expectation =
     state?.status === "ready" ? { source: state.source, connectionId: state.identity.userId, instanceUrl: state.instanceUrl } : null;
-  // This hook stays mounted while cached auth is reconciled, so a gate transition cannot erase
-  // edits made during the optimistic window.
-  const clipper = useClipper(capture, template, templateReady, expectation);
-
-  if (!state) {
+  const clipper = useClipper(expectation, template);
+  if (!state)
     return (
       <Frame>
         <Header left={<AppBrand />} />
@@ -429,42 +462,24 @@ export function App() {
         </div>
       </Frame>
     );
-  }
-
-  // If cached-ready state is invalidated while the user is editing, show the real gate state
-  // without unmounting the editor. Save is disabled and the draft remains accessible.
-  if (state.status !== "ready" && lastReady.current) {
-    return <SignedInView c={clipper} state={lastReady.current} blocked={state} />;
-  }
-
-  if (state.status === "signed-out") {
+  if (state.status !== "ready" && lastReady.current) return <SignedInView c={clipper} state={lastReady.current} blocked={state} />;
+  if (state.status === "signed-out")
     return (
       <Frame>
         <Header left={<AppBrand />} />
-        <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
           <p className="text-sm text-muted-foreground">{t("popupChooseConnection")}</p>
-          <Button className="mt-2 w-full" onClick={openOptions}>
-            {t("commonOpenSettings")}
-          </Button>
+          <Button onClick={openOptions}>{t("commonOpenSettings")}</Button>
         </div>
       </Frame>
     );
-  }
-  if (state.status === "disconnected") {
-    return <GatePrompt body={t("popupConnectToStart")} identity={state.identity} />;
-  }
+  if (state.status === "disconnected") return <GatePrompt body={t("popupConnectToStart")} identity={state.identity} />;
   if (state.status === "unsupported") {
-    // errors.ts owns the copy for this condition (the options page renders the same detail);
-    // only the detected-version parenthetical is local knowledge.
     const detail = describeSaveError("unsupported-version");
     return (
       <GatePrompt
         title={detail.title}
-        body={
-          state.version
-            ? t("popupUnsupportedWithVersion", [state.version, detail.why, detail.howToFix[0] ?? ""])
-            : t("popupUnsupportedWithoutVersion", [detail.why, detail.howToFix[0] ?? ""])
-        }
+        body={detail.why}
         learnMore={detail.learnMore}
         instanceUrl={state.instanceUrl}
         identity={state.identity}

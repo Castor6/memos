@@ -50,7 +50,7 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T
 
 /**
  * Runs INSIDE the page via scripting.executeScript, so it must be fully self-contained (Chrome
- * serializes the function; it can't reference imports). Injected fresh on every popup open, it
+ * serializes the function; it can't reference imports). Injected only after the user requests capture, it
  * works even when the tab's content script is stale (tab opened before an extension update).
  */
 function capturePage(maxDocumentHtmlChars: number): CapturePayload {
@@ -166,7 +166,7 @@ function captureFallback({ hasSelection, hasArticle, description }: { hasSelecti
   return hasSelection ? {} : { fallbackReason: "no-article" };
 }
 
-async function capture(): Promise<PageCapture> {
+export async function captureActivePage(): Promise<PageCapture> {
   let tab: Awaited<ReturnType<typeof browser.tabs.query>>[number] | undefined;
   try {
     [tab] = await withTimeout(browser.tabs.query({ active: true, currentWindow: true }), TAB_QUERY_TIMEOUT_MS);
@@ -233,21 +233,19 @@ async function capture(): Promise<PageCapture> {
 }
 
 /**
- * Runs the capture on first mount and returns it (null while pending). Called at the top of the
- * popup App — above the session-loading gate — so capture proceeds in parallel with session
- * hydration instead of waiting for the signed-in view to mount. By the time the editor renders,
- * the prefill data is usually already here.
+ * Extraction is opt-in. Merely mounting the popup never reads page content.
  */
-export function usePageCapture(): PageCapture | null {
+export function usePageCapture(enabled = false): PageCapture | null {
   const [result, setResult] = useState<PageCapture | null>(null);
   useEffect(() => {
+    if (!enabled) return;
     let active = true;
-    void capture().then((c) => {
+    void captureActivePage().then((c) => {
       if (active) setResult(c);
     });
     return () => {
       active = false;
     };
-  }, []);
+  }, [enabled]);
   return result;
 }

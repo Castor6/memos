@@ -108,7 +108,7 @@ describe("fixed capture corpus", () => {
       return [{ result: func(...(args ?? [])) }];
     });
 
-    const { result } = renderHook(() => usePageCapture());
+    const { result } = renderHook(() => usePageCapture(true));
     await waitFor(() => expect(result.current).not.toBeNull());
 
     expect(result.current?.url).toBe("https://example.com/corpus");

@@ -20,7 +20,7 @@ describe("usePageCapture", () => {
   });
 
   it("injects into the active tab and returns the selection as quoted markdown plus metadata", async () => {
-    const { result } = renderHook(() => usePageCapture());
+    const { result } = renderHook(() => usePageCapture(true));
     await waitFor(() => expect(result.current).not.toBeNull());
 
     expect(browserMock.scripting.executeScript).toHaveBeenCalledWith(expect.objectContaining({ target: { tabId: 7 } }));
@@ -34,7 +34,7 @@ describe("usePageCapture", () => {
 
   it("falls back to the tab title/url with no selection when injection is refused", async () => {
     browserMock.scripting.executeScript.mockRejectedValue(new Error("cannot access page"));
-    const { result } = renderHook(() => usePageCapture());
+    const { result } = renderHook(() => usePageCapture(true));
     await waitFor(() => expect(result.current).not.toBeNull());
 
     expect(result.current).toEqual({
@@ -59,7 +59,7 @@ describe("usePageCapture", () => {
       return [{ result: func(...(args ?? [])) }];
     });
 
-    const { result } = renderHook(() => usePageCapture());
+    const { result } = renderHook(() => usePageCapture(true));
     await waitFor(() => expect(result.current).not.toBeNull());
     expect(result.current?.description).toBe("This is the first meaningful article paragraph and it contains enough text to be useful.");
     expect(result.current?.articleMarkdown).toBe("");
@@ -69,7 +69,7 @@ describe("usePageCapture", () => {
   it("returns a link fallback when page injection exceeds its time budget", async () => {
     vi.useFakeTimers();
     browserMock.scripting.executeScript.mockImplementation(() => new Promise(() => {}));
-    const { result } = renderHook(() => usePageCapture());
+    const { result } = renderHook(() => usePageCapture(true));
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(PAGE_INJECTION_TIMEOUT_MS);

@@ -5,4 +5,5 @@
 - 在本目录运行 `corepack pnpm install --frozen-lockfile`、`corepack pnpm lint`、`corepack pnpm test`、`corepack pnpm build`。构建需要本地 `.env`，准备方式见 README。
 - 日常通过 `dist/` 加载已解压扩展。`package*` 是上游商店发布脚本，尚未适配当前仓库结构；当前不接入商店发布或 Memos 发布流程。
 - 实际令牌、浏览器数据、抓取网页、构建产物和 node_modules 不提交。保留现有试用版直到用户切换加载目录。
-- 当前只增加 Memos 0.7.0 版本校验例外及试用名称；空间、独立标签、正文超限提示属于后续定制，不能当作已经实现。
+- Star 是通用网页剪藏，Pick up 是 X 互动留存。弹窗打开不读正文，点击后提取；草稿本地保存，已保存记录以 Memos `Memo.capture` 为准。能力和正文限制从实例 Profile 读取，连接仍复用 URL + PAT。
+- 服务端快照仅创建者可见且创建后不可修改；普通正文编辑保留快照。更改保存、幂等或历史行为时同时验证服务端与扩展边界。空间、独立标签选择、旧历史迁移与右键快速保存改造尚未实现。

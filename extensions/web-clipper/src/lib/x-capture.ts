@@ -57,10 +57,17 @@ export function captureXPage(kind: "STAR" | "CLIP" | "PICK_UP"): XCaptureResult 
     return true;
   };
   const quoteRoot = (element: Element, article: Element): Element | null => {
-    const root = element.closest('[role="link"]');
-    return root && root !== article && article.contains(root) && root.querySelector('[data-testid="User-Name"], time[datetime]')
-      ? root
-      : null;
+    // Timestamp anchors also have role=link on X. A quote container includes both
+    // provenance and a body; walk past the inner timestamp to find that container.
+    for (let root: Element | null = element; root && root !== article; root = root.parentElement) {
+      if (root.getAttribute("role") !== "link" || !article.contains(root)) continue;
+      if (
+        root.querySelector('[data-testid="User-Name"]') ||
+        (root.querySelector("time[datetime]") && root.querySelector('[data-testid="tweetText"]'))
+      )
+        return root;
+    }
+    return null;
   };
   const ownElements = (root: Element, selector: string, article: Element) =>
     Array.from(root.querySelectorAll(selector)).filter(
@@ -221,7 +228,12 @@ export function captureXPage(kind: "STAR" | "CLIP" | "PICK_UP"): XCaptureResult 
   const posts: CapturedPost[] = [];
   if (kind === "PICK_UP") {
     const region = target.closest('[role="region"]');
-    const regionName = region?.getAttribute("aria-label") ?? "";
+    const regionName =
+      region?.getAttribute("aria-label") ||
+      (region?.getAttribute("aria-labelledby") ?? "")
+        .split(/\s+/)
+        .map((id) => document.getElementById(id)?.textContent ?? "")
+        .join(" ");
     const conversation = region && /(?:conversation|对话|對話|会话|會話)/i.test(regionName);
     if (conversation) {
       const preceding = articles.filter(

@@ -6,12 +6,12 @@ const post = (id: string, handle: string, content: string, extra = "") => `
     <div data-testid="User-Name"><a href="/${handle}"><span>${handle} Name</span></a><span>@${handle}</span></div>
     <div data-testid="tweetText">${content}</div>
     ${extra}
-    <a href="/${handle}/status/${id}"><time datetime="2026-09-22T08:00:00.000Z">Sep 22</time></a>
+    <a role="link" href="/${handle}/status/${id}"><time datetime="2026-09-22T08:00:00.000Z">Sep 22</time></a>
   </article></div>`;
 const quote = (id = "150", handle = "quoted") => `
   <div role="link" tabindex="0">
     <div data-testid="User-Name"><a href="/${handle}">${handle} Name</a></div>
-    <a href="/${handle}/status/${id}"><time datetime="2026-09-21T08:00:00.000Z">Sep 21</time></a>
+    <a role="link" href="/${handle}/status/${id}"><time datetime="2026-09-21T08:00:00.000Z">Sep 21</time></a>
     <div data-testid="tweetText">Quoted idea</div>
     <div data-testid="tweetPhoto"><img src="https://pbs.twimg.com/media/quote.jpg" alt="Quoted image"></div>
   </div>`;
@@ -71,6 +71,17 @@ describe("captureXPage", () => {
     expect(result.capture?.posts).toHaveLength(1);
     expect(result.capture?.posts[0]?.content).toBe("好\nRead [essay](<https://example.com/essay>) 👍");
     expect(result.images).toEqual(["https://pbs.twimg.com/media/photo.jpg?name=small"]);
+  });
+
+  it("reads the conversation label through aria-labelledby as rendered on X", () => {
+    page(post("100", "root", "Original") + post("200", "parent", "Reply") + post("300", "me", "My reply"));
+    const region = document.querySelector('[role="region"]')!;
+    region.removeAttribute("aria-label");
+    region.setAttribute("aria-labelledby", "conversation-heading");
+    region.insertAdjacentHTML("afterbegin", '<h1 id="conversation-heading">对话</h1>');
+    const result = captureXPage("PICK_UP");
+    expect(result.capture?.posts.map((post) => post.id)).toEqual(["100", "200", "300"]);
+    expect(result.isOwnPost).toBe(true);
   });
 
   it("normalizes twitter URLs and accepts the earlier CLIP input as Star", () => {
