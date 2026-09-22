@@ -123,6 +123,7 @@ cd proto && buf format -w          # Format proto files
 | Frontend behavior | Components/hooks/contexts under `web/src/` | `cd web && pnpm lint && pnpm test` |
 | Frontend production output | Vite config or release-sensitive UI | `cd web && pnpm build` or `pnpm release` |
 | CI or version tooling | `.github/`, root metadata, `scripts/ci*` and `scripts/release-check*` | Root `corepack pnpm test`, `check:release`, Actionlint; verify affected GitHub jobs |
+| Browser extension | `extensions/web-clipper/` (independent pnpm 11.10.0) | Extension lint/test/build, Python packaging tests and `package:release`; see module AGENTS.md |
 | Proto API | `.proto` source plus generated outputs | `cd proto && buf generate && buf lint` |
 | Public unauthenticated route | `server/router/api/v1/acl_config.go` | Targeted server test or manual route check |
 
@@ -162,5 +163,6 @@ cd proto && buf format -w          # Format proto files
 
 - Backend CI: Go 1.26.2, `go mod tidy -go=1.26.2`, golangci-lint v2.11.3, test groups `store`, `server`, `internal`, `other`.
 - Frontend CI: Node 24, pnpm 11.0.1, `pnpm lint`, `pnpm test`, `pnpm build`.
+- Web clipper CI: Node 24, pnpm 11.10.0, lint/test/build and deterministic Chromium ZIP; version PR releases include the ZIP and checksums.
 - Proto CI: `buf lint` and `buf format` check.
 - Docker: `scripts/Dockerfile`, Node 22.23.2 / Alpine 3.23 runtime（含服务端 PDF 排版组件）, non-root user, port 5230, multi-arch amd64/arm64/arm/v7.

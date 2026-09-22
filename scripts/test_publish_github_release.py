@@ -5,6 +5,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 import subprocess
+import zipfile
 
 spec = importlib.util.spec_from_file_location('github_release', Path(__file__).with_name('publish-github-release.py'))
 m = importlib.util.module_from_spec(spec)
@@ -62,12 +63,30 @@ class ReleaseTests(unittest.TestCase):
         for name in ('memos-linux-amd64', 'memos-linux-arm64', 'LICENSE'):
             (self.source / name).write_bytes(b'test binary\x00\xff')
         (self.source / 'CHANGELOG.md').write_text('# Changelog\n\n## 0.2.1\n\n### Patch Changes\n\n- 中文更新。\n\n## 0.2.0\n\n旧版说明\n')
-        (self.source / 'release.json').write_text(json.dumps({'version': '0.2.1', 'tag': 'castor-v0.2.1', 'commit': COMMIT}))
-        names = sorted(self.source.iterdir())
-        (self.source / 'SHA256SUMS').write_text(''.join(m.digest(p)[7:] + '  ' + p.name + '\n' for p in names))
+        self.extension_name = 'memos-web-clipper-chromium-v0.2.1.zip'
+        self.write_extension()
+        (self.source / 'release.json').write_text(json.dumps({
+            'version': '0.2.1', 'tag': 'castor-v0.2.1', 'commit': COMMIT,
+            'webClipper': {'version': '0.2.1', 'file': self.extension_name},
+        }))
+        self.write_checksums()
         (self.source / 'image.json').write_text(json.dumps({'image': 'private.example/personal/memos@sha256:' + 'b' * 64,
                                                           'version': '0.2.1', 'commit': COMMIT}))
         self.client = FakeGitHub()
+
+    def write_extension(self, *, version='0.2.1', commit=COMMIT, manifest_version='0.2.1'):
+        with zipfile.ZipFile(self.source / self.extension_name, 'w') as archive:
+            archive.writestr('manifest.json', json.dumps({
+                'manifest_version': 3, 'version': manifest_version, 'key': 'public-key',
+                'background': {'service_worker': 'background.js'}, 'action': {'default_popup': 'popup.html'},
+            }))
+            archive.writestr('castor-release.json', json.dumps({'version': version, 'tag': 'castor-v' + version, 'commit': commit}))
+            archive.writestr('background.js', 'console.log("extension");')
+            archive.writestr('popup.html', '<!doctype html><title>Web Clipper</title>')
+
+    def write_checksums(self):
+        names = sorted(p for p in self.source.iterdir() if p.name not in ('SHA256SUMS', 'image.json'))
+        (self.source / 'SHA256SUMS').write_text(''.join(m.digest(p)[7:] + '  ' + p.name + '\n' for p in names))
 
     def prepare(self):
         return m.prepare(self.source, self.output, COMMIT)
@@ -83,7 +102,9 @@ class ReleaseTests(unittest.TestCase):
         self.assertNotIn('旧版说明', body)
         self.assertNotIn('private.example', body)
         self.assertFalse((self.output / 'image.json').exists())
-        self.assertEqual(len(list(self.output.iterdir())), 7)
+        self.assertEqual(len(list(self.output.iterdir())), 8)
+        self.assertIn(self.extension_name, body)
+        self.assertEqual((self.source / self.extension_name).read_bytes(), (self.output / self.extension_name).read_bytes())
         for line in (self.output / 'SHA256SUMS').read_text().splitlines():
             checksum, name = line.split()
             self.assertEqual(m.digest(self.output / name), 'sha256:' + checksum)
@@ -102,6 +123,45 @@ class ReleaseTests(unittest.TestCase):
         receipt['version'] = '0.2.0'
         p.write_text(json.dumps(receipt))
         with self.assertRaisesRegex(RuntimeError, 'image identity'):
+            self.prepare()
+
+    def test_web_clipper_metadata_is_required_and_cannot_choose_an_arbitrary_file(self):
+        path = self.source / 'release.json'
+        release = json.loads(path.read_text())
+        for metadata in (None, {'version': '0.2.1', 'file': '../private.zip'},
+                         {'version': '0.2.0', 'file': self.extension_name}):
+            with self.subTest(metadata=metadata):
+                release['webClipper'] = metadata
+                path.write_text(json.dumps(release))
+                self.write_checksums()
+                with self.assertRaisesRegex(RuntimeError, 'clipper metadata mismatch'):
+                    self.prepare()
+        self.assertEqual(self.client.mutations, [])
+
+    def test_missing_or_corrupt_web_clipper_is_rejected(self):
+        path = self.source / self.extension_name
+        for data in (None, b'corrupt'):
+            with self.subTest(data=data):
+                if data is None:
+                    path.unlink()
+                else:
+                    path.write_bytes(data)
+                with self.assertRaisesRegex(RuntimeError, 'checksum mismatch'):
+                    self.prepare()
+
+    def test_web_clipper_internal_identity_and_manifest_must_match(self):
+        for override in ({'version': '0.2.0'}, {'commit': 'e' * 40}, {'manifest_version': '0.2.0'}):
+            with self.subTest(override=override):
+                self.write_extension(**override)
+                self.write_checksums()
+                with self.assertRaisesRegex(RuntimeError, '(identity|manifest) mismatch'):
+                    self.prepare()
+        self.assertEqual(self.client.mutations, [])
+
+    def test_non_zip_candidate_is_rejected_even_with_matching_checksum(self):
+        (self.source / self.extension_name).write_bytes(b'not an archive')
+        self.write_checksums()
+        with self.assertRaisesRegex(RuntimeError, 'Invalid web clipper archive'):
             self.prepare()
 
     def test_draft_upload_verification_then_publish_and_retry_noop(self):
@@ -124,6 +184,27 @@ class ReleaseTests(unittest.TestCase):
         self.publish(identity)
         self.assertEqual(len(self.client.releases), 1)
         self.assertFalse(self.client.releases[0]['draft'])
+
+    def test_web_clipper_upload_interruption_resumes_without_duplicate_assets(self):
+        identity = self.prepare()
+        self.client.fail_upload = self.extension_name
+        with self.assertRaisesRegex(RuntimeError, 'interrupted'):
+            self.publish(identity)
+        self.assertTrue(self.client.releases[0]['draft'])
+        self.client.fail_upload = None
+        self.publish(identity)
+        self.assertFalse(self.client.releases[0]['draft'])
+        uploads = [entry for entry in self.client.mutations if entry == ('upload', self.extension_name)]
+        self.assertEqual(len(uploads), 1)
+
+    def test_web_clipper_published_bytes_cannot_be_overwritten(self):
+        identity = self.prepare()
+        self.publish(identity)
+        self.client.assets[self.extension_name]['digest'] = 'sha256:' + 'f' * 64
+        before = self.client.mutations[:]
+        with self.assertRaisesRegex(RuntimeError, 'asset differs'):
+            self.publish(identity)
+        self.assertEqual(self.client.mutations, before)
 
     def test_tag_conflict_never_moves_tag(self):
         self.client.ref = {'object': {'type': 'commit', 'sha': 'd' * 40}}

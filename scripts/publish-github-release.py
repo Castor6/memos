@@ -9,6 +9,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import zipfile
 
 
 def digest(path):
@@ -25,6 +26,27 @@ def version_tuple(version):
     return tuple(map(int, version.split('.')))
 
 
+def verify_web_clipper(path, version, tag, commit):
+    try:
+        with zipfile.ZipFile(path) as archive:
+            names = archive.namelist()
+            if len(names) != len(set(names)) or archive.testzip() is not None:
+                raise RuntimeError('Invalid web clipper archive entries')
+            manifest = json.loads(archive.read('manifest.json'))
+            identity = json.loads(archive.read('castor-release.json'))
+            if any(identity.get(key) != value for key, value in {
+                'version': version, 'tag': tag, 'commit': commit,
+            }.items()):
+                raise RuntimeError('Web clipper release identity mismatch')
+            if (manifest.get('manifest_version') != 3 or manifest.get('version') != version
+                    or not manifest.get('key') or 'update_url' in manifest
+                    or manifest.get('background', {}).get('service_worker') not in names
+                    or manifest.get('action', {}).get('default_popup') not in names):
+                raise RuntimeError('Web clipper manifest mismatch')
+    except (zipfile.BadZipFile, KeyError, ValueError, AttributeError) as error:
+        raise RuntimeError('Invalid web clipper archive') from error
+
+
 def prepare(source, destination, commit):
     release = json.loads((source / 'release.json').read_text())
     version = release['version']
@@ -32,6 +54,9 @@ def prepare(source, destination, commit):
     tag = 'castor-v' + version
     if not re.fullmatch(r'[0-9a-f]{40}', commit) or release.get('commit') != commit or release.get('tag') != tag:
         raise RuntimeError('Candidate release identity mismatch')
+    extension_name = f'memos-web-clipper-chromium-v{version}.zip'
+    if release.get('webClipper') != {'version': version, 'file': extension_name}:
+        raise RuntimeError('Candidate web clipper metadata mismatch')
     image = json.loads((source / 'image.json').read_text())
     if image.get('commit') != commit or image.get('version') != version:
         raise RuntimeError('Published image identity mismatch')
@@ -39,7 +64,7 @@ def prepare(source, destination, commit):
     if not match:
         raise RuntimeError('Published image digest is missing')
     image_digest = match[1]
-    names = ('memos-linux-amd64', 'memos-linux-arm64', 'CHANGELOG.md', 'LICENSE', 'release.json')
+    names = ('memos-linux-amd64', 'memos-linux-arm64', 'CHANGELOG.md', 'LICENSE', 'release.json', extension_name)
     checksums = {}
     for line in (source / 'SHA256SUMS').read_text().splitlines():
         checksum, name = line.split(maxsplit=1)
@@ -49,6 +74,7 @@ def prepare(source, destination, commit):
         if path.is_symlink() or not path.is_file() or digest(path) != checksums.get(name):
             raise RuntimeError('Candidate checksum mismatch: ' + name)
         shutil.copyfile(path, destination / name)
+    verify_web_clipper(source / extension_name, version, tag, commit)
     changelog = (source / 'CHANGELOG.md').read_text()
     sections = re.split(r'^## ', changelog, flags=re.M)
     notes = [s.split('\n', 1)[1].strip() for s in sections[1:] if s.split('\n', 1)[0].strip() == version]
@@ -59,6 +85,8 @@ def prepare(source, destination, commit):
     files = sorted(destination.iterdir())
     (destination / 'SHA256SUMS').write_text(''.join(digest(p)[7:] + '  ' + p.name + '\n' for p in files))
     body = notes[0] + f'\n\n提交：`{commit}`\n\n镜像摘要：`{image_digest}`\n\n镜像构建和安装/升级测试已通过；服务器更新状态需单独确认。\n'
+    body += (f'\n浏览器扩展：下载 `{extension_name}`，解压后在 Chrome / Edge 的扩展管理页开启开发者模式，'
+             '选择「加载已解压的扩展程序」。后续更新需替换文件并重新加载；此 ZIP 不提供商店自动更新。\n')
     return version, tag, body
 
 

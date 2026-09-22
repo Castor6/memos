@@ -19,6 +19,7 @@
 | --- | --- | --- |
 | 基础检查 | 所有 PR | CI/版本规则测试、发布说明及版本归属、部署/备份恢复测试、差异空白与本地开发脚本语法 |
 | 前端 | 前端、Proto、工作流修改及版本 PR | 类型、Biome、单元测试、生产构建 |
+| 浏览器扩展 | `extensions/web-clipper/`、Node 版本、工作流修改及版本 PR | 独立 pnpm 11.10.0；Biome、单元测试、打包测试、类型、语言表、生产构建与 Chromium ZIP；提供短期 Actions artifact |
 | 后端 | Go、依赖、Proto、工作流修改及版本 PR | tidy、golangci-lint、store/server/internal/other 测试；store 含三种数据库 |
 | Proto | Proto、工作流修改及版本 PR | Buf lint、格式检查 |
 | 容器升级 | 存储结构/迁移、服务器入口、Docker/入口脚本及升级工作流修改 | 三驱动升级测试、真实容器的安装/升级、入口脚本检查 |
@@ -85,8 +86,12 @@ main 的 CI 成功后，`Version Packages` 工作流对仍为当前 main 的提�
 
 普通 PR 不创建 Release。版本 PR 合并后依次完成镜像安装/升级验证、ACR 发布、Actions artifact 归档，再创建 GitHub Release；该阶段使用独立 job 的 `contents: write` 权限，构建任务与普通 CI 仍为只读。
 
-附件包含 Linux amd64/arm64 二进制、`CHANGELOG.md`、`LICENSE`、`release.json`、`image-digest.txt` 和 `SHA256SUMS`。二进制和元数据先核对构建产物的校验清单，再生成包含镜像摘要的完整公开清单；不会公开私有 Registry 地址。与 30 天 Actions artifacts 不同，Release 附件不会因这个保留期限被自动清除。
+附件包含 Linux amd64/arm64 二进制、Chrome / Edge 通用的 `memos-web-clipper-chromium-v<版本>.zip`、`CHANGELOG.md`、`LICENSE`、`release.json`、`image-digest.txt` 和 `SHA256SUMS`。二进制、ZIP 和元数据先核对构建产物的校验清单，再生成包含镜像摘要的完整公开清单；不会公开私有 Registry 地址。与 30 天 Actions artifacts 不同，Release 附件不会因这个保留期限被自动清除。
+
+扩展与服务端从同一个确定提交构建。发布任务使用 Node 24、扩展独立的 pnpm 11.10.0 和公开 `.env.example`，执行 lint、单测、Python 标准库打包测试、类型及生产构建，再生成 ZIP；检查或打包失败会阻断镜像发布。ZIP 保留稳定 Chromium key、不含商店更新地址，包内 manifest 版本取根目录个人发行版本，源码的上游扩展版本不参与 Changesets 升级。`castor-release.json` 记录版本/提交/上游基线；外部 `release.json.webClipper` 指向对应 ZIP。公开前验证 ZIP 内部身份与清单，继续采用草稿上传、回读摘要、禁止覆盖同名不同内容的规则。
+
+下载 ZIP 后须解压，在 Chrome / Edge 扩展管理页开启开发者模式并加载含 `manifest.json` 的目录；后续需手动替换文件并重新加载，不是商店自动更新。安装及版本兼容边界见 [扩展说明](../extensions/web-clipper/README.md)。扩展源码修改要求中文 Changeset，普通 PR 仍不触发正式发布。
 
 上传不完整时保留草稿，可在 Actions 重跑失败的 Release job；标签、附件和摘要相符时复用，不重复创建。已有标签指向其它提交、同名附件内容不同或公开 Release 缺少附件时拒绝覆盖，需人工核查。重跑旧草稿不会把较新个人版本的 Latest 标记降级。
 
-Release 发布失败不会撤回已成功发布的镜像，服务器仍可能更新成功；Release 发布成功也不表示服务器已完成更新。继续分别查看发布工作流和服务器部署记录。新流程从包含此工作流的下一个版本 PR 开始，不自动补发历史版本。
+Release 发布失败不会撤回已成功发布的镜像，服务器仍可能更新成功；Release 发布成功也不表示服务器已完成更新。继续分别查看发布工作流和服务器部署记录。新流程从包含此工作流的下一个版本 PR 开始，不自动补发历史版本。手动重试旧版本时，按确定提交中是否包含个人扩展打包脚本选择原有流程，历史版本仍保留其原附件集合；包含脚本的新版本不能因构建失败而跳过扩展。
