@@ -14,6 +14,7 @@
     "package:chrome": "pnpm build && node scripts/package.mjs chrome",
     "package:edge": "pnpm build && node scripts/package.mjs edge",
     "package:firefox": "pnpm build && node scripts/package.mjs firefox",
+    "package:release": "pnpm build && python scripts/package-release.py",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

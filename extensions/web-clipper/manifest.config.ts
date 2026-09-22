@@ -12,7 +12,7 @@ export default defineManifest({
   key: CRX_KEY,
   default_locale: "en",
   name: "Memos Web Clipper - Castor Trial",
-  // package.json is the release version's single source of truth.
+  // Local builds use the upstream base version; personal release archives use the root Memos version.
   version: packageJson.version,
   version_name: `${packageJson.version} Castor trial (Memos 0.7.0)`,
   description: "__MSG_extensionDescription__",

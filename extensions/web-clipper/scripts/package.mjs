@@ -25,7 +25,8 @@ if (!VALID_TARGETS.has(requestedTarget)) {
 const packageJson = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
 
 const requireTrustedSourceTree = () => {
-  if (!existsSync(join(ROOT, ".git"))) throw new Error("Packaging requires a Git checkout.");
+  // Git resolves the owning checkout for both monorepo subdirectories and worktrees.
+  execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: ROOT, stdio: "pipe" });
   const status = execFileSync("git", ["status", "--porcelain", "--untracked-files=normal"], {
     cwd: ROOT,
     encoding: "utf8",
