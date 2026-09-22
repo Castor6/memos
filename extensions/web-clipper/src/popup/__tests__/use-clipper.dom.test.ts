@@ -78,7 +78,20 @@ describe("useClipper manual capture and durable drafts", () => {
     wireRuntime();
     browserMock.tabs.query.mockResolvedValue([{ id: 4, url: page.url, title: page.title }]);
     vi.mocked(captureActivePage).mockReset().mockResolvedValue(page);
-    browserMock.scripting.executeScript.mockResolvedValue([{ result: xResult }]);
+    browserMock.scripting.executeScript.mockImplementation(async (options: unknown) => {
+      const mode = (options as { args: string[] }).args[0];
+      return [
+        {
+          result:
+            mode === "STAR"
+              ? {
+                  ...xResult,
+                  capture: { ...xResult.capture!, kind: "STAR", comment: "", posts: [xResult.capture!.posts[1]!] },
+                }
+              : xResult,
+        },
+      ];
+    });
   });
 
   it("reads only tab metadata on open and never captures until the user chooses a mode", async () => {
@@ -146,7 +159,36 @@ describe("useClipper manual capture and durable drafts", () => {
     expect(result.current.draft?.capture.comment).toBe("Star thoughts");
     await act(async () => result.current.start("PICK_UP"));
     expect(result.current.draft?.capture.context).toBe("Why I replied");
-    expect(browserMock.scripting.executeScript).toHaveBeenCalledTimes(1);
+    expect(browserMock.scripting.executeScript).toHaveBeenCalledTimes(2);
+    expect(captureActivePage).not.toHaveBeenCalled();
+  });
+
+  it("uses X's dedicated Star extractor for short posts and allows saving another author's post", async () => {
+    browserMock.tabs.query.mockResolvedValue([{ id: 4, url: xUrl }]);
+    browserMock.scripting.executeScript.mockResolvedValue([
+      {
+        result: {
+          ...xResult,
+          isOwnPost: false,
+          capture: { ...xResult.capture!, kind: "STAR", comment: "", posts: [{ ...xResult.capture!.posts[1]!, content: "好" }] },
+        },
+      },
+    ]);
+    const { result } = renderHook(useReadyClipper);
+    await waitReady(result);
+    await act(async () => result.current.start("STAR"));
+    expect(captureActivePage).not.toHaveBeenCalled();
+    expect(browserMock.scripting.executeScript).toHaveBeenCalledWith(expect.objectContaining({ args: ["STAR"] }));
+    expect(result.current.draft?.capture).toMatchObject({ kind: "STAR", platform: "X", comment: "" });
+    expect(result.current.draft?.original).toContain("好");
+    expect(result.current.draft?.original).toContain(`[来源](${xUrl})`);
+    expect(result.current.draft?.confirmed).toBe(true);
+    await act(async () => result.current.update({}, { comment: "This matters to me" }));
+    await act(async () => result.current.start("STAR", true));
+    expect(result.current.draft?.capture.comment).toBe("This matters to me");
+    await act(async () => {
+      expect((await result.current.save()).ok).toBe(true);
+    });
   });
 
   it("refreshes captured source while preserving thoughts and context", async () => {
@@ -205,6 +247,92 @@ describe("useClipper manual capture and durable drafts", () => {
     });
     expect(result.current.draft).toBeNull();
     expect(saves()).toHaveLength(0);
+  });
+
+  it("preserves the visible draft during temporary auth loss and retries the same operation after the same account returns", async () => {
+    wireRuntime({ SAVE_MEMO: { ok: false, errorKind: "timeout" } });
+    const { result, rerender } = renderHook(({ account }: { account: typeof expectation | null }) => useClipper(account, null), {
+      initialProps: { account: expectation as typeof expectation | null },
+    });
+    await waitReady(result);
+    await act(async () => result.current.start("STAR"));
+    await act(async () => result.current.update({}, { comment: "Keep these thoughts visible" }));
+    await act(async () => {
+      await result.current.save();
+    });
+    const requestId = result.current.draft?.operation?.requestId;
+    rerender({ account: null });
+    expect(result.current.draft?.capture.comment).toBe("Keep these thoughts visible");
+    expect(result.current.draft?.operation?.requestId).toBe(requestId);
+    act(() => result.current.update({}, { comment: "Blocked edit" }));
+    expect(result.current.draft?.capture.comment).toBe("Keep these thoughts visible");
+    await act(async () => {
+      expect(await result.current.save()).toEqual({ ok: false, errorKind: "not-configured" });
+    });
+    expect(saves()).toHaveLength(1);
+    wireRuntime();
+    rerender({ account: expectation });
+    await waitReady(result);
+    await act(async () => {
+      expect((await result.current.save()).ok).toBe(true);
+    });
+    expect(saves()[1]?.saveRequestId).toBe(requestId);
+  });
+
+  it("does not reuse the retained draft when a different account replaces unavailable auth", async () => {
+    const { result, rerender } = renderHook(({ account }: { account: typeof expectation | null }) => useClipper(account, null), {
+      initialProps: { account: expectation as typeof expectation | null },
+    });
+    await waitReady(result);
+    await act(async () => result.current.start("STAR"));
+    await act(async () => result.current.update({}, { comment: "Account A thoughts" }));
+    rerender({ account: null });
+    expect(result.current.draft?.capture.comment).toBe("Account A thoughts");
+    rerender({ account: { ...expectation, connectionId: "account_b" } });
+    await waitReady(result);
+    expect(result.current.draft).toBeNull();
+    await act(async () => {
+      expect((await result.current.save()).ok).toBe(false);
+    });
+    expect(saves()).toHaveLength(0);
+    rerender({ account: expectation });
+    await waitReady(result);
+    expect(result.current.draft?.capture.comment).toBe("Account A thoughts");
+  });
+
+  it("checks current auth again after persisting and before sending a save", async () => {
+    const { result, rerender } = renderHook(({ account }: { account: typeof expectation | null }) => useClipper(account, null), {
+      initialProps: { account: expectation as typeof expectation | null },
+    });
+    await waitReady(result);
+    await act(async () => result.current.start("STAR"));
+    const write = browserMock.storage.local.set.getMockImplementation()!;
+    let releaseWrite!: () => void;
+    browserMock.storage.local.set.mockImplementationOnce(async (items) => {
+      await new Promise<void>((resolve) => {
+        releaseWrite = resolve;
+      });
+      await write(items);
+    });
+    let pending!: ReturnType<typeof result.current.save>;
+    act(() => {
+      pending = result.current.save();
+    });
+    await waitFor(() => expect(releaseWrite).toBeDefined());
+    const requestId = result.current.draft?.operation?.requestId;
+    rerender({ account: null });
+    await act(async () => {
+      releaseWrite();
+      expect(await pending).toEqual({ ok: false, errorKind: "auth-changed" });
+    });
+    expect(saves()).toHaveLength(0);
+    expect(result.current.draft?.operation?.requestId).toBe(requestId);
+    rerender({ account: expectation });
+    await waitReady(result);
+    await act(async () => {
+      expect((await result.current.save()).ok).toBe(true);
+    });
+    expect(saves()[0]?.saveRequestId).toBe(requestId);
   });
 
   it("clears the visible draft when the same tab navigates to another page", async () => {

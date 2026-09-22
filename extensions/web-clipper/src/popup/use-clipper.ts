@@ -103,8 +103,12 @@ export function useClipper(expectation: SaveExpectation | null, template: string
   const accountKey = expectation
     ? JSON.stringify([expectation.source, expectation.connectionId, expectation.instanceUrl.replace(/\/+$/, "")])
     : "";
+  // A temporarily unavailable session must not erase the draft shown in the blocked view.
+  const lastAccountKey = useRef(accountKey);
+  if (accountKey) lastAccountKey.current = accountKey;
+  const draftAccountKey = accountKey || lastAccountKey.current;
   const pageUrl = draftPageUrl(tab?.url ?? "");
-  const scope = accountKey && pageUrl ? `captureDraftV1:${encodeURIComponent(accountKey)}:${encodeURIComponent(pageUrl)}` : "";
+  const scope = draftAccountKey && pageUrl ? `captureDraftV1:${encodeURIComponent(draftAccountKey)}:${encodeURIComponent(pageUrl)}` : "";
   const scopeRef = useRef(scope);
   scopeRef.current = scope;
   const accountRef = useRef(accountKey);
@@ -283,12 +287,12 @@ export function useClipper(expectation: SaveExpectation | null, template: string
     return () => {
       active = false;
     };
-  }, [scope, ready, draft?.capture.kind, draft?.capture.sourceUrl]);
+  }, [scope, accountKey, ready, draft?.capture.kind, draft?.capture.sourceUrl]);
 
   const update = useCallback(
     (change: Partial<Draft>, fields?: Partial<CaptureData>) => {
       const current = draftRef.current;
-      if (!current || busyRef.current || !scope || scopeRef.current !== scope || readyScope.current !== scope) return;
+      if (!expectation || !current || busyRef.current || !scope || scopeRef.current !== scope || readyScope.current !== scope) return;
       if (current.operation) {
         setNotice("上次保存结果尚未确认，请先重试保存，再继续修改这份草稿。");
         return;
@@ -298,7 +302,7 @@ export function useClipper(expectation: SaveExpectation | null, template: string
       applyDraft(next);
       void persist(next, scope);
     },
-    [scope, applyDraft, persist],
+    [expectation, scope, applyDraft, persist],
   );
 
   const start = useCallback(
@@ -326,7 +330,8 @@ export function useClipper(expectation: SaveExpectation | null, template: string
       setNotice(null);
       try {
         let next: Draft;
-        if (mode === "STAR") {
+        const isXDetail = /^https:\/\/(?:(?:www|mobile)\.)?(?:x\.com|twitter\.com)\/\w+\/status\/\d+(?:[/?#]|$)/i.test(tab?.url ?? "");
+        if (mode === "STAR" && !isXDetail) {
           const captured = await captureActivePage();
           if (!/^https?:\/\//i.test(captured.url)) throw new Error("当前页面不是可保存的网页，请打开普通网页后再使用 Star。");
           if (draftPageUrl(captured.url) !== pageUrl) throw new Error("页面已切换，请重新打开扩展后提取。");
@@ -356,32 +361,37 @@ export function useClipper(expectation: SaveExpectation | null, template: string
             operation: null,
           };
         } else {
-          if (
-            !/^https:\/\/(?:(?:www|mobile)\.)?(?:x\.com|twitter\.com)\/\w+\/status\/\d+(?:[/?#]|$)/i.test(tab?.url ?? "") ||
-            tab?.id === undefined
-          )
-            throw new Error("请打开你自己的 X 回复或引用帖详情页，再使用 Pick up。");
+          if (!isXDetail || tab?.id === undefined) throw new Error("请打开你自己的 X 回复或引用帖详情页，再使用 Pick up。");
           const [injected] = await bounded(
-            browser.scripting.executeScript({ target: { tabId: tab.id }, func: captureXPage, args: ["PICK_UP"] }),
+            browser.scripting.executeScript({ target: { tabId: tab.id }, func: captureXPage, args: [mode] }),
             "X 页面提取超时，请展开帖子后重试。",
             2_000,
           );
           const result = injected?.result as XCaptureResult | undefined;
           if (!result?.capture) throw new Error(result?.error ?? "未能提取 X 帖子，请展开对话后重试。");
-          if (result.isOwnPost === false) throw new Error("当前帖子不属于已登录的 X 账号，请打开你自己的回复或引用帖。");
+          if (result.capture.kind !== mode) throw new Error("提取结果与当前模式不一致，请重新提取。");
+          if (mode === "PICK_UP" && result.isOwnPost === false)
+            throw new Error("当前帖子不属于已登录的 X 账号，请打开你自己的回复或引用帖。");
           if (draftPageUrl(result.capture.sourceUrl) !== pageUrl) throw new Error("页面已切换，请重新打开扩展后提取。");
           next = {
-            capture: { ...result.capture, context: existing?.capture.context ?? "" },
+            capture: {
+              ...result.capture,
+              comment: mode === "STAR" ? (existing?.capture.comment ?? "") : result.capture.comment,
+              context: existing?.capture.context ?? "",
+            },
             title: result.title,
-            original: formatCapturedPosts(result.capture),
+            original:
+              mode === "STAR"
+                ? `${formatCapturedPosts(result.capture)}\n\n[来源](${result.capture.sourceUrl})`
+                : formatCapturedPosts(result.capture),
             images: result.images,
             warnings: result.warnings,
-            confirmed: result.isOwnPost === true || existing?.confirmed === true,
+            confirmed: mode === "STAR" || result.isOwnPost === true || existing?.confirmed === true,
             visibility: existing?.visibility ?? defaultVisibility.current,
             operation: null,
           };
         }
-        if (!mounted.current || scopeRef.current !== scope || request !== extraction.current) return;
+        if (!mounted.current || scopeRef.current !== scope || accountRef.current !== accountKey || request !== extraction.current) return;
         if (edit !== revision.current) {
           setNotice("提取期间草稿已修改，已保留你的输入；需要时可重新提取。");
           return;
@@ -398,7 +408,7 @@ export function useClipper(expectation: SaveExpectation | null, template: string
         }
       }
     },
-    [expectation, scope, pageUrl, tab, template, applyDraft, persist],
+    [expectation, accountKey, scope, pageUrl, tab, template, applyDraft, persist],
   );
 
   const content = draft ? composeCaptureMemo(draft.capture, draft.original) : "";
@@ -429,7 +439,8 @@ export function useClipper(expectation: SaveExpectation | null, template: string
         if (mounted.current && scopeRef.current === scope) applyDraft(current);
         return { ok: false, errorKind: "storage-error" };
       }
-      if (!mounted.current || scopeRef.current !== scope) return { ok: false, errorKind: "auth-changed" };
+      if (!mounted.current || scopeRef.current !== scope || accountRef.current !== accountKey)
+        return { ok: false, errorKind: "auth-changed" };
       let result: SaveResult;
       try {
         result = await sendBackgroundRequest({
@@ -453,7 +464,7 @@ export function useClipper(expectation: SaveExpectation | null, template: string
       } catch {
         result = { ok: false, errorKind: "extension-error" };
       }
-      if (!mounted.current || scopeRef.current !== scope) return result;
+      if (!mounted.current || scopeRef.current !== scope || accountRef.current !== accountKey) return result;
       if (result.ok || !AMBIGUOUS_ERRORS.has(result.errorKind)) {
         const finished = { ...pending, operation: null };
         applyDraft(finished);
@@ -475,7 +486,7 @@ export function useClipper(expectation: SaveExpectation | null, template: string
         setBusy(false);
       }
     }
-  }, [expectation, capabilities, scope, applyDraft, persist]);
+  }, [expectation, accountKey, capabilities, scope, applyDraft, persist]);
 
   return {
     draft,
