@@ -425,6 +425,8 @@ func TestBuildCuratedToolsUseStandardSchemaFormats(t *testing.T) {
 			for index, item := range typed {
 				collectFormats(t, tool, path+"/"+strconv.Itoa(index), item)
 			}
+		default:
+			return
 		}
 	}
 

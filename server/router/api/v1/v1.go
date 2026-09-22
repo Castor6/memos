@@ -28,6 +28,7 @@ type APIV1Service struct {
 	v1pb.UnimplementedAuthServiceServer
 	v1pb.UnimplementedUserServiceServer
 	v1pb.UnimplementedMemoServiceServer
+	v1pb.UnimplementedMemoTransferServiceServer
 	v1pb.UnimplementedAttachmentServiceServer
 	v1pb.UnimplementedAIServiceServer
 	v1pb.UnimplementedShortcutServiceServer
@@ -41,7 +42,8 @@ type APIV1Service struct {
 	NotificationEmailSender notification.EmailSender
 
 	// pdfSemaphore limits concurrent PDF generation.
-	pdfSemaphore *semaphore.Weighted
+	pdfSemaphore     *semaphore.Weighted
+	archiveSemaphore *semaphore.Weighted
 	// thumbnailSemaphore limits concurrent thumbnail generation to prevent memory exhaustion.
 	thumbnailSemaphore       *semaphore.Weighted
 	imageProcessingSemaphore *semaphore.Weighted
@@ -64,6 +66,7 @@ func NewAPIV1Service(secret string, profile *profile.Profile, store *store.Store
 		SSEHub:                   NewSSEHub(),
 		NotificationEmailSender:  nil,
 		pdfSemaphore:             semaphore.NewWeighted(1),
+		archiveSemaphore:         semaphore.NewWeighted(1),
 		thumbnailSemaphore:       semaphore.NewWeighted(3), // Limit to 3 concurrent thumbnail generations
 		imageProcessingSemaphore: semaphore.NewWeighted(2),
 	}
@@ -125,6 +128,9 @@ func (s *APIV1Service) RegisterGateway(ctx context.Context, echoServer *echo.Ech
 		return err
 	}
 	if err := v1pb.RegisterMemoServiceHandlerServer(ctx, gwMux, s); err != nil {
+		return err
+	}
+	if err := v1pb.RegisterMemoTransferServiceHandlerServer(ctx, gwMux, s); err != nil {
 		return err
 	}
 	if err := v1pb.RegisterAttachmentServiceHandlerServer(ctx, gwMux, s); err != nil {

@@ -50,6 +50,9 @@ func (s *APIV1Service) CreateMemoComment(ctx context.Context, request *v1pb.Crea
 		return nil, status.Errorf(codes.Internal, "failed to clone memo comment")
 	}
 	comment.Visibility = convertVisibilityFromStore(relatedMemo.Visibility)
+	if isArchiveImport(ctx) {
+		comment.Visibility = v1pb.Visibility_PRIVATE
+	}
 
 	// Create the memo comment first; suppress the generic memo.created SSE event
 	// since CreateMemoComment broadcasts memo.comment.created for the parent instead.
@@ -120,6 +123,9 @@ func (s *APIV1Service) CreateMemoComment(ctx context.Context, request *v1pb.Crea
 		slog.Warn("Failed to dispatch memo comment created webhook", slog.Any("err", err))
 	}
 
+	if isArchiveImport(ctx) {
+		return memoComment, nil
+	}
 	s.dispatchMemoMentionNotificationsBestEffort(ctx, memo, relatedMemo, "")
 
 	// Broadcast live refresh event for the parent memo so subscribers see the new comment.

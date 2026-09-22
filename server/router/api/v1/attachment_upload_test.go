@@ -31,7 +31,7 @@ func uploadTestOwner(t *testing.T, s *APIV1Service) (*store.User, context.Contex
 	return user, store.WithSpace(userCtx(context.Background(), user.ID), "work")
 }
 
-func beginTestUpload(t *testing.T, s *APIV1Service, ctx context.Context, size int64) *v1pb.UploadAttachmentResponse {
+func beginTestUpload(ctx context.Context, t *testing.T, s *APIV1Service, size int64) *v1pb.UploadAttachmentResponse {
 	t.Helper()
 	response, err := s.UploadAttachment(ctx, &v1pb.UploadAttachmentRequest{Upload: &v1pb.UploadAttachmentRequest_Spec{Spec: &v1pb.UploadAttachmentSpec{
 		Attachment: &v1pb.Attachment{Filename: "sample.txt", Type: "text/plain"}, TotalSize: size,
@@ -44,7 +44,7 @@ func beginTestUpload(t *testing.T, s *APIV1Service, ctx context.Context, size in
 func TestChunkUploadIsolationRetryAndCompletion(t *testing.T) {
 	s := newIntegrationService(t)
 	owner, ctx := uploadTestOwner(t, s)
-	response := beginTestUpload(t, s, ctx, 6)
+	response := beginTestUpload(ctx, t, s, 6)
 	request := &v1pb.UploadAttachmentRequest{Upload: &v1pb.UploadAttachmentRequest_UploadId{UploadId: response.UploadId}, Data: []byte("abc")}
 	response, err := s.UploadAttachment(ctx, request)
 	require.NoError(t, err)
@@ -123,7 +123,7 @@ func TestChunkUploadLimitsExpiryAndRestart(t *testing.T) {
 		Attachment: &v1pb.Attachment{Filename: "too-big.txt"}, TotalSize: 1 << 40,
 	}}})
 	require.Equal(t, codes.InvalidArgument, status.Code(err))
-	response := beginTestUpload(t, s, ctx, 3)
+	response := beginTestUpload(ctx, t, s, 3)
 	upload, err := s.attachmentUploads.resume(response.UploadId, 1)
 	require.NoError(t, err)
 	path := upload.path
@@ -137,7 +137,7 @@ func TestChunkUploadLimitsExpiryAndRestart(t *testing.T) {
 	_, err = os.Stat(path)
 	require.True(t, os.IsNotExist(err))
 	for range uploadMaxActivePerUser {
-		beginTestUpload(t, s, ctx, 1)
+		beginTestUpload(ctx, t, s, 1)
 	}
 	_, err = s.UploadAttachment(ctx, &v1pb.UploadAttachmentRequest{Upload: &v1pb.UploadAttachmentRequest_Spec{Spec: &v1pb.UploadAttachmentSpec{Attachment: &v1pb.Attachment{Filename: "one-more.txt"}}}})
 	require.Equal(t, codes.ResourceExhausted, status.Code(err))
@@ -164,7 +164,7 @@ func TestChunkUploadRevalidatesMemoAndLimit(t *testing.T) {
 	require.NoError(t, s.Store.DeleteMemo(ctx, &store.DeleteMemo{ID: memo.ID}))
 	_, err = s.UploadAttachment(ctx, &v1pb.UploadAttachmentRequest{Upload: &v1pb.UploadAttachmentRequest_UploadId{UploadId: response.UploadId}, Data: []byte("abc"), FinishWrite: true})
 	require.Equal(t, codes.NotFound, status.Code(err))
-	response = beginTestUpload(t, s, ctx, 2*MebiByte)
+	response = beginTestUpload(ctx, t, s, 2*MebiByte)
 	_, err = s.Store.UpsertInstanceSetting(ctx, &storepb.InstanceSetting{Key: storepb.InstanceSettingKey_STORAGE, Value: &storepb.InstanceSetting_StorageSetting{StorageSetting: &storepb.InstanceStorageSetting{UploadSizeLimitMb: 1}}})
 	require.NoError(t, err)
 	_, err = s.UploadAttachment(ctx, &v1pb.UploadAttachmentRequest{Upload: &v1pb.UploadAttachmentRequest_UploadId{UploadId: response.UploadId}, Data: bytes.Repeat([]byte("x"), 2*MebiByte), FinishWrite: true})
@@ -189,7 +189,7 @@ func TestAttachmentStorageStatsOnlyOwnerAcrossSpaces(t *testing.T) {
 		_, err := s.Store.CreateAttachment(store.WithSpace(context.Background(), item.space), &store.Attachment{UID: item.uid, CreatorID: item.owner, Size: item.size})
 		require.NoError(t, err)
 	}
-	beginTestUpload(t, s, ctx, 123)
+	beginTestUpload(ctx, t, s, 123)
 	request := &v1pb.GetUserStatsRequest{Name: "users/" + owner.Username}
 	own, err := s.GetUserStats(ctx, request)
 	require.NoError(t, err)

@@ -721,6 +721,56 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /api/v1/memoArchive:export:
+        post:
+            tags:
+                - MemoTransferService
+            description: ExportMemoArchive exports notes and todos across every personal space.
+            operationId: MemoTransferService_ExportMemoArchive
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/ExportMemoArchiveRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ExportMemoArchiveResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /api/v1/memoArchive:import:
+        post:
+            tags:
+                - MemoTransferService
+            description: ImportMemoArchive validates an archive before importing its records.
+            operationId: MemoTransferService_ImportMemoArchive
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/ImportMemoArchiveRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ImportMemoArchiveResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /api/v1/memos:
         get:
             tags:
@@ -2862,6 +2912,28 @@ components:
                     description: |-
                         The actual token value - only returned on creation.
                          This is the only time the token value will be visible.
+        ExportMemoArchiveRequest:
+            type: object
+            properties: {}
+        ExportMemoArchiveResponse:
+            type: object
+            properties:
+                content:
+                    type: string
+                    description: ZIP bytes, limited to 128 MiB.
+                    format: bytes
+                filename:
+                    type: string
+                memoCount:
+                    type: integer
+                    format: int32
+                attachmentCount:
+                    type: integer
+                    format: int32
+                warnings:
+                    type: array
+                    items:
+                        type: string
         ExportMemoPdfRequest:
             required:
                 - name
@@ -2963,6 +3035,35 @@ components:
             properties:
                 oauth2Config:
                     $ref: '#/components/schemas/OAuth2Config'
+        ImportMemoArchiveRequest:
+            type: object
+            properties:
+                content:
+                    type: string
+                    description: ZIP bytes, limited to 128 MiB.
+                    format: bytes
+        ImportMemoArchiveResponse:
+            type: object
+            properties:
+                imported:
+                    type: integer
+                    format: int32
+                skipped:
+                    type: integer
+                    description: Existing memo IDs are never overwritten.
+                    format: int32
+                attachments:
+                    type: integer
+                    format: int32
+                warnings:
+                    type: array
+                    items:
+                        type: string
+                errors:
+                    type: array
+                    items:
+                        type: string
+                    description: Per-record failures are returned with any completed import counts.
         InstanceProfile:
             type: object
             properties:
@@ -4479,5 +4580,7 @@ tags:
     - name: IdentityProviderService
     - name: InstanceService
     - name: MemoService
+    - name: MemoTransferService
+      description: MemoTransferService transfers the authenticated user's notes as portable ZIP files.
     - name: ShortcutService
     - name: UserService

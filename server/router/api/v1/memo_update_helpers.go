@@ -50,6 +50,9 @@ func (s *APIV1Service) buildUpdatedMemoState(ctx context.Context, memoID int32) 
 }
 
 func (s *APIV1Service) dispatchMemoUpdatedSideEffects(ctx context.Context, memo *store.Memo, parentMemo *store.Memo, memoMessage *v1pb.Memo) {
+	if isArchiveImport(ctx) {
+		return
+	}
 	if err := s.DispatchMemoUpdatedWebhook(ctx, memoMessage); err != nil {
 		slog.Warn("Failed to dispatch memo updated webhook", slog.Any("err", err))
 	}

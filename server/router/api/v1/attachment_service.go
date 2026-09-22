@@ -185,7 +185,13 @@ func (s *APIV1Service) processAndSaveAttachment(ctx context.Context, create *sto
 	if err != nil && err != io.EOF {
 		return nil, status.Errorf(codes.Internal, "failed to read attachment header: %v", err)
 	}
-	source = buffered
+	if seekable, ok := source.(io.ReadSeeker); ok {
+		if _, err := seekable.Seek(0, io.SeekStart); err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to rewind attachment: %v", err)
+		}
+	} else {
+		source = buffered
+	}
 	if shouldStripExifContent(header, create.Type) || http.DetectContentType(header) == "image/jpeg" {
 		blob, err := io.ReadAll(&attachmentContextReader{ctx: ctx, reader: source})
 		if err != nil {

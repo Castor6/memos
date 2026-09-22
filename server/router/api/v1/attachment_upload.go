@@ -132,8 +132,8 @@ func (s *APIV1Service) startAttachmentUpload(ctx context.Context, request *v1pb.
 	}
 	// Validate before allocating a temporary file. Keep the original MIME type
 	// so an omitted type can be sniffed from real bytes at finalization.
-	metadata := proto.Clone(spec.Attachment).(*v1pb.Attachment)
-	validationMetadata := proto.Clone(metadata).(*v1pb.Attachment)
+	metadata := proto.CloneOf(spec.Attachment)
+	validationMetadata := proto.CloneOf(metadata)
 	create, err := s.prepareAttachment(ctx, &v1pb.CreateAttachmentRequest{Attachment: validationMetadata, AttachmentId: spec.AttachmentId})
 	if err != nil {
 		return "", nil, err
@@ -170,7 +170,7 @@ func (s *APIV1Service) finishAttachmentUpload(ctx context.Context, upload *attac
 		return nil, status.Errorf(codes.Internal, "failed to open upload file: %v", err)
 	}
 	defer file.Close()
-	metadata := proto.Clone(upload.state.metadata).(*v1pb.Attachment)
+	metadata := proto.CloneOf(upload.state.metadata)
 	metadata.Content = make([]byte, min(upload.totalSize, 512))
 	if _, err := io.ReadFull(file, metadata.Content); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to read attachment header: %v", err)

@@ -28,6 +28,9 @@ func (s *APIV1Service) DispatchMemoDeletedWebhook(ctx context.Context, memo *v1p
 
 // DispatchMemoCommentCreatedWebhook dispatches webhook to the related memo owner when a comment is created.
 func (s *APIV1Service) DispatchMemoCommentCreatedWebhook(ctx context.Context, commentMemo *v1pb.Memo, relatedMemoCreatorID int32) error {
+	if isArchiveImport(ctx) {
+		return nil
+	}
 	webhooks, err := s.Store.GetUserWebhooks(ctx, relatedMemoCreatorID)
 	if err != nil {
 		return err
@@ -46,6 +49,9 @@ func (s *APIV1Service) DispatchMemoCommentCreatedWebhook(ctx context.Context, co
 }
 
 func (s *APIV1Service) dispatchMemoRelatedWebhook(ctx context.Context, memo *v1pb.Memo, activityType string) error {
+	if isArchiveImport(ctx) {
+		return nil
+	}
 	creator, err := ResolveUserByName(ctx, s.Store, memo.Creator)
 	if err != nil {
 		return status.Errorf(codes.InvalidArgument, "invalid memo creator")
