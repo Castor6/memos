@@ -18,7 +18,7 @@ import { remarkPreview } from "@/utils/remark-plugins/remark-preview";
 import { remarkSplitMixedTaskLists } from "@/utils/remark-plugins/remark-split-mixed-task-lists";
 import { remarkTag } from "@/utils/remark-plugins/remark-tag";
 import { CodeBlock } from "./CodeBlock";
-import { SANITIZE_SCHEMA } from "./constants";
+import { memoUrlTransform, SANITIZE_SCHEMA } from "./constants";
 import { MarkdownRenderContext, rootMarkdownRenderContext } from "./MarkdownRenderContext";
 import { Mention } from "./Mention";
 import { AnchorLink, Blockquote, Heading, HorizontalRule, Image, InlineCode, Link, List, ListItem, Paragraph } from "./markdown";
@@ -171,6 +171,7 @@ export const MemoMarkdownRendererCore = ({
   return (
     <MarkdownRenderContext.Provider value={{ ...rootMarkdownRenderContext, linkMetadata }}>
       <ReactMarkdown
+        urlTransform={memoUrlTransform}
         remarkPlugins={[
           remarkDisableSetext,
           ...mathRemarkPlugins,
