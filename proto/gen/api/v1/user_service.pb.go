@@ -859,8 +859,11 @@ type UserStats struct {
 	PinnedMemos []string `protobuf:"bytes,5,rep,name=pinned_memos,json=pinnedMemos,proto3" json:"pinned_memos,omitempty"`
 	// Total memo count.
 	TotalMemoCount int32 `protobuf:"varint,6,opt,name=total_memo_count,json=totalMemoCount,proto3" json:"total_memo_count,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// Total persisted attachment bytes across all personal spaces, including unlinked uploads.
+	// Excludes temporary uploads and derived files. Only returned for the current user.
+	AttachmentStorageBytes *int64 `protobuf:"varint,9,opt,name=attachment_storage_bytes,json=attachmentStorageBytes,proto3,oneof" json:"attachment_storage_bytes,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *UserStats) Reset() {
@@ -938,6 +941,13 @@ func (x *UserStats) GetPinnedMemos() []string {
 func (x *UserStats) GetTotalMemoCount() int32 {
 	if x != nil {
 		return x.TotalMemoCount
+	}
+	return 0
+}
+
+func (x *UserStats) GetAttachmentStorageBytes() int64 {
+	if x != nil && x.AttachmentStorageBytes != nil {
+		return *x.AttachmentStorageBytes
 	}
 	return 0
 }
@@ -3452,7 +3462,7 @@ const file_api_v1_user_service_proto_rawDesc = "" +
 	"\x11DeleteUserRequest\x12-\n" +
 	"\x04name\x18\x01 \x01(\tB\x19\xe0A\x02\xfaA\x13\n" +
 	"\x11memos.api.v1/UserR\x04name\x12\x19\n" +
-	"\x05force\x18\x02 \x01(\bB\x03\xe0A\x01R\x05force\"\xf5\x05\n" +
+	"\x05force\x18\x02 \x01(\bB\x03\xe0A\x01R\x05force\"\xd6\x06\n" +
 	"\tUserStats\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12M\n" +
 	"\x0fmemo_type_stats\x18\x03 \x01(\v2%.memos.api.v1.UserStats.MemoTypeStatsR\rmemoTypeStats\x12B\n" +
@@ -3461,7 +3471,8 @@ const file_api_v1_user_service_proto_rawDesc = "" +
 	"\x17memo_updated_timestamps\x18\b \x03(\v2\x1a.google.protobuf.TimestampR\x15memoUpdatedTimestamps\x129\n" +
 	"\fpinned_memos\x18\x05 \x03(\tB\x16\xfaA\x13\n" +
 	"\x11memos.api.v1/MemoR\vpinnedMemos\x12(\n" +
-	"\x10total_memo_count\x18\x06 \x01(\x05R\x0etotalMemoCount\x1a;\n" +
+	"\x10total_memo_count\x18\x06 \x01(\x05R\x0etotalMemoCount\x12B\n" +
+	"\x18attachment_storage_bytes\x18\t \x01(\x03B\x03\xe0A\x03H\x00R\x16attachmentStorageBytes\x88\x01\x01\x1a;\n" +
 	"\rTagCountEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\x1a\x8b\x01\n" +
@@ -3474,7 +3485,8 @@ const file_api_v1_user_service_proto_rawDesc = "" +
 	"todo_count\x18\x03 \x01(\x05R\ttodoCount\x12\x1d\n" +
 	"\n" +
 	"undo_count\x18\x04 \x01(\x05R\tundoCount:E\xeaAB\n" +
-	"\x16memos.api.v1/UserStats\x12\x12users/{user}/stats*\tuserStats2\tuserStatsJ\x04\b\x02\x10\x03R\x17memo_display_timestamps\"D\n" +
+	"\x16memos.api.v1/UserStats\x12\x12users/{user}/stats*\tuserStats2\tuserStatsB\x1b\n" +
+	"\x19_attachment_storage_bytesJ\x04\b\x02\x10\x03R\x17memo_display_timestamps\"D\n" +
 	"\x13GetUserStatsRequest\x12-\n" +
 	"\x04name\x18\x01 \x01(\tB\x19\xe0A\x02\xfaA\x13\n" +
 	"\x11memos.api.v1/UserR\x04name\"f\n" +
@@ -3893,6 +3905,7 @@ func file_api_v1_user_service_proto_init() {
 		return
 	}
 	file_api_v1_common_proto_init()
+	file_api_v1_user_service_proto_msgTypes[9].OneofWrappers = []any{}
 	file_api_v1_user_service_proto_msgTypes[13].OneofWrappers = []any{
 		(*UserSetting_GeneralSetting_)(nil),
 		(*UserSetting_WebhooksSetting_)(nil),

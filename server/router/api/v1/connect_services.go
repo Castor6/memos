@@ -654,3 +654,11 @@ func (s *ConnectServiceHandler) ExportSharedMemoPdf(ctx context.Context, req *co
 	}
 	return connect.NewResponse(resp), nil
 }
+
+func (s *ConnectServiceHandler) UploadAttachment(ctx context.Context, req *connect.Request[v1pb.UploadAttachmentRequest]) (*connect.Response[v1pb.UploadAttachmentResponse], error) {
+	resp, err := s.APIV1Service.UploadAttachment(ctx, req.Msg)
+	if err != nil {
+		return nil, convertGRPCError(err)
+	}
+	return connect.NewResponse(resp), nil
+}

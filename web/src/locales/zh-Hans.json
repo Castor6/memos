@@ -671,6 +671,9 @@
       "no-tokens-found": "未找到访问令牌"
     },
     "account": {
+      "attachment-storage": "附件占用",
+      "attachment-storage-description": "账号全部空间的附件总量，包含未关联附件；不含临时上传、缩略图和生成的 PDF。",
+      "attachment-storage-retry": "容量加载失败，点击重试",
       "change-password": "修改密码",
       "danger-area": "危险操作区",
       "danger-area-description": "不可逆的账号操作统一放在这里，执行前请再次确认影响。",

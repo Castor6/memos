@@ -188,7 +188,7 @@ const transport = createConnectTransport({
   fetch: fetchWithCredentials,
   interceptors: [
     (next) => (req) => {
-      req.header.set("X-Memos-Space", getActiveSpace());
+      if (!req.header.has("X-Memos-Space")) req.header.set("X-Memos-Space", getActiveSpace());
       return next(req);
     },
     authInterceptor,

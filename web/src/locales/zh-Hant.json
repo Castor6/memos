@@ -396,6 +396,9 @@
       "no-tokens-found": "未找到存取令牌"
     },
     "account": {
+      "attachment-storage": "附件用量",
+      "attachment-storage-description": "帳號全部空間的附件總量，包含未關聯附件；不含暫存上傳、縮圖和產生的 PDF。",
+      "attachment-storage-retry": "用量載入失敗，點擊重試",
       "change-password": "變更密碼",
       "danger-area": "危險區域",
       "danger-area-description": "此處為不可逆的帳號操作。請在繼續之前仔細檢閱。",

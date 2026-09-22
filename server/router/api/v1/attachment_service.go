@@ -1,10 +1,13 @@
 package v1
 
 import (
+	"bufio"
+	"bytes"
 	"context"
-	"encoding/binary"
 	"fmt"
+	"io"
 	"log/slog"
+	"math"
 	"mime"
 	"net/http"
 	"path/filepath"
@@ -17,6 +20,7 @@ import (
 
 	"github.com/usememos/memos/internal/filter"
 	v1pb "github.com/usememos/memos/proto/gen/api/v1"
+	storepb "github.com/usememos/memos/proto/gen/store"
 	"github.com/usememos/memos/store"
 )
 
@@ -51,7 +55,7 @@ var exifCapableImageTypes = map[string]bool{
 	"image/heif": true,
 }
 
-func (s *APIV1Service) CreateAttachment(ctx context.Context, request *v1pb.CreateAttachmentRequest) (*v1pb.Attachment, error) {
+func (s *APIV1Service) prepareAttachment(ctx context.Context, request *v1pb.CreateAttachmentRequest) (*store.Attachment, error) {
 	user, err := s.fetchCurrentUser(ctx)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get current user: %v", err)
@@ -115,21 +119,6 @@ func (s *APIV1Service) CreateAttachment(ctx context.Context, request *v1pb.Creat
 		create.Payload.MotionMedia = inputMotionMedia
 	}
 
-	instanceStorageSetting, err := s.Store.GetInstanceStorageSetting(ctx)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to get instance storage setting: %v", err)
-	}
-	size := binary.Size(request.Attachment.Content)
-	uploadSizeLimit := int(instanceStorageSetting.UploadSizeLimitMb) * MebiByte
-	if uploadSizeLimit == 0 {
-		uploadSizeLimit = MaxUploadBufferSizeBytes
-	}
-	if size > uploadSizeLimit {
-		return nil, status.Errorf(codes.InvalidArgument, "file size exceeds the limit")
-	}
-	create.Size = int64(size)
-	create.Blob = request.Attachment.Content
-
 	if request.Attachment.Memo != nil {
 		memoUID, err := ExtractMemoUIDFromName(*request.Attachment.Memo)
 		if err != nil {
@@ -148,43 +137,110 @@ func (s *APIV1Service) CreateAttachment(ctx context.Context, request *v1pb.Creat
 		create.MemoID = &memo.ID
 	}
 
-	if create.Payload == nil || create.Payload.MotionMedia == nil {
-		if detectedMotion := detectAndroidMotionMedia(create.Blob, create.Type, attachmentUID); detectedMotion != nil {
-			create.Payload = ensureAttachmentPayload(create.Payload)
-			create.Payload.MotionMedia = detectedMotion
-		}
+	existing, err := s.Store.GetAttachment(store.WithoutSpace(ctx), &store.FindAttachment{UID: &attachmentUID})
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to check attachment ID: %v", err)
 	}
+	if existing != nil {
+		return nil, status.Errorf(codes.AlreadyExists, "attachment ID already exists")
+	}
+	return create, nil
+}
 
-	// Strip EXIF metadata from images for privacy protection.
-	// This removes sensitive information like GPS location, device details, etc.
-	if shouldStripExifContent(create.Blob, create.Type) && !isAndroidMotionContainer(create.Payload.GetMotionMedia()) {
-		release, err := s.acquireImageProcessingSlot(ctx)
+func (s *APIV1Service) CreateAttachment(ctx context.Context, request *v1pb.CreateAttachmentRequest) (*v1pb.Attachment, error) {
+	create, err := s.prepareAttachment(ctx, request)
+	if err != nil {
+		return nil, err
+	}
+	setting, err := s.Store.GetInstanceStorageSetting(ctx)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get instance storage setting: %v", err)
+	}
+	if err := checkUploadSize(setting, int64(len(request.Attachment.Content))); err != nil {
+		return nil, err
+	}
+	create.Size = int64(len(request.Attachment.Content))
+	return s.processAndSaveAttachment(ctx, create, bytes.NewReader(request.Attachment.Content))
+}
+
+func attachmentUploadLimit(setting *storepb.InstanceStorageSetting) int64 {
+	if setting.UploadSizeLimitMb <= 0 {
+		return MaxUploadBufferSizeBytes
+	}
+	return min(setting.UploadSizeLimitMb, math.MaxInt64/MebiByte) * MebiByte
+}
+
+func checkUploadSize(setting *storepb.InstanceStorageSetting, size int64) error {
+	if size < 0 || size > attachmentUploadLimit(setting) {
+		return status.Errorf(codes.InvalidArgument, "file size exceeds the limit")
+	}
+	return nil
+}
+
+// processAndSaveAttachment keeps the existing media processing policy shared by both upload APIs.
+// Non-image files stream to local/S3 storage; image processing and database blobs may buffer a file.
+func (s *APIV1Service) processAndSaveAttachment(ctx context.Context, create *store.Attachment, source io.Reader) (*v1pb.Attachment, error) {
+	buffered := bufio.NewReader(source)
+	header, err := buffered.Peek(512)
+	if err != nil && err != io.EOF {
+		return nil, status.Errorf(codes.Internal, "failed to read attachment header: %v", err)
+	}
+	source = buffered
+	if shouldStripExifContent(header, create.Type) || http.DetectContentType(header) == "image/jpeg" {
+		blob, err := io.ReadAll(&attachmentContextReader{ctx: ctx, reader: source})
 		if err != nil {
-			return nil, status.Errorf(codes.ResourceExhausted, "too many image processing requests")
+			return nil, status.Errorf(codes.Internal, "failed to read image: %v", err)
 		}
-		strippedBlob, stripErr := stripImageExif(create.Blob, create.Type)
-		release()
-		if stripErr != nil {
-			// Log warning but continue with original image to ensure uploads don't fail.
-			slog.Warn("failed to strip EXIF metadata from image",
-				slog.String("type", create.Type),
-				slog.String("filename", create.Filename),
-				slog.String("error", stripErr.Error()))
-		} else {
-			create.Blob = strippedBlob
-			create.Size = int64(len(strippedBlob))
+		create.Blob = blob
+		if create.Payload == nil || create.Payload.MotionMedia == nil {
+			if detectedMotion := detectAndroidMotionMedia(create.Blob, create.Type, create.UID); detectedMotion != nil {
+				create.Payload = ensureAttachmentPayload(create.Payload)
+				create.Payload.MotionMedia = detectedMotion
+			}
 		}
-	}
 
-	if err := SaveAttachmentBlob(ctx, s.Profile, s.Store, create); err != nil {
+		// Strip EXIF metadata from images for privacy protection.
+		// This removes sensitive information like GPS location, device details, etc.
+		if shouldStripExifContent(create.Blob, create.Type) && !isAndroidMotionContainer(create.Payload.GetMotionMedia()) {
+			release, err := s.acquireImageProcessingSlot(ctx)
+			if err != nil {
+				return nil, status.Errorf(codes.ResourceExhausted, "too many image processing requests")
+			}
+			strippedBlob, stripErr := stripImageExif(create.Blob, create.Type)
+			release()
+			if stripErr != nil {
+				// Log warning but continue with original image to ensure uploads don't fail.
+				slog.Warn("failed to strip EXIF metadata from image",
+					slog.String("type", create.Type),
+					slog.String("filename", create.Filename),
+					slog.String("error", stripErr.Error()))
+			} else {
+				create.Blob = strippedBlob
+				create.Size = int64(len(strippedBlob))
+			}
+		}
+
+		source = bytes.NewReader(create.Blob)
+	}
+	if err := saveAttachmentContent(ctx, s.Profile, s.Store, create, source); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to save attachment blob: %v", err)
 	}
-
 	attachment, err := s.Store.CreateAttachment(ctx, create)
 	if err != nil {
+		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+		defer cancel()
+		persisted, lookupErr := s.Store.GetAttachment(store.WithoutSpace(cleanupCtx), &store.FindAttachment{UID: &create.UID, GetBlob: true})
+		if lookupErr == nil {
+			if persisted != nil && persisted.CreatorID == create.CreatorID && persisted.Space == create.Space && persisted.Reference == create.Reference &&
+				(create.Reference != "" || bytes.Equal(persisted.Blob, create.Blob)) {
+				return convertAttachmentFromStore(persisted), nil
+			}
+			if cleanupErr := s.Store.DeleteAttachmentStorage(cleanupCtx, create); cleanupErr != nil {
+				slog.Warn("failed to clean up uncommitted attachment", slog.Any("error", cleanupErr))
+			}
+		}
 		return nil, status.Errorf(codes.Internal, "failed to create attachment: %v", err)
 	}
-
 	return convertAttachmentFromStore(attachment), nil
 }
 

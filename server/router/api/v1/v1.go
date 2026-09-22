@@ -48,6 +48,7 @@ type APIV1Service struct {
 
 	// instanceStatsCache memoizes GetInstanceStats results for instanceStatsCacheTTL.
 	instanceStatsCache instanceStatsCache
+	attachmentUploads  attachmentUploads
 }
 
 func NewAPIV1Service(secret string, profile *profile.Profile, store *store.Store) *APIV1Service {
@@ -143,6 +144,7 @@ func (s *APIV1Service) RegisterGateway(ctx context.Context, echoServer *echo.Ech
 	RegisterSSERoutes(gwGroup, s.SSEHub, s.Store, s.Secret)
 	handler := echo.WrapHandler(http.MaxBytesHandler(gwMux, MaxAPIRequestBytes))
 
+	gwGroup.POST("/api/v1/attachments:upload", echo.WrapHandler(http.MaxBytesHandler(gwMux, uploadRequestLimit)))
 	gwGroup.Any("/api/v1/*", handler)
 	gwGroup.Any("/file/*", handler)
 
@@ -159,6 +161,7 @@ func (s *APIV1Service) RegisterGateway(ctx context.Context, echoServer *echo.Ech
 	connectHandler.RegisterConnectHandlers(connectMux, connectInterceptors, connect.WithReadMaxBytes(MaxAPIRequestBytes))
 
 	connectGroup := echoServer.Group("")
+	connectGroup.POST(attachmentUploadProcedure, echo.WrapHandler(http.MaxBytesHandler(connectMux, uploadRequestLimit)))
 	connectGroup.Any("/memos.api.v1.*", echo.WrapHandler(http.MaxBytesHandler(connectMux, MaxAPIRequestBytes)))
 
 	return nil

@@ -475,6 +475,9 @@
       "web-clipper-title": "Use a token with Memos Web Clipper"
     },
     "account": {
+      "attachment-storage": "Attachment storage",
+      "attachment-storage-description": "Account total across all spaces, including unlinked attachments. Excludes temporary uploads, thumbnails and generated PDFs.",
+      "attachment-storage-retry": "Could not load storage usage. Retry",
       "change-password": "Change password",
       "danger-area": "Danger area",
       "danger-area-description": "Irreversible account actions live here. Review them carefully before continuing.",

@@ -316,3 +316,8 @@ func shouldFailDeleteAttachmentStorage(ctx context.Context) bool {
 	failpoint, ok := ctx.Value(deleteAttachmentStorageFailpointKey{}).(bool)
 	return ok && failpoint
 }
+
+// GetAttachmentStorageUsage returns persisted bytes owned by a user across all personal spaces.
+func (s *Store) GetAttachmentStorageUsage(ctx context.Context, creatorID int32) (int64, error) {
+	return s.driver.GetAttachmentStorageUsage(ctx, creatorID)
+}

@@ -266,3 +266,12 @@ func (d *DB) DeleteAttachments(ctx context.Context, deletes []*store.DeleteAttac
 	tx = nil
 	return nil
 }
+
+// GetAttachmentStorageUsage returns persisted bytes across all spaces for one owner.
+func (d *DB) GetAttachmentStorageUsage(ctx context.Context, creatorID int32) (int64, error) {
+	var size int64
+	if err := d.db.QueryRowContext(ctx, "SELECT COALESCE(SUM(size), 0) FROM attachment WHERE creator_id = ?", creatorID).Scan(&size); err != nil {
+		return 0, errors.Wrap(err, "failed to sum attachment sizes")
+	}
+	return size, nil
+}
