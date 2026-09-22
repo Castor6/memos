@@ -39,6 +39,7 @@ Webhook 是用户配置接收地址后向外发送笔记事件的集成，与微
 - 列表、统计及详情刷新按查询键合并，重叠键串行并保留必要的尾随刷新，无关键可并行；React Query 的取消信号传递给 Connect 请求。SSE 表情事件只刷新包含目标笔记的列表，不刷新全局统计。
 - 笔记更新先完成字段、附件和引用验证，再以事务提交正文、关系及待清理记录。单笔记附件元数据查询不再被默认 100 条截断。事务按 ID 锁定当前和请求附件的联合集合，覆盖删除与并发转绑。
 - `attachment_cleanup` 保存清理快照，启动及每分钟处理最多 100 个任务，失败退避、重启恢复，S3 配置随任务保留。三驱动增加 `04__attachment_cleanup.sql` 并同步新建表结构。
+- 新上传的本地文件与 S3 对象独立生成随机存储后缀，保留模板目录和界面文件名，避免附件 UID/同名路径复用后被旧任务误删。历史共享存储对象仍有引用时跳过物理删除；S3 按待清理 key 筛选，历史本地相对/绝对/软链接别名须在有清理任务时每批读取一次 LOCAL 引用元数据，不读取文件内容。
 - `link_metadata_job` 持久保存 URL 任务及租约，`link_metadata_backfill` 保存历史补抓上界/游标；写笔记与登记 URL 同事务。每轮回填 100 条、最多抓取 8 个 URL，失败 1 分钟至 24 小时退避；成功快照永不覆盖。三驱动增加 `05__link_metadata_queue.sql`。无效 URL 入队前拒绝，API 保持 `InvalidArgument`，笔记中的无效链接不阻止正文保存。
 - Webhook 一次解析、校验全部结果后，直接连接选定 IP；保留原 HTTP Host/TLS 主机名，支持多地址回退。
 - 首次/分页/后台列表错误显示重试，保留已有内容。附件媒体、音频、文档各自在服务端筛选分页；PSD/MIDI 保持文档分类，动态照片图片与视频留在同一媒体查询；未使用附件独立查询。
@@ -50,6 +51,8 @@ Webhook 是用户配置接收地址后向外发送笔记事件的集成，与微
 - 前端 `pnpm lint`、`pnpm test`、`pnpm build` 通过：80 个测试文件、321 项测试。构建保留已有的大分块提示。
 - 新增 SQLite/API 回归通过：完整验证后失败、提交前故障回滚、正文/附件/引用一致性、101 个附件、清理失败重试及重启、S3 配置快照、并发转绑；链接覆盖跨 Store/API/后台并发、等待取消、租约恢复、过期工作者隔离、持续失败后成功、旧快照迁移及补抓完成后不再读取笔记表。
 - Webhook 定向测试通过，覆盖实际拨号 IP、只解析一次、混合内网结果拒绝、IPv6/映射地址、取消及真实 HTTP Host。
+- 同 UID、同模板重新上传后的清理重放及历史本地/S3 共享对象回归通过；S3 以本地测试服务验证实际 PUT/GET/DELETE，无需真实存储账号。
+- 完整 `golangci-lint run` 通过（0 issues）；`go mod tidy -go=1.26.2` 无依赖差异；`corepack pnpm check:release origin/main` 通过。
 - 整合后的 SQLite 定向命令通过：`DRIVER=sqlite go test ./store/test ./server/router/api/v1/... ./server/runner/... ./internal/webhook ./internal/httpgetter -run 'TestMemoMutation|TestMemoAttachment|TestDeleteMemo|TestUpdateMemo|TestAttachmentCleanup|TestLinkMetadata|TestBackfillKeeps|TestRunnerBounds|TestSafeDial|TestDialValidated|TestGetLink|TestBatchGetLink' -count=1`。
 - 本地服务实际从 schema `0.30.4` 升至 `0.30.6`，应用两份迁移并启动；原有临时笔记和附件仍能读取。
 - 内置浏览器使用本地可丢弃账号，在 1440×900、430×739、430×932 验证页面；手机布局无常驻左侧栏或页面横向溢出。55 张图片之后仍能直接看到更早的音频，文档分类包含文本、MIDI、PSD；计数显示“已加载”。停止本地后端后筛选笔记，看到明确错误与重试按钮，恢复服务后重试成功。
