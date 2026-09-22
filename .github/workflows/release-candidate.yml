@@ -84,12 +84,6 @@ jobs:
           // Old version PRs keep their original assets when retried from this workflow.
           appendFileSync(process.env.GITHUB_OUTPUT, `web_clipper=${existsSync('extensions/web-clipper/scripts/package-release.py')}\n`);
           JS
-      - working-directory: web
-        run: |
-          pnpm install --frozen-lockfile
-          pnpm lint
-          pnpm test
-          pnpm release
       - uses: pnpm/action-setup@v4.2.0
         if: steps.version.outputs.web_clipper == 'true'
         with:
@@ -108,6 +102,19 @@ jobs:
       - name: Package the versioned Chromium extension
         if: steps.version.outputs.web_clipper == 'true'
         run: python3 extensions/web-clipper/scripts/package-release.py --output build/candidate
+      - uses: pnpm/action-setup@v4.2.0
+        if: steps.version.outputs.web_clipper == 'true'
+        with:
+          version: 11.0.1
+          package_json_file: package.json
+      # Embedding the main frontend modifies a tracked placeholder, so package the
+      # extension from the clean source tree before running the main web release.
+      - working-directory: web
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm lint
+          pnpm test
+          pnpm release
       - name: Build versioned Linux candidates
         env:
           RELEASE_VERSION: ${{ steps.version.outputs.version }}

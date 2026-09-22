@@ -84,7 +84,7 @@ test("the web clipper workflow is routed into the required gate with its own too
   }
   assert.match(workflow, /run: python3 -m unittest discover -s scripts -p 'test_package\*\.py'/);
   assert.match(workflow, /working-directory: \.\s+run: python3 extensions\/web-clipper\/scripts\/package-release\.py --output build\/clipper-ci/);
-  assert.match(workflow, /uses: actions\/upload-artifact@v7/);
+  assert.match(workflow, /uses: actions\/upload-artifact@v6/);
   assert.match(workflow, /path: build\/clipper-ci\/\s+if-no-files-found: error/);
   assert.doesNotMatch(workflow, /secrets\.|continue-on-error/);
 });

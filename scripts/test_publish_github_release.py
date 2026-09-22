@@ -1,7 +1,10 @@
 import importlib.util
 import json
+import os
 from pathlib import Path
+import re
 import tempfile
+import textwrap
 import unittest
 from unittest.mock import patch
 import subprocess
@@ -246,6 +249,49 @@ class ReleaseTests(unittest.TestCase):
                     client.api('git/ref/tags/castor-v0.2.1', optional=True)
         with patch.object(m.subprocess, 'run', return_value=subprocess.CompletedProcess([], 1, '', 'gh: Not Found (HTTP 404)')):
             self.assertIsNone(client.api('git/ref/tags/castor-v0.2.1', optional=True))
+
+
+class ReleaseWorkflowTests(unittest.TestCase):
+    def test_extension_is_packaged_before_embedding_the_main_frontend(self):
+        root = Path(__file__).parents[1]
+        workflow = (root / '.github/workflows/release-candidate.yml').read_text(encoding='utf-8')
+        package_step = workflow.index('run: python3 extensions/web-clipper/scripts/package-release.py')
+        web_release = workflow.index('          pnpm release')
+        self.assertLess(package_step, web_release)
+        self.assertIn('version: 11.0.1', workflow[package_step:web_release])
+        self.assertIn('extensions/web-clipper/', (root / '.dockerignore').read_text().splitlines())
+
+    def test_candidate_metadata_preserves_old_releases_and_identifies_new_extension(self):
+        workflow = (Path(__file__).parents[1] / '.github/workflows/release-candidate.yml').read_text(encoding='utf-8')
+        scripts = re.findall(r"^          node --input-type=module <<'JS'\n(.*?)^          JS$", workflow, re.M | re.S)
+        self.assertEqual(len(scripts), 2)
+        for has_extension in (False, True):
+            with self.subTest(has_extension=has_extension), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                (root / 'package.json').write_text(json.dumps({'version': '0.2.1'}))
+                (root / 'build/candidate').mkdir(parents=True)
+                if has_extension:
+                    package_script = root / 'extensions/web-clipper/scripts/package-release.py'
+                    package_script.parent.mkdir(parents=True)
+                    package_script.touch()
+                env = {**os.environ, 'GITHUB_OUTPUT': str(root / 'outputs'), 'RELEASE_COMMIT': COMMIT}
+                subprocess.run(['node', '--input-type=module'], input=textwrap.dedent(scripts[0]),
+                               cwd=root, env=env, text=True, check=True, capture_output=True)
+                values = dict(line.split('=', 1) for line in (root / 'outputs').read_text().splitlines())
+                self.assertEqual(values['version'], '0.2.1')
+                self.assertEqual(values['web_clipper'], str(has_extension).lower())
+                env.update(RELEASE_VERSION=values['version'], WEB_CLIPPER=values['web_clipper'])
+                subprocess.run(['node', '--input-type=module'], input=textwrap.dedent(scripts[1]),
+                               cwd=root, env=env, text=True, check=True, capture_output=True)
+                metadata = json.loads((root / 'build/candidate/release.json').read_text())
+                self.assertEqual(metadata['commit'], COMMIT)
+                self.assertEqual(metadata['tag'], 'castor-v0.2.1')
+                if has_extension:
+                    self.assertEqual(metadata['webClipper'], {
+                        'version': '0.2.1', 'file': 'memos-web-clipper-chromium-v0.2.1.zip',
+                    })
+                else:
+                    self.assertNotIn('webClipper', metadata)
 
 
 if __name__ == '__main__':
