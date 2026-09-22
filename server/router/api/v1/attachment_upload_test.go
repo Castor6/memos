@@ -25,7 +25,7 @@ func uploadTestOwner(t *testing.T, s *APIV1Service) (*store.User, context.Contex
 	require.NoError(t, err)
 	_, err = s.Store.UpsertUserSetting(context.Background(), &storepb.UserSetting{
 		UserId: user.ID, Key: storepb.UserSetting_GENERAL,
-		Value: &storepb.UserSetting_General{General: &storepb.GeneralUserSetting{Spaces: map[string]string{"work": "宸ヤ綔"}}},
+		Value: &storepb.UserSetting_General{General: &storepb.GeneralUserSetting{Spaces: map[string]string{"work": "Work"}}},
 	})
 	require.NoError(t, err)
 	return user, store.WithSpace(userCtx(context.Background(), user.ID), "work")

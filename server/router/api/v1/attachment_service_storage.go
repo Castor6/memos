@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"mime"
 	"os"
 	"path/filepath"
@@ -123,9 +124,9 @@ func saveAttachmentContent(ctx context.Context, profile *profile.Profile, stores
 		if err != nil {
 			return errors.Wrap(err, "Failed to upload via s3 client")
 		}
-		presignURL, err := s3Client.PresignGetObject(ctx, key)
+		presignURL, err := presignAttachmentObject(ctx, s3Client, key)
 		if err != nil {
-			return errors.Wrap(err, "Failed to presign via s3 client")
+			return err
 		}
 
 		create.Reference = presignURL
@@ -148,6 +149,26 @@ func saveAttachmentContent(ctx context.Context, profile *profile.Profile, stores
 		create.Blob = blob
 	}
 	return nil
+}
+
+type uploadedAttachmentObject interface {
+	PresignGetObject(context.Context, string) (string, error)
+	DeleteObject(context.Context, string) error
+}
+
+// presignAttachmentObject removes an uploaded object if it cannot be referenced.
+// Cleanup must survive request cancellation, but never wait indefinitely.
+func presignAttachmentObject(ctx context.Context, client uploadedAttachmentObject, key string) (string, error) {
+	url, err := client.PresignGetObject(ctx, key)
+	if err == nil {
+		return url, nil
+	}
+	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+	defer cancel()
+	if cleanupErr := client.DeleteObject(cleanupCtx, key); cleanupErr != nil {
+		slog.Warn("failed to clean up attachment after presign failure", slog.Any("error", cleanupErr))
+	}
+	return "", errors.Wrap(err, "Failed to presign via s3 client")
 }
 
 type attachmentContextReader struct {
