@@ -357,6 +357,7 @@ export type ListMemosRequest = Message<"memos.api.v1.ListMemosRequest"> & {
    * The service may return fewer than this value.
    * If unspecified, at most 50 memos will be returned.
    * The maximum value is 1000; values above 1000 will be coerced to 1000.
+   * Requests using capture filters are limited to 100 memos per page.
    *
    * @generated from field: int32 page_size = 1;
    */
@@ -1321,6 +1322,8 @@ export type MemoCapture = Message<"memos.api.v1.MemoCapture"> & {
   platform: string;
 
   /**
+   * HTTP(S) page URL; X captures require a canonical HTTPS status URL without query or fragment.
+   *
    * @generated from field: string source_url = 3;
    */
   sourceUrl: string;
@@ -1331,7 +1334,7 @@ export type MemoCapture = Message<"memos.api.v1.MemoCapture"> & {
   sourceId: string;
 
   /**
-   * The user's thoughts or the original reply text.
+   * The user's thoughts, or the exact selected source post text for PICK_UP.
    *
    * @generated from field: string comment = 5;
    */
@@ -1347,6 +1350,7 @@ export type MemoCapture = Message<"memos.api.v1.MemoCapture"> & {
   /**
    * Source posts in reading order, including the selected post for PICK_UP.
    * Generic web pages use the memo content and may leave this empty.
+   * PICK_UP requires its selected post URL and author handle to identify the source.
    *
    * @generated from field: repeated memos.api.v1.MemoCapture.Post posts = 7;
    */

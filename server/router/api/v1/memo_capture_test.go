@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 
@@ -38,8 +39,14 @@ func TestValidateMemoCapture(t *testing.T) {
 		"long context":       func(c *v1pb.MemoCapture) { c.Context = strings.Repeat("x", 64*1024+1) },
 		"long post":          func(c *v1pb.MemoCapture) { c.Posts[0].Content = strings.Repeat("x", 128*1024+1) },
 		"invalid timestamp":  func(c *v1pb.MemoCapture) { c.Posts[0].PublishedAt = "yesterday" },
-		"unsafe image":       func(c *v1pb.MemoCapture) { c.Posts[0].Images = []string{"javascript:alert(1)"} },
-		"missing source":     func(c *v1pb.MemoCapture) { c.Posts[0].Id = "123"; c.Posts[0].Url = "https://x.com/user/status/123" },
+		"mismatched comment": func(c *v1pb.MemoCapture) { c.Comment = "Different reply" },
+		"mismatched URL": func(c *v1pb.MemoCapture) {
+			c.Posts[0].Url = "https://twitter.com/canlantiancai/status/2102063913437376776"
+		},
+		"missing author": func(c *v1pb.MemoCapture) { c.Posts[0].Author = "" },
+		"wrong author":   func(c *v1pb.MemoCapture) { c.Posts[0].Author = "someone_else" },
+		"unsafe image":   func(c *v1pb.MemoCapture) { c.Posts[0].Images = []string{"javascript:alert(1)"} },
+		"missing source": func(c *v1pb.MemoCapture) { c.Posts[0].Id = "123"; c.Posts[0].Url = "https://x.com/user/status/123" },
 	} {
 		t.Run(name, func(t *testing.T) {
 			capture := proto.Clone(valid).(*v1pb.MemoCapture)
@@ -52,4 +59,18 @@ func TestValidateMemoCapture(t *testing.T) {
 	}
 	storeCapture := convertMemoCaptureToStore(valid)
 	require.True(t, proto.Equal(valid, convertMemoCaptureFromStore(storeCapture)))
+	withHandle := proto.Clone(valid).(*v1pb.MemoCapture)
+	withHandle.Posts[0].Author = "@Canlantiancai"
+	require.NoError(t, validateMemoCapture(withHandle))
+	for _, source := range []string{"https://x.com/i/status/2102063913437376776", "https://x.com/i/web/status/2102063913437376776"} {
+		withHandle.SourceUrl = source
+		withHandle.Posts[0].Url = source
+		require.NoError(t, validateMemoCapture(withHandle))
+	}
+	tooLarge := proto.Clone(valid).(*v1pb.MemoCapture)
+	for i := range 9 {
+		id := strconv.Itoa(i + 1)
+		tooLarge.Posts = append(tooLarge.Posts, &v1pb.MemoCapture_Post{Id: id, Url: "https://x.com/reader/status/" + id, Content: strings.Repeat("x", 128*1024)})
+	}
+	require.Equal(t, codes.InvalidArgument, status.Code(validateMemoCapture(tooLarge)), "the total limit includes all duplicated metadata and source text")
 }

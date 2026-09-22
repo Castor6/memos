@@ -710,6 +710,7 @@ paths:
                      The service may return fewer than this value.
                      If unspecified, at most 50 memos will be returned.
                      The maximum value is 1000; values above 1000 will be coerced to 1000.
+                     Requests using capture filters are limited to 100 memos per page.
                   schema:
                     type: integer
                     format: int32
@@ -3531,11 +3532,12 @@ components:
                     description: WEB for generic pages, or X for posts. PICK_UP requires X.
                 sourceUrl:
                     type: string
+                    description: HTTP(S) page URL; X captures require a canonical HTTPS status URL without query or fragment.
                 sourceId:
                     type: string
                 comment:
                     type: string
-                    description: The user's thoughts or the original reply text.
+                    description: The user's thoughts, or the exact selected source post text for PICK_UP.
                 context:
                     type: string
                     description: Optional background supplied when saving.
@@ -3546,6 +3548,7 @@ components:
                     description: |-
                         Source posts in reading order, including the selected post for PICK_UP.
                          Generic web pages use the memo content and may leave this empty.
+                         PICK_UP requires its selected post URL and author handle to identify the source.
             description: Structured source material and personal observations saved by the web clipper.
         MemoCapture_Post:
             type: object

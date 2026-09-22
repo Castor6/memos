@@ -2,6 +2,7 @@ package test
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -87,7 +88,7 @@ func TestMemoCaptureSpaceAndValidation(t *testing.T) {
 	require.NoError(t, err)
 	personal := store.WithSpace(ctx, "")
 	work := store.WithSpace(ctx, "work")
-	capture := &v1pb.MemoCapture{Kind: "PICK_UP", Platform: "X", SourceId: "123", SourceUrl: "https://x.com/reader/status/123", Comment: "My reply", Posts: []*v1pb.MemoCapture_Post{{Id: "123", Url: "https://x.com/reader/status/123", Content: "My reply"}}}
+	capture := &v1pb.MemoCapture{Kind: "PICK_UP", Platform: "X", SourceId: "123", SourceUrl: "https://x.com/reader/status/123", Comment: "My reply", Posts: []*v1pb.MemoCapture_Post{{Id: "123", Url: "https://x.com/reader/status/123", Author: "@reader", Content: "My reply"}}}
 	memo, err := ts.Service.CreateMemo(work, &v1pb.CreateMemoRequest{Memo: &v1pb.Memo{Content: "Reply and source", Capture: capture}})
 	require.NoError(t, err)
 	require.Equal(t, "work", memo.Space)
@@ -115,4 +116,31 @@ func TestMemoCaptureSpaceAndValidation(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, profile.WebClipperSupported)
 	require.EqualValues(t, store.DefaultContentLengthLimit, profile.MemoContentMaxBytes)
+}
+
+func TestMemoCaptureHistoryPaginationLimit(t *testing.T) {
+	ts := NewTestService(t)
+	defer ts.Cleanup()
+	ctx := store.WithSpace(context.Background(), "")
+	owner, err := ts.CreateRegularUser(ctx, "capture-pagination")
+	require.NoError(t, err)
+	ctx = ts.CreateUserContext(ctx, owner.ID)
+	for i := range 101 {
+		_, err := ts.Store.CreateMemo(ctx, &store.Memo{
+			UID: fmt.Sprintf("capture-page-%d", i), CreatorID: owner.ID, Content: "Snapshot", Visibility: store.Private,
+			Payload: &storepb.MemoPayload{Capture: &storepb.MemoCapture{Kind: "STAR", Platform: "WEB", SourceUrl: "https://example.com/"}},
+		})
+		require.NoError(t, err)
+	}
+	first, err := ts.Service.ListMemos(ctx, &v1pb.ListMemosRequest{PageSize: 1000, Filter: `has_capture`})
+	require.NoError(t, err)
+	require.Len(t, first.Memos, 100)
+	require.NotEmpty(t, first.NextPageToken)
+	second, err := ts.Service.ListMemos(ctx, &v1pb.ListMemosRequest{PageSize: 1000, PageToken: first.NextPageToken, Filter: `has_capture`})
+	require.NoError(t, err)
+	require.Len(t, second.Memos, 1)
+	require.Empty(t, second.NextPageToken)
+	for _, previous := range first.Memos {
+		require.NotEqual(t, previous.Name, second.Memos[0].Name)
+	}
 }

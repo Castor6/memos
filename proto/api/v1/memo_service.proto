@@ -335,6 +335,7 @@ message ListMemosRequest {
   // The service may return fewer than this value.
   // If unspecified, at most 50 memos will be returned.
   // The maximum value is 1000; values above 1000 will be coerced to 1000.
+  // Requests using capture filters are limited to 100 memos per page.
   int32 page_size = 1 [(google.api.field_behavior) = OPTIONAL];
 
   // Optional. A page token, received from a previous `ListMemos` call.
@@ -709,14 +710,16 @@ message MemoCapture {
   string kind = 1;
   // WEB for generic pages, or X for posts. PICK_UP requires X.
   string platform = 2;
+  // HTTP(S) page URL; X captures require a canonical HTTPS status URL without query or fragment.
   string source_url = 3;
   string source_id = 4;
-  // The user's thoughts or the original reply text.
+  // The user's thoughts, or the exact selected source post text for PICK_UP.
   string comment = 5;
   // Optional background supplied when saving.
   string context = 6;
   // Source posts in reading order, including the selected post for PICK_UP.
   // Generic web pages use the memo content and may leave this empty.
+  // PICK_UP requires its selected post URL and author handle to identify the source.
   repeated Post posts = 7;
 
   message Post {

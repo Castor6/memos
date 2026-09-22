@@ -239,12 +239,14 @@ func (s *APIV1Service) ListMemos(ctx context.Context, request *v1pb.ListMemosReq
 		memoFind.OrderByTimeAsc = false
 	}
 
+	captureHistory := false
 	if request.Filter != "" {
 		if err := s.validateFilter(ctx, request.Filter); err != nil {
 			return nil, status.Errorf(codes.InvalidArgument, "invalid filter: %v", err)
 		}
 		memoFind.Filters = append(memoFind.Filters, request.Filter)
-		if err := scopeMemoCaptureFilter(ctx, request.Filter, memoFind, currentUser); err != nil {
+		captureHistory, err = scopeMemoCaptureFilter(ctx, request.Filter, memoFind, currentUser)
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -272,6 +274,10 @@ func (s *APIV1Service) ListMemos(ctx context.Context, request *v1pb.ListMemosReq
 		limit = normalizePageSize(request.PageSize)
 	}
 	limit = min(limit, MaxPageSize)
+	if captureHistory {
+		// Bound pages containing the immutable source snapshots.
+		limit = min(limit, 100)
+	}
 	limitPlusOne := limit + 1
 	memoFind.Limit = &limitPlusOne
 	memoFind.Offset = &offset

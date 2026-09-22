@@ -575,6 +575,7 @@ type ListMemosRequest struct {
 	// The service may return fewer than this value.
 	// If unspecified, at most 50 memos will be returned.
 	// The maximum value is 1000; values above 1000 will be coerced to 1000.
+	// Requests using capture filters are limited to 100 memos per page.
 	PageSize int32 `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
 	// Optional. A page token, received from a previous `ListMemos` call.
 	// Provide this to retrieve the subsequent page.
@@ -2388,15 +2389,17 @@ type MemoCapture struct {
 	// STAR or PICK_UP.
 	Kind string `protobuf:"bytes,1,opt,name=kind,proto3" json:"kind,omitempty"`
 	// WEB for generic pages, or X for posts. PICK_UP requires X.
-	Platform  string `protobuf:"bytes,2,opt,name=platform,proto3" json:"platform,omitempty"`
+	Platform string `protobuf:"bytes,2,opt,name=platform,proto3" json:"platform,omitempty"`
+	// HTTP(S) page URL; X captures require a canonical HTTPS status URL without query or fragment.
 	SourceUrl string `protobuf:"bytes,3,opt,name=source_url,json=sourceUrl,proto3" json:"source_url,omitempty"`
 	SourceId  string `protobuf:"bytes,4,opt,name=source_id,json=sourceId,proto3" json:"source_id,omitempty"`
-	// The user's thoughts or the original reply text.
+	// The user's thoughts, or the exact selected source post text for PICK_UP.
 	Comment string `protobuf:"bytes,5,opt,name=comment,proto3" json:"comment,omitempty"`
 	// Optional background supplied when saving.
 	Context string `protobuf:"bytes,6,opt,name=context,proto3" json:"context,omitempty"`
 	// Source posts in reading order, including the selected post for PICK_UP.
 	// Generic web pages use the memo content and may leave this empty.
+	// PICK_UP requires its selected post URL and author handle to identify the source.
 	Posts         []*MemoCapture_Post `protobuf:"bytes,7,rep,name=posts,proto3" json:"posts,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
