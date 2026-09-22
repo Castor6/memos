@@ -167,7 +167,9 @@ func attachmentUploadLimit(setting *storepb.InstanceStorageSetting) int64 {
 	if setting.UploadSizeLimitMb <= 0 {
 		return MaxUploadBufferSizeBytes
 	}
-	return min(setting.UploadSizeLimitMb, math.MaxInt64/MebiByte) * MebiByte
+	configuredLimit := min(setting.UploadSizeLimitMb, math.MaxInt64/MebiByte) * MebiByte
+	// MySQL and PostgreSQL store each attachment size in a signed 32-bit column.
+	return min(configuredLimit, math.MaxInt32)
 }
 
 func checkUploadSize(setting *storepb.InstanceStorageSetting, size int64) error {

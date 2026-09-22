@@ -2,7 +2,7 @@
 
 - 记录日期：2026-09-22
 - 模块与关键词：附件、分块上传、短时续传、账号容量、三驱动
-- 维护归属：feat/upstream-upload（schema_review 子会话）
+- 维护归属：schema_review 子会话；初始实现 feat/upstream-upload，单文件上限补充 fix/upload-file-size-limit
 - 关联任务：[上游评估](TASK-20260922-upstream-v031-review.md)
 
 ## 背景与目标
@@ -48,3 +48,14 @@
 ## 未覆盖范围与后续建议
 
 MySQL/PostgreSQL 容器集成测试、真实 S3、进程异常退出后的磁盘回收、实际网络断开及浏览器手工交互未执行；服务重启失效与过期回收由单进程单元/集成测试模拟。桌面与 430px 两个高度的视觉验收由整合任务统一完成，本记录不推定其结果；窄视口亦不能替代 iPhone/Safari 真机验证。完整 race 检查、全部后端包与三驱动检查需在具备对应工具和容器条件的环境补跑。
+
+
+## 2026-09-22 补充：单附件大小与三驱动字段边界
+
+基于整合代码 4abd247ad 复核发现，MySQL 与 PostgreSQL 的单条附件 size 为有符号 32 位整数；跨附件 SUM 使用更宽类型并扫描到 Go int64。账号总容量测试应使用多个合法大小记录构造超过 2 GiB 的总和，该测试数据修正由整合任务负责，本次不修改统计查询或数据库结构。
+
+分块上传的 total_size 不再受到旧接口单请求体大小的约束，管理员将限额配置为 2048 MiB 或更大时，原逻辑可能允许最终无法存入上述两驱动的单个附件。本次将共享 attachmentUploadLimit 的有效值限制为配置字节数与 math.MaxInt32（2,147,483,647 字节）的较小值，保留配置乘法的溢出防护及原有默认/普通配置行为。旧 CreateAttachment、分块上传开始/完成、ZIP 内部导入共用大小校验，不增加数据库迁移。
+
+实际验证：DRIVER=sqlite go test ./server/router/api/v1/... -run 'TestChunkUpload|TestCreateAttachment' 通过。新增测试覆盖 1 MiB、默认 30 MiB、2047 MiB、2048 MiB 和 math.MaxInt64 配置：超出有效上限 1 字节返回原有 InvalidArgument 错误，上传 manager 中无 session，磁盘上无临时上传文件；恰好等于有效上限可创建会话，临时文件实际仍为 0 字节。测试不分配或传输 2 GiB 文件。golangci-lint v2.11.3 run --timeout=3m --new-from-rev=4abd247ad ./server/router/api/v1/... 返回 0 issues；这是相对上述基线的新增问题检查。
+
+本次仅执行本地 SQLite 目标验证，未启动 MySQL/PostgreSQL 容器，未实际上传接近 2 GiB 的文件；不把会话开始边界测试当作大文件传输或三驱动集成测试通过。独立分支的暂存空白检查已执行。

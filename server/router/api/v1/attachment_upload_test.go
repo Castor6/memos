@@ -3,6 +3,7 @@ package v1
 import (
 	"bytes"
 	"context"
+	"math"
 	"os"
 	"path/filepath"
 	"sync"
@@ -149,6 +150,57 @@ func TestChunkUploadLimitsExpiryAndRestart(t *testing.T) {
 	t.Cleanup(restarted.CloseUploads)
 	_, err = restarted.UploadAttachment(ctx, &v1pb.UploadAttachmentRequest{Upload: &v1pb.UploadAttachmentRequest_UploadId{UploadId: response.UploadId}})
 	require.Equal(t, codes.NotFound, status.Code(err))
+}
+
+func TestChunkUploadSizeLimitBeforeSessionAllocation(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		configured int64
+		limit      int64
+	}{
+		{name: "ordinary limit", configured: 1, limit: MebiByte},
+		{name: "default limit", configured: 0, limit: 30 * MebiByte},
+		{name: "below database cap", configured: 2047, limit: 2047 * MebiByte},
+		{name: "database cap", configured: 2048, limit: math.MaxInt32},
+		{name: "overflowing configuration", configured: math.MaxInt64, limit: math.MaxInt32},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s := newIntegrationService(t)
+			owner, ctx := uploadTestOwner(t, s)
+			_, err := s.Store.UpsertInstanceSetting(ctx, &storepb.InstanceSetting{
+				Key: storepb.InstanceSettingKey_STORAGE,
+				Value: &storepb.InstanceSetting_StorageSetting{StorageSetting: &storepb.InstanceStorageSetting{
+					UploadSizeLimitMb: tc.configured,
+				}},
+			})
+			require.NoError(t, err)
+			_, err = s.UploadAttachment(ctx, &v1pb.UploadAttachmentRequest{
+				Upload: &v1pb.UploadAttachmentRequest_Spec{Spec: &v1pb.UploadAttachmentSpec{
+					Attachment: &v1pb.Attachment{Filename: "oversized.bin"}, TotalSize: tc.limit + 1,
+				}},
+			})
+			require.Equal(t, codes.InvalidArgument, status.Code(err))
+			require.Equal(t, "file size exceeds the limit", status.Convert(err).Message())
+			s.attachmentUploads.mu.Lock()
+			sessionCount := len(s.attachmentUploads.entries)
+			s.attachmentUploads.mu.Unlock()
+			require.Zero(t, sessionCount, "rejected files must not consume upload sessions")
+			pending, err := filepath.Glob(filepath.Join(s.Profile.Data, attachmentUploadTempPrefix+"*"))
+			require.NoError(t, err)
+			require.Empty(t, pending, "rejected files must not allocate temporary files")
+
+			// Opening a boundary-sized upload must not preallocate its declared bytes.
+			response := beginTestUpload(ctx, t, s, tc.limit)
+			upload, err := s.attachmentUploads.resume(response.UploadId, owner.ID)
+			require.NoError(t, err)
+			uploadPath, totalSize := upload.path, upload.totalSize
+			upload.mu.Unlock()
+			require.Equal(t, tc.limit, totalSize)
+			info, err := os.Stat(uploadPath)
+			require.NoError(t, err)
+			require.Zero(t, info.Size())
+		})
+	}
 }
 
 func TestChunkUploadRevalidatesMemoAndLimit(t *testing.T) {
