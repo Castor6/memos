@@ -146,7 +146,7 @@ func (s *Store) GetInstanceSetting(ctx context.Context, find *FindInstanceSettin
 	if cache, ok := s.instanceSettingCache.Get(ctx, find.Name); ok {
 		instanceSetting, ok := cache.(*storepb.InstanceSetting)
 		if ok {
-			return instanceSetting, nil
+			return cloneInstanceSetting(instanceSetting), nil
 		}
 	}
 
@@ -167,7 +167,8 @@ func (s *Store) cacheInstanceSetting(ctx context.Context, setting *storepb.Insta
 	if setting == nil || s.IsInstanceSettingDeploymentConfigured(setting.Key) {
 		return
 	}
-	s.instanceSettingCache.Set(ctx, setting.Key.String(), setting)
+	// Cache snapshots stay private so defaulting getters and callers can mutate their own copy.
+	s.instanceSettingCache.Set(ctx, setting.Key.String(), cloneInstanceSetting(setting))
 }
 
 func (s *Store) GetInstanceBasicSetting(ctx context.Context) (*storepb.InstanceBasicSetting, error) {

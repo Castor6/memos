@@ -44,3 +44,13 @@
 ## 未覆盖范围
 
 当前 Windows 环境缺少 CGO 编译工具链与 Docker；未运行 race、MySQL/PostgreSQL 容器测试或真实 S3。需在支持环境执行相应 `go test -race` 和三驱动测试。此次新 SQL 沿用主线的占位符转换、行锁与清理配置快照机制，SQLite 的成功、回滚和重试路径已验证。
+
+## 2026-09-22：修复 Linux CI 暴露的实例设置缓存竞争
+
+- 维护分支：`fix/storage-setting-cache-race`，基于整合提交 `4abd247ad`。Linux CI 的并发 S3 上传测试检测到 `GetInstanceStorageSetting` 读写默认上传大小时的数据竞争。
+- 根因是普通实例设置缓存直接保存、返回同一个可变 protobuf 指针；getter 填充默认值和调用方修改返回值都可能写入共享缓存。
+- 仅在缓存命中返回、缓存存入两处复用现有 `cloneInstanceSetting` 深拷贝，包含嵌套 S3 配置。没有逐个重构 typed getter，也没有改动部署配置优先级或 getter 回写与并发 Upsert 的既有一致性窗口。
+- 新增回归覆盖 Upsert/Get/typed getter/List 返回值隔离，以及 32 个 goroutine 并发补默认值、修改各自 S3 配置。修复前，写入返回值隔离测试可确定复现：调用方设置 999 后缓存也读到 999；修复后通过。
+- 原实例设置测试改用 `proto.Equal` 比较消息内容，避免把 protobuf 内部反射缓存状态当作业务值比较。
+- 实际验证：SQLite 实例设置测试、部署配置/鉴权/缓存测试、S3 并发与分块上传测试连续 5 次、全部 API v1/fileserver/runner 包测试均通过；限定本次变更的 `golangci-lint run --new-from-rev HEAD ./store/...` 为 0 issues；gofmt 和提交前空白检查通过。
+- 本地仍无 CGO，未声称本机通过 `-race`；竞态修复需由 Linux CI 重新验证。容量统计 fixture 由主会话独立修复，本补丁未改动该文件。
