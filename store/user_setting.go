@@ -145,23 +145,36 @@ func (s *Store) GetUserByPATHash(ctx context.Context, tokenHash string) (*PATQue
 	return result, nil
 }
 
-// GetUserRefreshTokens returns the refresh tokens of the user.
+// GetUserRefreshTokens returns an independent snapshot of the user's refresh tokens.
 func (s *Store) GetUserRefreshTokens(ctx context.Context, userID int32) ([]*storepb.RefreshTokensUserSetting_RefreshToken, error) {
-	userSetting, err := s.GetUserSetting(ctx, &FindUserSetting{
+	// Read the database directly: concurrent generic setting reads can populate
+	// the cache with an older snapshot after a token has been added or revoked.
+	settings, err := s.driver.ListUserSettings(ctx, &FindUserSetting{
 		UserID: &userID,
 		Key:    storepb.UserSetting_REFRESH_TOKENS,
 	})
 	if err != nil {
 		return nil, err
 	}
-	if userSetting == nil {
+	if len(settings) == 0 {
 		return []*storepb.RefreshTokensUserSetting_RefreshToken{}, nil
+	}
+	if len(settings) != 1 {
+		return nil, errors.Errorf("expected 1 refresh token setting, but got %d", len(settings))
+	}
+	userSetting, err := convertUserSettingFromRaw(settings[0])
+	if err != nil {
+		return nil, err
 	}
 	return userSetting.GetRefreshTokens().RefreshTokens, nil
 }
 
 // AddUserRefreshToken adds a new refresh token for the user.
 func (s *Store) AddUserRefreshToken(ctx context.Context, userID int32, token *storepb.RefreshTokensUserSetting_RefreshToken) error {
+	// Serialize the whole read-modify-write with removals, not just the append.
+	s.refreshTokenMu.Lock()
+	defer s.refreshTokenMu.Unlock()
+
 	tokens, err := s.GetUserRefreshTokens(ctx, userID)
 	if err != nil {
 		return err
@@ -183,6 +196,9 @@ func (s *Store) AddUserRefreshToken(ctx context.Context, userID int32, token *st
 
 // RemoveUserRefreshToken removes a refresh token from the user.
 func (s *Store) RemoveUserRefreshToken(ctx context.Context, userID int32, tokenID string) error {
+	s.refreshTokenMu.Lock()
+	defer s.refreshTokenMu.Unlock()
+
 	existingTokens, err := s.GetUserRefreshTokens(ctx, userID)
 	if err != nil {
 		return err

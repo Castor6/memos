@@ -261,6 +261,9 @@ func TestConcurrentSSOFirstSignInConvergesOnOneUser(t *testing.T) {
 	users, err := ts.Store.ListUsers(ctx, &store.FindUser{})
 	require.NoError(t, err)
 	require.Len(t, users, 1)
+	refreshTokens, err := ts.Store.GetUserRefreshTokens(ctx, users[0].ID)
+	require.NoError(t, err)
+	require.Len(t, refreshTokens, signInCount, "every concurrent sign-in must retain its session")
 	assertSingleSSOLink(ctx, t, ts, "concurrent-provider", "alice", "alice")
 }
 

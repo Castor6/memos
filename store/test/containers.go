@@ -108,6 +108,13 @@ func GetMySQLDSN(t *testing.T) string {
 			mysql.WithDatabase("init_db"),
 			mysql.WithUsername("root"),
 			mysql.WithPassword(testPassword),
+			// The parallel store suite creates thousands of table definitions across
+			// isolated databases. Keep enough definitions and open tables cached so
+			// MySQL does not evict metadata underneath active prepared statements.
+			testcontainers.WithCmd(
+				"--table-definition-cache=8192",
+				"--table-open-cache=8192",
+			),
 			testcontainers.WithEnv(map[string]string{
 				"MYSQL_ROOT_PASSWORD": testPassword,
 			}),
