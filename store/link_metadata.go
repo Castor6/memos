@@ -30,13 +30,25 @@ func (s *Store) GetLinkMetadata(ctx context.Context, url string) (*LinkMetadata,
 
 // SaveLinkMetadata keeps the first successful snapshot, including across restarts.
 func (s *Store) SaveLinkMetadata(ctx context.Context, value *LinkMetadata) error {
+	tx, err := s.driver.GetDB().BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err := saveLinkMetadata(ctx, tx, s.profile.Driver, value); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, linkMetadataSQL(s.profile.Driver, "DELETE FROM link_metadata_job WHERE url_hash = ?"), linkKey(value.URL)); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func saveLinkMetadata(ctx context.Context, db linkMetadataExecutor, dialect string, value *LinkMetadata) error {
 	query := "INSERT INTO link_metadata (url_hash,url,title,description,image) VALUES (?,?,?,?,?) ON CONFLICT(url_hash) DO NOTHING"
-	if s.profile.Driver == "mysql" {
+	if dialect == "mysql" {
 		query = "INSERT INTO link_metadata (url_hash,url,title,description,image) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE url_hash=url_hash"
 	}
-	if s.profile.Driver == "postgres" {
-		query = "INSERT INTO link_metadata (url_hash,url,title,description,image) VALUES ($1,$2,$3,$4,$5) ON CONFLICT(url_hash) DO NOTHING"
-	}
-	_, err := s.driver.GetDB().ExecContext(ctx, query, linkKey(value.URL), value.URL, value.Title, value.Description, value.Image)
+	_, err := db.ExecContext(ctx, linkMetadataSQL(dialect, query), linkKey(value.URL), value.URL, value.Title, value.Description, value.Image)
 	return err
 }

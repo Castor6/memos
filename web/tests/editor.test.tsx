@@ -1,9 +1,11 @@
 const preferences = vi.hoisted(() => ({ enterToSave: false }));
 vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => ({ userGeneralSetting: preferences }) }));
-import { render } from "@testing-library/react";
+import { act, render } from "@testing-library/react";
 import { createRef } from "react";
 import { describe, expect, it, vi } from "vitest";
 import Editor from "@/components/MemoEditor/Editor";
+import { EditorProvider, useEditorContext, useEditorSelector } from "@/components/MemoEditor/state";
+import { createInitialState } from "@/components/MemoEditor/state/types";
 import type { EditorController } from "@/components/MemoEditor/types/editorController";
 
 vi.mock("@/hooks/useUserQueries", () => ({
@@ -11,6 +13,57 @@ vi.mock("@/hooks/useUserQueries", () => ({
 }));
 
 describe("Editor", () => {
+  it("keeps the successful save reset empty when the editor becomes editable again", () => {
+    const ref = createRef<EditorController>();
+    let store!: ReturnType<typeof useEditorContext>;
+    const Harness = () => {
+      store = useEditorContext();
+      const content = useEditorSelector((state) => state.content);
+      const saving = useEditorSelector((state) => state.ui.isLoading.saving);
+      return (
+        <Editor
+          ref={ref}
+          className="x"
+          initialContent={content}
+          readOnly={saving}
+          placeholder="memo"
+          onContentChange={(value) => store.dispatch(store.actions.updateContent(value))}
+          onFiles={vi.fn()}
+          onSubmit={vi.fn()}
+        />
+      );
+    };
+    const { container } = render(
+      <EditorProvider initialEditorState={{ ...createInitialState(), content: "saved memo" }}>
+        <Harness />
+      </EditorProvider>,
+    );
+    act(() => store.dispatch(store.actions.setLoading("saving", true)));
+    expect(container.querySelector(".rich-editor")).toHaveAttribute("contenteditable", "false");
+    act(() => {
+      store.dispatch(store.actions.reset());
+      store.dispatch(store.actions.setLoading("saving", false));
+    });
+    expect(store.getState().content).toBe("");
+    expect(ref.current?.getMarkdown()).toBe("");
+    expect(container.querySelector(".rich-editor")).not.toHaveTextContent("saved memo");
+    expect(container.querySelector(".rich-editor")).toHaveAttribute("contenteditable", "true");
+  });
+
+  it("disables editing and file paste while a save is pending, then restores editing", async () => {
+    const { fireEvent } = await import("@testing-library/react");
+    const onFiles = vi.fn();
+    const props = { className: "x", initialContent: "draft", placeholder: "memo", onContentChange: vi.fn(), onFiles, onSubmit: vi.fn() };
+    const { container, rerender } = render(<Editor {...props} readOnly />);
+    const body = container.querySelector(".rich-editor")!;
+    expect(body).toHaveAttribute("contenteditable", "false");
+    fireEvent.paste(body, { clipboardData: { files: [new File(["data"], "test.txt")], getData: () => "", types: [] } });
+    expect(onFiles).not.toHaveBeenCalled();
+    rerender(<Editor {...props} readOnly={false} />);
+    expect(body).toHaveAttribute("contenteditable", "true");
+    expect(body).toHaveTextContent("draft");
+  });
+
   it("loads Markdown as rich content and preserves its structure", () => {
     const ref = createRef<EditorController>();
     render(

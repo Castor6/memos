@@ -37,7 +37,7 @@ func newHTTPClient() *http.Client {
 		Transport: transport,
 		Timeout:   5 * time.Second,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			if err := validateURL(req.URL.String()); err != nil {
+			if err := ValidateURL(req.URL.String()); err != nil {
 				return errors.Wrap(err, "redirect to internal IP")
 			}
 			if len(via) >= 10 {
@@ -113,7 +113,8 @@ func isInternalIP(ip net.IP) bool {
 	return ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsUnspecified()
 }
 
-func validateURL(urlStr string) error {
+// ValidateURL checks URL syntax, protocol, and literal IP restrictions without resolving DNS.
+func ValidateURL(urlStr string) error {
 	u, err := url.Parse(urlStr)
 	if err != nil {
 		return errors.New("invalid URL format")
@@ -160,7 +161,7 @@ func GetHTMLMeta(urlStr string) (*HTMLMeta, error) {
 
 // GetHTMLMetaWithContext fetches metadata with cancellation and the same network restrictions.
 func GetHTMLMetaWithContext(ctx context.Context, urlStr string) (*HTMLMeta, error) {
-	if err := validateURL(urlStr); err != nil {
+	if err := ValidateURL(urlStr); err != nil {
 		return nil, err
 	}
 

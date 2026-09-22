@@ -8,118 +8,63 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
 	v1pb "github.com/usememos/memos/proto/gen/api/v1"
 	"github.com/usememos/memos/store"
 )
 
 func (s *APIV1Service) SetMemoRelations(ctx context.Context, request *v1pb.SetMemoRelationsRequest) (*emptypb.Empty, error) {
-	user, err := s.fetchCurrentUser(ctx)
+	_, err := s.UpdateMemo(ctx, &v1pb.UpdateMemoRequest{
+		Memo:       &v1pb.Memo{Name: request.Name, Relations: request.Relations},
+		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"relations", "update_time"}},
+	})
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to get current user: %v", err)
-	}
-	if user == nil {
-		return nil, status.Errorf(codes.Unauthenticated, "user not authenticated")
-	}
-	memoUID, err := ExtractMemoUIDFromName(request.Name)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid memo name: %v", err)
-	}
-	memo, err := s.Store.GetMemo(ctx, &store.FindMemo{UID: &memoUID})
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to get memo")
-	}
-	if memo == nil {
-		return nil, status.Errorf(codes.NotFound, "memo not found")
-	}
-	if memo.CreatorID != user.ID && !isSuperUser(user) {
-		return nil, status.Errorf(codes.PermissionDenied, "permission denied")
-	}
-	if err := s.setMemoRelationsInternal(ctx, memo, request.Relations); err != nil {
 		return nil, err
 	}
-	if err := s.touchMemoUpdatedTimestamp(ctx, memo.ID); err != nil {
-		return nil, err
-	}
-	updatedMemo, parentMemo, memoMessage, err := s.buildUpdatedMemoState(ctx, memo.ID)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to build updated memo state")
-	}
-	s.dispatchMemoUpdatedSideEffects(ctx, updatedMemo, parentMemo, memoMessage)
-
 	return &emptypb.Empty{}, nil
 }
 
 func (s *APIV1Service) validateMemoRelations(ctx context.Context, memo *store.Memo, relations []*v1pb.MemoRelation) error {
-	// Validate all targets before changing existing relations.
+	_, err := s.prepareMemoRelations(ctx, memo, relations)
+	return err
+}
+
+func (s *APIV1Service) prepareMemoRelations(ctx context.Context, memo *store.Memo, relations []*v1pb.MemoRelation) ([]*store.MemoRelation, error) {
+	prepared := make([]*store.MemoRelation, 0, len(relations))
 	for _, relation := range relations {
 		if relation == nil || relation.RelatedMemo == nil {
-			return status.Errorf(codes.InvalidArgument, "related memo is required")
+			return nil, status.Errorf(codes.InvalidArgument, "related memo is required")
 		}
 		if relation.Type == v1pb.MemoRelation_COMMENT {
 			continue
 		}
 		uid, err := ExtractMemoUIDFromName(relation.RelatedMemo.Name)
 		if err != nil {
-			return status.Errorf(codes.InvalidArgument, "invalid related memo")
+			return nil, status.Errorf(codes.InvalidArgument, "invalid related memo")
 		}
 		target, err := s.Store.GetMemo(ctx, &store.FindMemo{UID: &uid})
 		if err != nil {
-			return status.Errorf(codes.Internal, "failed to find related memo")
+			return nil, status.Errorf(codes.Internal, "failed to find related memo")
 		}
 		if target == nil || target.Space != memo.Space || target.IsTodo || memo.IsTodo {
-			return status.Errorf(codes.InvalidArgument, "references must link notes in the same space")
+			return nil, status.Errorf(codes.InvalidArgument, "references must link notes in the same space")
 		}
 		if err := s.checkMemoReadAccess(ctx, target); err != nil {
-			return err
+			return nil, err
 		}
+		prepared = append(prepared, &store.MemoRelation{MemoID: memo.ID, RelatedMemoID: target.ID, Type: store.MemoRelationReference})
 	}
-	return nil
+	return prepared, nil
 }
 
 func (s *APIV1Service) setMemoRelationsInternal(ctx context.Context, memo *store.Memo, relations []*v1pb.MemoRelation) error {
-	if err := s.validateMemoRelations(ctx, memo, relations); err != nil {
+	prepared, err := s.prepareMemoRelations(ctx, memo, relations)
+	if err != nil {
 		return err
 	}
-	referenceType := store.MemoRelationReference
-	// Delete all reference relations first.
-	if err := s.Store.DeleteMemoRelation(ctx, &store.DeleteMemoRelation{
-		MemoID: &memo.ID,
-		Type:   &referenceType,
-	}); err != nil {
-		return status.Errorf(codes.Internal, "failed to delete memo relation")
-	}
-
-	for _, relation := range relations {
-		// Ignore reflexive relations.
-		if buildMemoName(memo.UID) == relation.RelatedMemo.Name {
-			continue
-		}
-		// Ignore comment relations as there's no need to update a comment's relation.
-		// Inserting/Deleting a comment is handled elsewhere.
-		if relation.Type == v1pb.MemoRelation_COMMENT {
-			continue
-		}
-		relatedMemoUID, err := ExtractMemoUIDFromName(relation.RelatedMemo.Name)
-		if err != nil {
-			return status.Errorf(codes.InvalidArgument, "invalid related memo name: %v", err)
-		}
-		relatedMemo, err := s.Store.GetMemo(ctx, &store.FindMemo{UID: &relatedMemoUID})
-		if err != nil {
-			return status.Errorf(codes.Internal, "failed to get related memo")
-		}
-		if _, err := s.Store.UpsertMemoRelation(ctx, &store.MemoRelation{
-			MemoID:        memo.ID,
-			RelatedMemoID: relatedMemo.ID,
-			Type:          convertMemoRelationTypeToStore(relation.Type),
-		}); err != nil {
-			return status.Errorf(codes.Internal, "failed to upsert memo relation")
-		}
-	}
-
-	return nil
+	return s.Store.ApplyMemoMutation(ctx, &store.MemoMutation{Update: &store.UpdateMemo{ID: memo.ID}, Relations: &prepared})
 }
-
 func (s *APIV1Service) ListMemoRelations(ctx context.Context, request *v1pb.ListMemoRelationsRequest) (*v1pb.ListMemoRelationsResponse, error) {
 	memoUID, err := ExtractMemoUIDFromName(request.Name)
 	if err != nil {
@@ -217,14 +162,5 @@ func convertMemoRelationTypeFromStore(relationType store.MemoRelationType) v1pb.
 		return v1pb.MemoRelation_COMMENT
 	default:
 		return v1pb.MemoRelation_TYPE_UNSPECIFIED
-	}
-}
-
-func convertMemoRelationTypeToStore(relationType v1pb.MemoRelation_Type) store.MemoRelationType {
-	switch relationType {
-	case v1pb.MemoRelation_COMMENT:
-		return store.MemoRelationComment
-	default:
-		return store.MemoRelationReference
 	}
 }

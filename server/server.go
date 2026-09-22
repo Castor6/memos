@@ -160,6 +160,11 @@ func (s *Server) Shutdown(ctx context.Context) {
 }
 
 func (s *Server) startBackgroundRunners(ctx context.Context) {
+	cleanupContext, cancelCleanup := context.WithCancel(ctx)
+	s.backgroundRunnerCancels = append(s.backgroundRunnerCancels, cancelCleanup)
+	s.backgroundRunnerWG.Add(1)
+	go func() { defer s.backgroundRunnerWG.Done(); s.Store.RunAttachmentCleanup(cleanupContext) }()
+
 	linkContext, cancelLinks := context.WithCancel(ctx)
 	s.backgroundRunnerCancels = append(s.backgroundRunnerCancels, cancelLinks)
 	s.backgroundRunnerWG.Add(1)

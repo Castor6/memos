@@ -11,7 +11,7 @@ import (
 
 // GetPDFImage fetches a bounded image using the metadata client's SSRF protections.
 func GetPDFImage(ctx context.Context, address string) ([]byte, error) {
-	if err := validateURL(address); err != nil {
+	if err := ValidateURL(address); err != nil {
 		return nil, err
 	}
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, address, nil)

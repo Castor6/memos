@@ -31,12 +31,13 @@ export function useAttachments() {
 export function useInfiniteAttachments(request: Partial<ListAttachmentsRequest> = {}, options?: { enabled?: boolean }) {
   return useInfiniteQuery({
     queryKey: attachmentKeys.list(request),
-    queryFn: async ({ pageParam }) => {
+    queryFn: async ({ pageParam, signal }) => {
       const response = await attachmentServiceClient.listAttachments(
         create(ListAttachmentsRequestSchema, {
           ...request,
           pageToken: pageParam || "",
         } as Record<string, unknown>),
+        { signal },
       );
       return response;
     },

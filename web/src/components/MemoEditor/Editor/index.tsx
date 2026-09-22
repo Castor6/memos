@@ -25,6 +25,7 @@ interface EditorProps {
   onFiles: (files: File[]) => void;
   onSubmit: () => void;
   isFocusMode?: boolean;
+  readOnly?: boolean;
 }
 
 const Editor = forwardRef<EditorController, EditorProps>((props, ref) => {
@@ -34,6 +35,7 @@ const Editor = forwardRef<EditorController, EditorProps>((props, ref) => {
   const listeners = useRef(new Set<() => void>());
   const lastEmitted = useRef(props.initialContent);
   const editor = useEditor({
+    editable: !props.readOnly,
     extensions: [
       StarterKit.configure({ trailingNode: false, link: { openOnClick: false }, heading: { levels: [1, 2, 3, 4, 5, 6] } }),
       TableKit,
@@ -85,12 +87,14 @@ const Editor = forwardRef<EditorController, EditorProps>((props, ref) => {
     editorProps: {
       attributes: { class: "rich-editor", role: "textbox", "aria-multiline": "true", "aria-label": "正文" },
       handlePaste: (_view, event) => {
+        if (current.current.readOnly) return true;
         const files = Array.from(event.clipboardData?.files || []);
         if (!files.length) return false;
         current.current.onFiles(files);
         return true;
       },
       handleDrop: (view, event, _slice, moved) => {
+        if (current.current.readOnly) return true;
         if (moved) return false;
         const files = Array.from(event.dataTransfer?.files || []);
         if (!files.length) return false;
@@ -107,6 +111,11 @@ const Editor = forwardRef<EditorController, EditorProps>((props, ref) => {
     },
     onTransaction: () => listeners.current.forEach((listener) => listener()),
   });
+
+  useEffect(() => {
+    // Toggling editability must not emit the old document over a successful reset.
+    editor?.setEditable(!props.readOnly, false);
+  }, [editor, props.readOnly]);
 
   useEffect(() => {
     if (editor && props.initialContent !== lastEmitted.current) {

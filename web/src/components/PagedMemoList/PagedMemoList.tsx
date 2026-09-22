@@ -139,16 +139,17 @@ const PagedMemoList = (props: Props) => {
   // pages don't each repeat the policy.
   const effectiveCompact = compactMode || useGrid || (userGeneralSetting?.previewCharacters ?? 0) > 0;
 
-  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } = useInfiniteMemos(
-    {
-      state: props.state || State.NORMAL,
-      orderBy: props.orderBy || "create_time desc",
-      filter: props.filter,
-      isTodo: props.isTodo ?? false,
-      pageSize: props.pageSize || DEFAULT_LIST_MEMOS_PAGE_SIZE,
-    },
-    { enabled: props.enabled ?? true },
-  );
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, isError, isFetchNextPageError, isFetching, refetch } =
+    useInfiniteMemos(
+      {
+        state: props.state || State.NORMAL,
+        orderBy: props.orderBy || "create_time desc",
+        filter: props.filter,
+        isTodo: props.isTodo ?? false,
+        pageSize: props.pageSize || DEFAULT_LIST_MEMOS_PAGE_SIZE,
+      },
+      { enabled: props.enabled ?? true },
+    );
 
   // Queries can start as soon as routing is unlocked, but memo content stays
   // hidden until settings that control its presentation have settled.
@@ -169,7 +170,7 @@ const PagedMemoList = (props: Props) => {
 
   // Auto-fetch hook: fetches more content when page isn't scrollable
   useAutoFetchWhenNotScrollable({
-    enabled: !isDisplayPending,
+    enabled: !isDisplayPending && !isError,
     hasNextPage,
     isFetchingNextPage,
     memoCount: sortedMemoList.length,
@@ -178,7 +179,7 @@ const PagedMemoList = (props: Props) => {
 
   // Infinite scroll: fetch more when user scrolls near bottom
   useEffect(() => {
-    if (isDisplayPending || !hasNextPage) return;
+    if (isDisplayPending || isError || !hasNextPage) return;
 
     const handleScroll = () => {
       const nearBottom = window.innerHeight + window.scrollY >= document.body.offsetHeight - 300;
@@ -189,7 +190,7 @@ const PagedMemoList = (props: Props) => {
 
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
-  }, [isDisplayPending, hasNextPage, isFetchingNextPage, fetchNextPage]);
+  }, [isDisplayPending, isError, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const leadingContent = props.renderLeading?.({ useGrid });
 
@@ -213,8 +214,18 @@ const PagedMemoList = (props: Props) => {
     [props.showCreator, sortedMemoList],
   );
 
+  const errorState = isError ? (
+    <div role="alert" className="w-full rounded-lg border border-destructive/30 p-4 text-center">
+      <p className="text-sm text-muted-foreground">{t("memo.load-error")}</p>
+      <Button variant="outline" className="mt-3" disabled={isFetching} onClick={() => (isFetchNextPageError ? fetchNextPage() : refetch())}>
+        {t("memo.retry")}
+      </Button>
+    </div>
+  ) : null;
   const emptyPlaceholder =
-    !isDisplayPending && !isFetchingNextPage && !hasNextPage && sortedMemoList.length === 0 ? (
+    sortedMemoList.length === 0 && isError ? (
+      errorState
+    ) : !isDisplayPending && !isFetchingNextPage && !hasNextPage && sortedMemoList.length === 0 ? (
       <Placeholder variant="empty" message={t("message.no-data")} className="w-full" />
     ) : null;
 
@@ -235,6 +246,7 @@ const PagedMemoList = (props: Props) => {
   // Pagination controls are identical across both layouts.
   const footer = (
     <>
+      {sortedMemoList.length > 0 && errorState}
       {(showLoader || isFetchingNextPage) && <Loader />}
       {!isFetchingNextPage && (hasNextPage || sortedMemoList.length > 0) && (
         <div className="w-full opacity-70 flex flex-row justify-center items-center my-4">

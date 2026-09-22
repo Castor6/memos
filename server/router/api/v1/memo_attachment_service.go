@@ -2,103 +2,60 @@ package v1
 
 import (
 	"context"
-	"slices"
-	"time"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
 	v1pb "github.com/usememos/memos/proto/gen/api/v1"
 	"github.com/usememos/memos/store"
 )
 
 func (s *APIV1Service) SetMemoAttachments(ctx context.Context, request *v1pb.SetMemoAttachmentsRequest) (*emptypb.Empty, error) {
-	user, err := s.fetchCurrentUser(ctx)
+	_, err := s.UpdateMemo(ctx, &v1pb.UpdateMemoRequest{
+		Memo:       &v1pb.Memo{Name: request.Name, Attachments: request.Attachments},
+		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"attachments", "update_time"}},
+	})
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to get current user: %v", err)
-	}
-	if user == nil {
-		return nil, status.Errorf(codes.Unauthenticated, "user not authenticated")
-	}
-	memoUID, err := ExtractMemoUIDFromName(request.Name)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid memo name: %v", err)
-	}
-	memo, err := s.Store.GetMemo(ctx, &store.FindMemo{UID: &memoUID})
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to get memo")
-	}
-	if memo == nil {
-		return nil, status.Errorf(codes.NotFound, "memo not found")
-	}
-	if !canModifyMemo(user, memo) {
-		return nil, status.Errorf(codes.PermissionDenied, "permission denied")
-	}
-	if err := s.setMemoAttachmentsInternal(ctx, user, memo, request.Attachments); err != nil {
 		return nil, err
 	}
-	if err := s.touchMemoUpdatedTimestamp(ctx, memo.ID); err != nil {
-		return nil, err
-	}
-	updatedMemo, parentMemo, memoMessage, err := s.buildUpdatedMemoState(ctx, memo.ID)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to build updated memo state")
-	}
-	s.dispatchMemoUpdatedSideEffects(ctx, updatedMemo, parentMemo, memoMessage)
-
 	return &emptypb.Empty{}, nil
 }
 
-func (s *APIV1Service) setMemoAttachmentsInternal(ctx context.Context, user *store.User, memo *store.Memo, requestAttachments []*v1pb.Attachment) error {
-	currentAttachments, err := s.Store.ListAttachments(ctx, &store.FindAttachment{
-		MemoID: &memo.ID,
-	})
+func (s *APIV1Service) prepareMemoAttachmentIDs(ctx context.Context, user *store.User, memo *store.Memo, requestAttachments []*v1pb.Attachment) ([]int32, error) {
+	currentAttachments, err := s.Store.ListAttachments(ctx, &store.FindAttachment{MemoID: &memo.ID})
 	if err != nil {
-		return status.Errorf(codes.Internal, "failed to list attachments")
+		return nil, status.Errorf(codes.Internal, "failed to list attachments")
 	}
-
 	normalizedAttachments, err := s.normalizeMemoAttachmentRequest(ctx, user, currentAttachments, requestAttachments)
+	if err != nil {
+		return nil, err
+	}
+	requested := make(map[int32]bool, len(normalizedAttachments))
+	ids := make([]int32, 0, len(normalizedAttachments))
+	for _, attachment := range normalizedAttachments {
+		requested[attachment.ID] = true
+		ids = append(ids, attachment.ID)
+	}
+	for _, attachment := range currentAttachments {
+		if !requested[attachment.ID] && attachment.CreatorID != user.ID && !isSuperUser(user) {
+			return nil, status.Errorf(codes.PermissionDenied, "cannot remove another user's attachment")
+		}
+	}
+	return ids, nil
+}
+
+func (s *APIV1Service) setMemoAttachmentsInternal(ctx context.Context, user *store.User, memo *store.Memo, requestAttachments []*v1pb.Attachment) error {
+	ids, err := s.prepareMemoAttachmentIDs(ctx, user, memo, requestAttachments)
 	if err != nil {
 		return err
 	}
-
-	requestedIDs := make(map[int32]bool, len(normalizedAttachments))
-	for _, attachment := range normalizedAttachments {
-		requestedIDs[attachment.ID] = true
-	}
-
-	// Delete attachments that are not in the request.
-	for _, attachment := range currentAttachments {
-		if !requestedIDs[attachment.ID] {
-			if attachment.CreatorID != user.ID && !isSuperUser(user) {
-				return status.Errorf(codes.PermissionDenied, "cannot remove another user's attachment")
-			}
-			if err = s.Store.DeleteAttachment(ctx, &store.DeleteAttachment{
-				ID:     int32(attachment.ID),
-				MemoID: &memo.ID,
-			}); err != nil {
-				return status.Errorf(codes.Internal, "failed to delete attachment")
-			}
-		}
-	}
-
-	slices.Reverse(normalizedAttachments)
-	// Update attachments' memo_id in the request.
-	for index, attachment := range normalizedAttachments {
-		updatedTs := time.Now().Unix() + int64(index)
-		if err := s.Store.UpdateAttachment(ctx, &store.UpdateAttachment{
-			ID:        attachment.ID,
-			MemoID:    &memo.ID,
-			UpdatedTs: &updatedTs,
-		}); err != nil {
-			return status.Errorf(codes.Internal, "failed to update attachment: %v", err)
-		}
-	}
-
-	return nil
+	return s.Store.ApplyMemoMutation(ctx, &store.MemoMutation{
+		Update: &store.UpdateMemo{ID: memo.ID}, AttachmentIDs: &ids,
+		ActorID: user.ID, AllowForeignAttachments: isSuperUser(user),
+	})
 }
-
 func (s *APIV1Service) normalizeMemoAttachmentRequest(
 	ctx context.Context,
 	user *store.User,

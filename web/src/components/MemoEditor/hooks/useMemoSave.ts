@@ -6,6 +6,7 @@ import { useNewMemo } from "@/contexts/NewMemoContext";
 import { memoKeys } from "@/hooks/useMemoQueries";
 import { userKeys } from "@/hooks/useUserQueries";
 import { handleError } from "@/lib/error";
+import { scheduleQueryRefresh } from "@/lib/query-refresh";
 import type { Visibility } from "@/types/proto/api/v1/memo_service_pb";
 import { useTranslate } from "@/utils/i18n";
 import { errorService, memoService, validationService } from "../services";
@@ -65,17 +66,14 @@ export function useMemoSave({
       // Prevent the autosave unmount flush from restoring the saved draft.
       discardDraft();
 
-      const invalidationPromises = [
-        queryClient.invalidateQueries({ queryKey: memoKeys.lists() }),
-        queryClient.invalidateQueries({ queryKey: userKeys.stats() }),
-      ];
+      const refreshKeys = [memoKeys.lists(), userKeys.stats()];
       if (memoName) {
-        invalidationPromises.push(queryClient.invalidateQueries({ queryKey: memoKeys.detail(memoName) }));
+        scheduleQueryRefresh(queryClient, memoKeys.detail(memoName));
       }
       if (parentMemoName) {
-        invalidationPromises.push(queryClient.invalidateQueries({ queryKey: memoKeys.comments(parentMemoName) }));
+        scheduleQueryRefresh(queryClient, memoKeys.comments(parentMemoName));
       }
-      await Promise.all(invalidationPromises);
+      scheduleQueryRefresh(queryClient, ...refreshKeys);
 
       dispatch(actions.reset());
       dispatch(

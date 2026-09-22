@@ -57,23 +57,54 @@ func init() {
 // safeDialContext is a net.Dialer.DialContext replacement that resolves the target
 // hostname and rejects any address that falls within a reserved/private IP range.
 func safeDialContext(ctx context.Context, network, addr string) (net.Conn, error) {
+	return dialValidatedAddress(ctx, network, addr, net.DefaultResolver.LookupHost, (&net.Dialer{}).DialContext)
+}
+
+func dialValidatedAddress(
+	ctx context.Context,
+	network, addr string,
+	lookupHost func(context.Context, string) ([]string, error),
+	dialContext func(context.Context, string, string) (net.Conn, error),
+) (net.Conn, error) {
 	host, port, err := net.SplitHostPort(addr)
 	if err != nil {
 		return nil, errors.Errorf("webhook: invalid address %q", addr)
 	}
 
-	ips, err := net.DefaultResolver.LookupHost(ctx, host)
+	ips, err := lookupHost(ctx, host)
 	if err != nil {
 		return nil, errors.Wrapf(err, "webhook: failed to resolve host %q", host)
 	}
 
+	if len(ips) == 0 {
+		return nil, errors.New("webhook: hostname resolved to no addresses")
+	}
+	addresses := make([]string, 0, len(ips))
 	for _, ipStr := range ips {
-		if ip := net.ParseIP(ipStr); ip != nil && isReservedIP(ip) {
+		ip := net.ParseIP(ipStr)
+		if ip == nil {
+			return nil, errors.New("webhook: hostname resolved to an invalid IP address")
+		}
+		if isReservedIP(ip) {
 			return nil, errors.Errorf("webhook: connection to reserved/private IP address is not allowed")
 		}
+		addresses = append(addresses, net.JoinHostPort(ip.String(), port))
 	}
 
-	return (&net.Dialer{}).DialContext(ctx, network, net.JoinHostPort(host, port))
+	// Dial only the addresses we validated. Keeping the request URL unchanged
+	// lets net/http preserve the original HTTP Host and TLS server name.
+	var dialErr error
+	for _, address := range addresses {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		conn, err := dialContext(ctx, network, address)
+		if err == nil {
+			return conn, nil
+		}
+		dialErr = err
+	}
+	return nil, errors.Wrap(dialErr, "webhook: failed to connect to validated addresses")
 }
 
 type WebhookRequestPayload struct {

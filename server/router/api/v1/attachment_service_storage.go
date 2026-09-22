@@ -68,7 +68,7 @@ func SaveAttachmentBlob(ctx context.Context, profile *profile.Profile, stores *s
 		if !filepath.IsAbs(osPath) {
 			osPath = filepath.Join(profile.Data, osPath)
 		}
-		osPath = ensureUniqueLocalAttachmentPath(osPath, create.UID)
+		osPath = uniqueAttachmentStoragePath(osPath)
 		internalPath = filepath.ToSlash(osPath)
 		if !filepath.IsAbs(filepath.FromSlash(internalPath)) {
 			internalPath, err = filepath.Rel(profile.Data, osPath)
@@ -104,6 +104,7 @@ func SaveAttachmentBlob(ctx context.Context, profile *profile.Profile, stores *s
 			filepathTemplate = filepath.Join(filepathTemplate, "{filename}")
 		}
 		filepathTemplate = replaceFilenameWithPathTemplate(filepathTemplate, create.Filename)
+		filepathTemplate = filepath.ToSlash(uniqueAttachmentStoragePath(filepathTemplate))
 		key, err := s3Client.UploadObject(ctx, filepathTemplate, create.Type, bytes.NewReader(create.Blob))
 		if err != nil {
 			return errors.Wrap(err, "Failed to upload via s3 client")
@@ -214,14 +215,13 @@ func replaceFilenameWithPathTemplate(path, filename string) string {
 	return path
 }
 
-func ensureUniqueLocalAttachmentPath(path, uid string) string {
-	if _, err := os.Stat(path); err != nil {
-		return path
-	}
-
+func uniqueAttachmentStoragePath(path string) string {
+	// Storage identities must never be reused by later uploads, including after a
+	// file was removed but its durable cleanup job has not been acknowledged yet.
+	// Attachment UIDs are intentionally not used here because clients can reuse them.
 	ext := filepath.Ext(path)
 	base := strings.TrimSuffix(path, ext)
-	return base + "_" + uid + ext
+	return base + "_" + util.GenUUID() + ext
 }
 
 func validateFilename(filename string) bool {
