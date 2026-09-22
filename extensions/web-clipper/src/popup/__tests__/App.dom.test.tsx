@@ -31,6 +31,7 @@ function wireSaveResult(
     if (type === "GET_POPUP_STATE") return popupState;
     if (type === "GET_CAPTURE_CAPABILITIES") return { ok: true, supported: true, contentMaxBytes: 8192 };
     if (type === "GET_CLIP_STATUS") return savedClip;
+    if (type === "GET_MEMO_TAGS") return { ok: true, tags: ["阅读", "项目/灵感"] };
     if (type === "SAVE_MEMO") return result;
     return undefined;
   });
@@ -121,7 +122,28 @@ describe("App — manual capture workspace", () => {
       .find((r) => r.type === "SAVE_MEMO")!;
     expect(save.content.indexOf("This is the insight")).toBeLessThan(save.content.indexOf("Captured body"));
     expect(save.clip.capture).toMatchObject({ kind: "STAR", platform: "WEB", comment: "This is the insight I noticed." });
+    expect(save.tags).toEqual(["star"]);
     expect(screen.getByRole("link", { name: /open memo/i })).toHaveAttribute("href", "https://memos.example.com/memos/1");
+  });
+
+  it("saves selected and new independent tags and renders the final Markdown preview", async () => {
+    const { user } = await startStar();
+    expect(screen.getByRole("button", { name: "移除标签 star" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /添加标签/ }));
+    await user.click(await screen.findByRole("option", { name: "阅读" }));
+    await user.click(screen.getByRole("button", { name: /添加标签/ }));
+    await user.type(screen.getByRole("combobox", { name: "搜索或新建标签" }), "自己的想法{Enter}");
+    await user.type(screen.getByRole("textbox", { name: "我的思考" }), "**值得回顾**");
+    await user.click(screen.getByText("预览完整保存内容"));
+    expect(screen.getByRole("heading", { name: "我的思考" })).toBeInTheDocument();
+    expect(screen.getByText("值得回顾").tagName).toBe("STRONG");
+    await user.click(screen.getByRole("button", { name: /save to memos/i }));
+    await screen.findByRole("button", { name: /saved to memos/i });
+    const save = browserMock.runtime.sendMessage.mock.calls
+      .map(([request]) => request as Record<string, unknown>)
+      .find((r) => r.type === "SAVE_MEMO")!;
+    expect(save.tags).toEqual(["star", "阅读", "自己的想法"]);
+    expect(String(save.content)).not.toContain("#star");
   });
 
   it("rejects Pick up away from an X detail page without injecting scripts", async () => {

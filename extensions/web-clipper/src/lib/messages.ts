@@ -38,6 +38,7 @@ export type Request =
   | { type: "GET_AUTH_USER" }
   | { type: "GET_CONNECTION_STATE"; refresh?: boolean; source?: "active" | "usememos" }
   | { type: "GET_POPUP_STATE" }
+  | { type: "GET_MEMO_TAGS"; expectedSource: ConnectionSource; expectedConnectionId: string; expectedInstanceUrl: string }
   | { type: "GET_CAPTURE_CAPABILITIES"; expectedSource: ConnectionSource; expectedConnectionId: string; expectedInstanceUrl: string }
   | {
       type: "GET_CLIP_STATUS";
@@ -55,6 +56,7 @@ export type Request =
       content: string;
       visibility: Visibility;
       images?: string[];
+      tags?: string[];
       expectedSource: ConnectionSource;
       expectedConnectionId: string;
       expectedInstanceUrl: string;
@@ -93,3 +95,5 @@ export type SaveResult =
 
 export type CaptureCapabilitiesResult = { ok: true; supported: boolean; contentMaxBytes: number } | { ok: false; errorKind: SaveErrorKind };
 export type ClipRecordsResult = { ok: true; records: ClipRecord[] } | { ok: false; errorKind: SaveErrorKind };
+
+export type MemoTagsResult = { ok: true; tags: string[] } | { ok: false; errorKind: SaveErrorKind };

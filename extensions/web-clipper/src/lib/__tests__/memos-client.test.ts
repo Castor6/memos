@@ -5,6 +5,7 @@ import {
   createMemo,
   getCurrentUser,
   getInstanceProfile,
+  getMemoTags,
   isValidInstanceUrl,
   listRecentMemos,
   memoWebUrl,
@@ -309,5 +310,32 @@ describe("published OpenAPI compatibility", () => {
       ),
     ).resolves.toEqual({ name: "memos/save-123", uid: undefined });
     await expect(listRecentMemos(creds, 20, "users/steven", { fetchImpl })).resolves.toHaveLength(1);
+  });
+});
+
+describe("getMemoTags", () => {
+  it("combines current-user counts with configured unused tags without duplicates", async () => {
+    const fetchImpl = vi.fn(async (url: RequestInfo | URL) => {
+      if (String(url).endsWith("/auth/me")) return jsonResponse({ user: { name: "users/steven" } });
+      if (String(url).endsWith("users/steven:getStats")) return jsonResponse({ tagCount: { Star: 2 } });
+      if (String(url).endsWith("users/steven/settings/TAGS")) return jsonResponse({ tagsSetting: { tags: { Star: {}, "Pick up": {} } } });
+      throw new Error("Unexpected endpoint");
+    });
+    await expect(getMemoTags(creds, { fetchImpl })).resolves.toEqual(["Star", "Pick up"]);
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+  });
+
+  it("supports empty settings and rejects malformed tag maps", async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ user: { name: "users/steven" } }))
+      .mockResolvedValueOnce(jsonResponse({}))
+      .mockResolvedValueOnce(jsonResponse({}));
+    await expect(getMemoTags(creds, { fetchImpl })).resolves.toEqual([]);
+    fetchImpl
+      .mockResolvedValueOnce(jsonResponse({ user: { name: "users/steven" } }))
+      .mockResolvedValueOnce(jsonResponse({ tagCount: [] }))
+      .mockResolvedValueOnce(jsonResponse({}));
+    await expect(getMemoTags(creds, { fetchImpl })).rejects.toMatchObject({ kind: "bad-response" });
   });
 });

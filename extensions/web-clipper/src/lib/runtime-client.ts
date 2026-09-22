@@ -7,6 +7,7 @@ import type {
   ClipRecordsResult,
   ConnectionActionResult,
   ConnectionStateResult,
+  MemoTagsResult,
   PopupStateResult,
   SaveResult,
 } from "./messages";
@@ -18,6 +19,7 @@ type BackgroundResponses = {
   GET_CLIP_STATUS: ClipSaveStatus | null;
   LIST_CLIP_RECORDS: ClipRecordsResult;
   GET_CAPTURE_CAPABILITIES: CaptureCapabilitiesResult;
+  GET_MEMO_TAGS: MemoTagsResult;
   CONNECT_DIRECT: ConnectionActionResult;
   ACTIVATE_USEMEMOS_CONNECTION: ConnectionActionResult;
   SAVE_MEMO: SaveResult;

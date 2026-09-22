@@ -14,6 +14,8 @@ import { useEffect, useRef, useState } from "react";
 import browser from "webextension-polyfill";
 import { AccountBadge } from "@/components/account-badge";
 import { AppBrand } from "@/components/app-brand";
+import { MarkdownPreview } from "@/components/markdown-preview";
+import { TagEditor } from "@/components/tag-editor";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -319,11 +321,20 @@ function SignedInView({ c, state, blocked }: { c: ClipperState; state: ReadyPopu
                 重新提取原内容
               </Button>
             </div>
+            <TagEditor
+              tags={draft.tags}
+              suggestions={c.tagSuggestions}
+              onChange={(tags) => edit({ tags })}
+              disabled={editingDisabled}
+              loading={c.tagsLoading}
+              error={c.tagsError}
+              onRetry={c.retryTags}
+            />
             <label htmlFor="capture-comment" className="flex flex-col gap-1.5 text-sm font-medium">
-              {isPickup ? "我的评论" : "我的思考"}
+              {isPickup ? "Pick up" : "我的思考"}
               <Textarea
                 id="capture-comment"
-                aria-label={isPickup ? "我的评论" : "我的思考"}
+                aria-label={isPickup ? "Pick up" : "我的思考"}
                 value={draft.capture.comment}
                 readOnly={isPickup}
                 disabled={editingDisabled}
@@ -334,7 +345,7 @@ function SignedInView({ c, state, blocked }: { c: ClipperState; state: ReadyPopu
             </label>
             {isPickup ? (
               <>
-                <p className="text-[11px] text-muted-foreground">保留已发表的原话；新的想法写在下方。</p>
+                <p className="text-[11px] text-muted-foreground">保留已发表的原话；下方可记录形成这条评论的背景、线索与思考过程。</p>
                 {!draft.confirmed ? (
                   <label className="flex items-start gap-2 text-xs">
                     <input
@@ -347,14 +358,14 @@ function SignedInView({ c, state, blocked }: { c: ClipperState; state: ReadyPopu
                   </label>
                 ) : null}
                 <label htmlFor="capture-context" className="flex flex-col gap-1.5 text-sm font-medium">
-                  补充背景（可选）
+                  Context & thinking（可选）
                   <Textarea
                     id="capture-context"
-                    aria-label="补充背景"
+                    aria-label="Context & thinking"
                     value={draft.capture.context}
                     disabled={editingDisabled}
                     className="min-h-20 max-h-40 resize-y text-sm field-sizing-fixed"
-                    placeholder="当时为什么回复？有什么背景、链接或后来的感想？"
+                    placeholder="哪些背景、线索和思考促成了这条评论？"
                     onChange={(event) => edit({}, { context: event.target.value })}
                   />
                 </label>
@@ -368,7 +379,7 @@ function SignedInView({ c, state, blocked }: { c: ClipperState; state: ReadyPopu
               </ul>
             ) : null}
             <details className="rounded-md border p-2">
-              <summary className="cursor-pointer text-sm font-medium">{isPickup ? "回应内容与上文" : "原内容"} · 点击展开</summary>
+              <summary className="cursor-pointer text-sm font-medium">{isPickup ? "What they put down" : "原内容"} · 点击展开</summary>
               <Textarea
                 aria-label="原内容"
                 className="mt-2 min-h-40 max-h-64 resize-y text-xs field-sizing-fixed"
@@ -380,7 +391,9 @@ function SignedInView({ c, state, blocked }: { c: ClipperState; state: ReadyPopu
             </details>
             <details className="rounded-md border p-2">
               <summary className="cursor-pointer text-xs">预览完整保存内容</summary>
-              <pre className="mt-2 whitespace-pre-wrap break-words text-xs">{c.content}</pre>
+              <div className="mt-2">
+                <MarkdownPreview content={c.content} />
+              </div>
             </details>
             {draft.images.length ? <p className="text-xs text-muted-foreground">{draft.images.length} 张图片将尝试保存为附件。</p> : null}
             <p role={c.overLimit ? "alert" : "status"} className={`text-xs ${c.overLimit ? "text-destructive" : "text-muted-foreground"}`}>

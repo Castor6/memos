@@ -65,6 +65,7 @@ async function saveFingerprint(
   images: string[],
   accessToken: string,
   capture?: CaptureData,
+  tags?: string[],
 ): Promise<string> {
   const value = JSON.stringify([
     content,
@@ -75,6 +76,7 @@ async function saveFingerprint(
     images,
     accessToken,
     capture,
+    ...(tags !== undefined ? [tags] : []),
   ]);
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -125,6 +127,7 @@ export async function savePopupMemo(
   expected: SaveExpectation,
   operation: SaveOperation = { requestId: `legacy_${Date.now()}_${Math.random().toString(36).slice(2)}`, startedAt: Date.now() },
   clip?: ClipCaptureInput,
+  tags?: string[],
 ): Promise<SaveResult> {
   let connection: Awaited<ReturnType<typeof resolveActiveConnection>>;
   try {
@@ -156,11 +159,11 @@ export async function savePopupMemo(
   }
   if (!(await connectionStillMatches(expected, credentials))) return { ok: false, errorKind: "auth-changed" };
   const attemptKey = JSON.stringify([expected.source, expected.connectionId, expected.instanceUrl, operation.requestId]);
-  const fingerprint = await saveFingerprint(content, visibility, expected, images, credentials.accessToken, capture);
+  const fingerprint = await saveFingerprint(content, visibility, expected, images, credentials.accessToken, capture, tags);
   const running = inFlight.get(attemptKey);
   if (running) return running.fingerprint === fingerprint ? running.promise : { ok: false, errorKind: "invalid-content" };
 
-  const save = savePopupMemoOnce(content, visibility, images, expected, operation, credentials, attemptKey, fingerprint, capture)
+  const save = savePopupMemoOnce(content, visibility, images, expected, operation, credentials, attemptKey, fingerprint, capture, tags)
     .then(async (result) => {
       if (!(await connectionStillMatches(expected, credentials))) return { ok: false, errorKind: "auth-changed" } as const;
       if (result.ok && clip && !clip.capture) {
@@ -203,6 +206,7 @@ async function savePopupMemoOnce(
   attemptKey: string,
   fingerprint: string,
   capture?: CaptureData,
+  tags?: string[],
 ): Promise<SaveResult> {
   const previous = (await readAttempts())[attemptKey];
   if (previous && previous.fingerprint !== fingerprint) return { ok: false, errorKind: "bad-response" };
@@ -223,6 +227,9 @@ async function savePopupMemoOnce(
       const match = recent.find(
         (memo) =>
           memo.creator === currentUser?.name &&
+          (tags === undefined ||
+            (capture && previous?.result) ||
+            ((memo.tags ?? []).length === tags.length && tags.every((tag) => memo.tags?.includes(tag)))) &&
           (capture
             ? sameCapture(memo.capture, capture) && (previous?.result || (memo.content === content && memo.visibility === visibility))
             : memo.content === content && memo.visibility === visibility) &&
@@ -259,7 +266,7 @@ async function savePopupMemoOnce(
   }
 
   if (!(await connectionStillMatches(expected, credentials))) return { ok: false, errorKind: "auth-changed" };
-  const result = await createMemoWithAttachments(content, names, credentials, visibility, operation.serverMemoId, capture);
+  const result = await createMemoWithAttachments(content, names, credentials, visibility, operation.serverMemoId, capture, tags);
   if (result.ok) {
     const success = failed > 0 ? { ...result, failedImages: failed } : result;
     await writeAttempt(attemptKey, { ...attempt, result: success });
@@ -456,12 +463,14 @@ async function createMemoWithAttachments(
   visibility: Visibility,
   memoId?: string,
   capture?: CaptureData,
+  tags?: string[],
 ): Promise<SaveResult> {
   try {
     const memo = await createMemo(credentials, {
       content,
       visibility,
       ...(capture ? { capture } : {}),
+      ...(tags !== undefined ? { tags, explicitTags: true } : {}),
       ...(memoId ? { memoId } : {}),
       ...(attachmentNames.length ? { attachments: attachmentNames.map((name) => ({ name })) } : {}),
     });

@@ -15,7 +15,7 @@ import { captureCapabilities, findServerClipStatus, listServerClipRecords } from
 import { describeSaveError, type SaveErrorKind, toSaveErrorKind } from "@/lib/errors";
 import { applyLocalePreference, getTextDirection, initializeLocalePreference, LOCALE_PREFERENCE_KEY, t, tp } from "@/lib/i18n";
 import { checkVersion, clearCachedVersion } from "@/lib/instance-version";
-import { memosUserDisplayName } from "@/lib/memos-client";
+import { getMemoTags, memosUserDisplayName } from "@/lib/memos-client";
 import type { ConnectionStateResult, Request, SaveResult, SelectionClip } from "@/lib/messages";
 import { clearPopupState } from "@/lib/popup-state";
 import { readClipTemplate } from "@/lib/template-settings";
@@ -111,6 +111,25 @@ browser.runtime.onMessage.addListener((message: unknown, sender: RuntimeSender) 
         return { ok: false, errorKind: toSaveErrorKind(error) };
       }
     })();
+  if (req.type === "GET_MEMO_TAGS")
+    return (async () => {
+      try {
+        const connection = await resolveActiveConnection();
+        if (!connection) return { ok: false, errorKind: "not-configured" };
+        const matches = (value: typeof connection | null) =>
+          value &&
+          value.source === req.expectedSource &&
+          value.connectionId === req.expectedConnectionId &&
+          value.credentials.instanceUrl === req.expectedInstanceUrl &&
+          value.credentials.accessToken === connection.credentials.accessToken;
+        if (!matches(connection)) return { ok: false, errorKind: "auth-changed" };
+        const tags = await getMemoTags(connection.credentials);
+        if (!matches(await resolveActiveConnection())) return { ok: false, errorKind: "auth-changed" };
+        return { ok: true, tags };
+      } catch (error) {
+        return { ok: false, errorKind: toSaveErrorKind(error) };
+      }
+    })();
   if (req.type === "GET_CAPTURE_CAPABILITIES")
     return (async () => {
       try {
@@ -190,6 +209,7 @@ browser.runtime.onMessage.addListener((message: unknown, sender: RuntimeSender) 
         ...(req.saveRequestId || req.clip ? { serverMemoId: requestId } : {}),
       },
       req.clip,
+      req.tags,
     );
   }
   if (req.type === "OPEN_SIGN_IN") return openSignInFlow();

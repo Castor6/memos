@@ -7,4 +7,4 @@
 - 扩展 CI 纳入根 `validate`，运行 lint/test/build、`python -m unittest discover -s scripts -p 'test_package*.py'` 和 ZIP 生成；版本 PR 合并后同一提交的 ZIP 进入 GitHub Release 与 SHA256SUMS。交付行为变化需根目录 Changeset。
 - 实际令牌、浏览器数据、抓取网页、构建产物和 node_modules 不提交。保留现有试用版直到用户切换加载目录。
 - Star 是通用网页剪藏，Pick up 是 X 互动留存。弹窗打开不读正文，点击后提取；草稿本地保存，已保存记录以 Memos `Memo.capture` 为准。能力和正文限制从实例 Profile 读取，连接仍复用 URL + PAT。
-- 服务端快照仅创建者可见且创建后不可修改；普通正文编辑保留快照。更改保存、幂等或历史行为时同时验证服务端与扩展边界。空间、独立标签选择、旧历史迁移与右键快速保存改造尚未实现。
+- 服务端快照仅创建者可见且创建后不可修改；普通正文编辑保留快照。更改保存、幂等或历史行为时同时验证服务端与扩展边界。弹窗以 `tags` + `explicitTags` 保存独立标签，新草稿默认 `star` / `pick up`；旧的未知结果请求保留原正文及标签语义。空间、旧历史迁移与右键快速保存改造尚未实现。

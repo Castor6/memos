@@ -125,6 +125,86 @@ describe("background — SAVE_MEMO message", () => {
     clip: { sourceUrl: starCapture.sourceUrl, sourceTitle: "Title", imageCount: images.length, capture: starCapture },
   });
 
+  it("saves explicit tags and refuses changed tags under the same request id", async () => {
+    const fetchMock = vi.fn((value: unknown, init?: RequestInit) => {
+      if (String(value).endsWith("/instance/profile")) return Promise.resolve(jsonResponse({ version: "dev", webClipperSupported: true }));
+      if (init?.method === "POST") return Promise.resolve(jsonResponse({ name: "memos/tagged_capture" }));
+      return Promise.resolve(jsonResponse({}, 404));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const request = { ...captureRequest("tagged_capture"), tags: ["Star", "中文"] };
+    expect(await emitRuntime(request)).toMatchObject({ ok: true });
+    const post = fetchMock.mock.calls.find(([, init]) => init?.method === "POST");
+    expect(JSON.parse(String(post?.[1]?.body))).toMatchObject({ tags: ["Star", "中文"], explicitTags: true });
+    expect(await emitRuntime({ ...request, tags: ["Star", "changed"] })).toMatchObject({ ok: false });
+    expect(fetchMock.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(1);
+    vi.unstubAllGlobals();
+  });
+
+  it.each([
+    { confirmed: true, sameSnapshot: true, recovered: true },
+    { confirmed: false, sameSnapshot: true, recovered: false },
+    { confirmed: true, sameSnapshot: false, recovered: false },
+  ])("reconciles later tag edits only for a confirmed matching capture: %j", async ({ confirmed, sameSnapshot, recovered }) => {
+    let remote: Record<string, unknown> | null = null;
+    const fetchMock = vi.fn((value: unknown, init?: RequestInit) => {
+      const url = String(value);
+      if (url.endsWith("/instance/profile")) return Promise.resolve(jsonResponse({ version: "dev", webClipperSupported: true }));
+      if (url.endsWith("/auth/me")) return Promise.resolve(jsonResponse({ user: { name: "users/steven" } }));
+      if (init?.method === "POST") {
+        remote = {
+          ...JSON.parse(String(init.body)),
+          name: "memos/edited_tags_retry",
+          creator: "users/steven",
+          createTime: new Date().toISOString(),
+        };
+        return confirmed
+          ? Promise.resolve(jsonResponse(remote))
+          : Promise.reject(Object.assign(new Error("response lost"), { name: "TimeoutError" }));
+      }
+      return Promise.resolve(remote ? jsonResponse(remote) : jsonResponse({}, 404));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const request = { ...captureRequest("edited_tags_retry"), tags: ["star"] };
+    expect(await emitRuntime(request)).toMatchObject(confirmed ? { ok: true } : { ok: false, errorKind: "timeout" });
+    remote = {
+      ...remote!,
+      tags: ["read"],
+      capture: sameSnapshot ? starCapture : { ...starCapture, comment: "Different capture" },
+    };
+    expect(await emitRuntime({ ...request, saveIsRetry: true })).toMatchObject(
+      recovered ? { ok: true } : { ok: false, errorKind: "invalid-content" },
+    );
+    expect(fetchMock.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(1);
+  });
+
+  it.each([{ tags: ["Star"] }, { tags: ["Other"] }, { tags: [] }])("reconciles exact tags after local state is lost: %j", async ({
+    tags,
+  }) => {
+    const fetchMock = vi.fn((value: unknown, _init?: RequestInit) => {
+      const url = String(value);
+      if (url.endsWith("/instance/profile")) return Promise.resolve(jsonResponse({ version: "dev", webClipperSupported: true }));
+      if (url.endsWith("/auth/me")) return Promise.resolve(jsonResponse({ user: { name: "users/steven" } }));
+      return Promise.resolve(
+        jsonResponse({
+          name: "memos/tags_reconcile",
+          creator: "users/steven",
+          createTime: new Date().toISOString(),
+          content: "body",
+          visibility: "PRIVATE",
+          capture: starCapture,
+          tags,
+        }),
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await emitRuntime({ ...captureRequest("tags_reconcile"), tags: ["Star"], saveIsRetry: true })).toMatchObject(
+      tags[0] === "Star" ? { ok: true } : { ok: false, errorKind: "invalid-content" },
+    );
+    expect(fetchMock.mock.calls.every(([, init]) => init?.method !== "POST")).toBe(true);
+    vi.unstubAllGlobals();
+  });
+
   it("rejects an existing id with changed thoughts instead of accepting a matching source alone", async () => {
     const fetchMock = vi.fn((value: unknown, _init?: RequestInit) => {
       const url = String(value);
@@ -1218,5 +1298,30 @@ describe("background — context menu quick save", () => {
   it("ignores clicks on other menu items", async () => {
     await browserMock.contextMenus.onClicked.emit({ menuItemId: "something-else", selectionText: "x" }, { id: 5 });
     expect(browserMock.action.setBadgeText).not.toHaveBeenCalled();
+  });
+});
+
+describe("background — GET_MEMO_TAGS", () => {
+  beforeEach(ready);
+  it("rejects stale lookup identities before fetching", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await emitRuntime({ type: "GET_MEMO_TAGS", ...expected, expectedConnectionId: "stale" })).toEqual({
+      ok: false,
+      errorKind: "auth-changed",
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it("drops tag results if credentials change while loading", async () => {
+    const fetchMock = vi.fn(async (value: unknown) => {
+      if (String(value).endsWith("/auth/me")) return jsonResponse({ user: { name: "users/steven" } });
+      mockUser = { id: "user_123", unsafeMetadata: memos({ accessToken: "replaced" }) };
+      return jsonResponse({});
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await emitRuntime({ type: "GET_MEMO_TAGS", ...expected })).toEqual({ ok: false, errorKind: "auth-changed" });
+    vi.unstubAllGlobals();
   });
 });

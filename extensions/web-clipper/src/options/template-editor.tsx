@@ -9,7 +9,7 @@ import { t } from "@/lib/i18n";
 import { DEFAULT_TEMPLATE, renderTemplate, splitTemplateTokens } from "@/lib/template";
 
 // Record<TemplateVarName, …> keeps the preview in sync with the template engine.
-// Tags are not a variable — default tags are literal #tags typed into the template body.
+// Tags are not a template variable; the capture workspace manages independent tags.
 function previewVars(): Record<TemplateVarName, string> {
   return {
     content: t("templatePreviewContent"),

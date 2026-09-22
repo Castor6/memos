@@ -38,6 +38,9 @@ describe("capture rendering", () => {
     expect(content.indexOf("Why I replied")).toBeLessThan(content.indexOf("Original idea"));
     expect(content.match(/My reply/g)).toHaveLength(1);
     expect(content).toContain("@author");
+    expect(content).toContain("## Pick up\n");
+    expect(content).toContain("## Context & thinking\n");
+    expect(content).toContain("## What they put down\n");
     expect(content).toContain("2026-09-22T00:00:00Z");
   });
 
@@ -47,6 +50,14 @@ describe("capture rendering", () => {
     expect(content.indexOf("My reply")).toBeLessThan(content.indexOf("<details>"));
     expect(content).toContain(body.trim());
     expect(content).toContain("</details>");
+  });
+
+  it("preserves legacy headings for retrying old drafts without replacing quoted text", () => {
+    const content = composeCaptureMemo(capture, "## 我的评论\n\nQuoted text", true);
+    expect(content).toContain("## 我的评论\n\nMy reply");
+    expect(content).toContain("## 补充背景\n\nWhy I replied");
+    expect(content).toContain("## 回应内容与上文\n\n## 我的评论\n\nQuoted text");
+    expect(composeCaptureMemo(capture, "## 我的评论\n\nQuoted text")).toContain("## What they put down\n\n## 我的评论\n\nQuoted text");
   });
 
   it("counts UTF-8 bytes including Chinese and emoji", () => {

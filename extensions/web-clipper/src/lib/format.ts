@@ -41,7 +41,7 @@ export type ComposeInput = {
 /**
  * Every `{{var}}` the template engine fills — the options UI derives its chip list from this.
  * Deliberately few: the capture data the default template actually needs. Tags are not a
- * variable — default tags are literal #tags written in the template itself.
+ * variable — the capture workspace manages tags separately from the template body.
  */
 export const TEMPLATE_VAR_NAMES = ["content", "title", "url", "description"] as const;
 export type TemplateVarName = (typeof TEMPLATE_VAR_NAMES)[number];

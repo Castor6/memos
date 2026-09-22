@@ -2,6 +2,7 @@ import { ArrowLeftIcon, ChevronDownIcon, ExternalLinkIcon, FileTextIcon, SearchI
 import { useEffect, useMemo, useState } from "react";
 import browser from "webextension-polyfill";
 import { AppBrand } from "@/components/app-brand";
+import { MarkdownPreview } from "@/components/markdown-preview";
 import { buttonVariants } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import type { ClipRecord } from "@/lib/clip-records";
@@ -95,19 +96,19 @@ function ClipDetail({ record }: { record: ClipRecord }) {
 
             <section>
               <h3 className={`mb-2 ${SECTION_LABEL_CLASS}`}>{t("historyMemoContent")}</h3>
-              <pre className="max-h-[28rem] overflow-auto whitespace-pre-wrap rounded-md border bg-muted/15 px-4 py-3.5 font-sans text-[13px] leading-[1.65]">
-                {record.memoContent}
-              </pre>
+              <div className="max-h-[28rem] overflow-auto rounded-md border bg-muted/15 px-4 py-3.5">
+                <MarkdownPreview content={record.memoContent} />
+              </div>
             </section>
             {record.capture ? (
               <details className="rounded-md border p-3">
                 <summary className="cursor-pointer text-xs text-muted-foreground">保存时的互动与背景</summary>
                 <p className="mt-3 text-xs text-muted-foreground">上方显示服务器当前正文；以下保留首次保存时的互动信息。</p>
-                <p className="mt-3 text-xs font-medium">{record.capture.kind === "PICK_UP" ? "我的评论" : "我的思考"}</p>
+                <p className="mt-3 text-xs font-medium">{record.capture.kind === "PICK_UP" ? "Pick up" : "我的思考"}</p>
                 <pre className="mt-1 whitespace-pre-wrap font-sans text-sm">{record.capture.comment || "（未填写）"}</pre>
                 {record.capture.context ? (
                   <>
-                    <p className="mt-3 text-xs font-medium">补充背景</p>
+                    <p className="mt-3 text-xs font-medium">Context & thinking</p>
                     <pre className="mt-1 whitespace-pre-wrap font-sans text-sm">{record.capture.context}</pre>
                   </>
                 ) : null}
