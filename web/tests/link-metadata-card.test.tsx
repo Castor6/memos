@@ -6,20 +6,47 @@ import { MarkdownRenderContext } from "@/components/MemoContent/MarkdownRenderCo
 import { LinkMetadataSchema } from "@/types/proto/api/v1/memo_service_pb";
 
 const query = vi.hoisted(() => ({
-  isSuccess: true,
+  status: "success" as "success" | "pending" | "error",
+  enabled: true,
   data: { url: "https://example.com/article", title: "Article title", description: "Description", image: "" },
 }));
 
-vi.mock("@/hooks/useMemoQueries", () => ({ useLinkMetadata: () => query }));
+vi.mock("@/hooks/useMemoQueries", () => ({
+  useLinkMetadata: (_url: string, options: { enabled: boolean }) => {
+    query.enabled = options.enabled;
+    return { ...query, isLoading: query.status === "pending" && options.enabled, isSuccess: query.status === "success" && options.enabled };
+  },
+}));
 
-const renderCard = () => render(<LinkMetadataCard url={query.data.url} fallback={<a href={query.data.url}>{query.data.url}</a>} />);
+const renderCard = (enabled = true) =>
+  render(<LinkMetadataCard url={query.data.url} fallback={<a href={query.data.url}>{query.data.url}</a>} enabled={enabled} />);
+
+const expectPlainLink = () => {
+  expect(screen.getByRole("link", { name: query.data.url })).toBeInTheDocument();
+  expect(screen.queryByText(/正在读取链接预览/)).not.toBeInTheDocument();
+  expect(screen.queryByText("Article title")).not.toBeInTheDocument();
+};
 
 beforeEach(() => {
-  query.isSuccess = true;
+  query.status = "success";
+  query.enabled = true;
   query.data = { url: "https://example.com/article", title: "Article title", description: "Description", image: "" };
 });
 
 describe("link metadata card fallback", () => {
+  it("keeps the original link before it enters the viewport", () => {
+    renderCard(false);
+    expect(query.enabled).toBe(false);
+    expectPlainLink();
+  });
+
+  it("keeps the original link while metadata is loading", () => {
+    query.status = "pending";
+    renderCard();
+    expect(query.enabled).toBe(true);
+    expectPlainLink();
+  });
+
   it.each(["", " \n "])("keeps the original link when title is %j, even with a description and image", (title) => {
     query.data.title = title;
     query.data.image = "https://example.com/cover.jpg";
@@ -30,10 +57,9 @@ describe("link metadata card fallback", () => {
   });
 
   it("keeps the original link when fetching fails", () => {
-    query.isSuccess = false;
+    query.status = "error";
     renderCard();
-    expect(screen.getByRole("link", { name: query.data.url })).toBeInTheDocument();
-    expect(screen.queryByText("Article title")).not.toBeInTheDocument();
+    expectPlainLink();
   });
 
   it("renders a title without requiring a description or image", () => {
@@ -45,7 +71,7 @@ describe("link metadata card fallback", () => {
 });
 
 it("renders the persisted title immediately without waiting for the metadata query", () => {
-  query.isSuccess = false;
+  query.status = "pending";
   render(
     <MarkdownRenderContext.Provider
       value={{

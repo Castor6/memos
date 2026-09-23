@@ -28,14 +28,6 @@ const LinkMetadataCard = ({ url, fallback, enabled = true }: LinkMetadataCardPro
   const description = metadata?.description.trim() ?? "";
   const hostname = getHostname(metadata?.url || url);
 
-  if (!saved && (query.isLoading || !enabled)) {
-    return (
-      <div className="my-0 mb-2 min-h-20 w-full rounded-md border border-border bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
-        <span>正在读取链接预览…</span>
-        {fallback}
-      </div>
-    );
-  }
   if (!isSuccess || title === "") {
     return fallback;
   }

@@ -187,6 +187,7 @@ export function useLinkMetadata(url: string, options?: { enabled?: boolean }) {
       return metadata;
     },
     enabled: (options?.enabled ?? true) && isHTTPURL(trimmedUrl),
+    retry: false,
     staleTime: 1000 * 60 * 60 * 24,
     gcTime: 1000 * 60 * 60 * 24,
   });
