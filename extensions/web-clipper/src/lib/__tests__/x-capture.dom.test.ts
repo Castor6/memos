@@ -154,15 +154,44 @@ describe("captureXPage", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it("stops before an advertisement and reports incomplete context", () => {
+  it("does not filter preceding posts by advertisement markers", () => {
     page(
       post("100", "root", "Original") +
         post("200", "ad", "Product", '<span data-testid="promotedIndicator">Promoted</span>') +
         post("300", "me", "Response"),
     );
     const result = captureXPage("PICK_UP");
-    expect(result.capture?.posts.map(({ id }) => id)).toEqual(["300"]);
-    expect(result.warnings.join(" ")).toContain("上下文可能不完整");
+    expect(result.capture?.posts.map(({ id }) => id)).toEqual(["100", "200", "300"]);
+    expect(result.warnings.join(" ")).not.toContain("已停止向前提取");
+  });
+
+  it("captures a video ancestor wrapped in placementTracking without fetching media", () => {
+    page(
+      post(
+        "200",
+        "parent",
+        "Video introduction",
+        '<div data-testid="placementTracking"><div data-testid="videoPlayer"><video src="blob:https://x.com/example"></video></div></div>',
+      ) + post("300", "me", "My response"),
+    );
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    const result = captureXPage("PICK_UP");
+    expect(result.capture?.posts.map(({ id }) => id)).toEqual(["200", "300"]);
+    expect(result.capture?.posts[0]).toMatchObject({ content: "Video introduction", url: "https://x.com/parent/status/200" });
+    expect(result.warnings.join(" ")).toContain("不下载视频");
+    expect(result.warnings.join(" ")).not.toContain("已停止向前提取");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it.each(["STAR", "PICK_UP"] as const)("captures the current post inside tracking wrappers in %s mode", (mode) => {
+    page(
+      `<div data-testid="placementTracking">${post("300", "me", "Current video", '<div data-testid="placementTracking"><div data-testid="videoPlayer"><video></video></div></div>')}</div>`,
+    );
+    const result = captureXPage(mode);
+    expect(result.error).toBeUndefined();
+    expect(result.capture?.posts[0]).toMatchObject({ id: "300", content: "Current video" });
+    expect(result.warnings.join(" ")).toContain("不下载视频");
   });
 
   it("does not treat the word Ad in post text as an advertisement", () => {
