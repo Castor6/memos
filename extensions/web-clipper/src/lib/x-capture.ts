@@ -145,19 +145,11 @@ export function captureXPage(kind: "STAR" | "CLIP" | "PICK_UP"): XCaptureResult 
       images: mediaImages(article, article, false),
     };
   };
-  const isAdvertisement = (article: Element) =>
-    !!article.closest('[data-testid="placementTracking"]') ||
-    !!article.querySelector('[data-testid="promotedIndicator"], [data-testid="placementTracking"]') ||
-    Array.from(article.querySelectorAll("span")).some(
-      (element) =>
-        !element.closest('[data-testid="tweetText"], [data-testid="User-Name"]') &&
-        /^(?:Ad|Promoted|广告|推廣|推广)$/.test(element.textContent?.trim() ?? ""),
-    );
   const primary = document.querySelector('[data-testid="primaryColumn"]') ?? document.querySelector("main") ?? document;
   const articles = Array.from(primary.querySelectorAll('article[data-testid="tweet"]')).filter(
     (article) => visible(article) && !article.parentElement?.closest('article[data-testid="tweet"]'),
   );
-  const target = articles.find((article) => !isAdvertisement(article) && readPost(article)?.id === source.id);
+  const target = articles.find((article) => readPost(article)?.id === source.id);
   if (!target) return fail("未找到当前帖子正文。请等待帖子加载完成，并展开内容后重试。");
   const current = readPost(target)!;
 
@@ -257,8 +249,8 @@ export function captureXPage(kind: "STAR" | "CLIP" | "PICK_UP"): XCaptureResult 
             element.textContent ?? "",
           ),
         );
-        if (isAdvertisement(article) || hasGap || !previous || BigInt(previous.id) >= BigInt(next.id)) {
-          warnings.push("对话中存在广告、推荐、折叠或不可用内容，已停止向前提取；上下文可能不完整。");
+        if (hasGap || !previous || BigInt(previous.id) >= BigInt(next.id)) {
+          warnings.push("对话中存在推荐、折叠、不可用内容或无法确认的帖子顺序，已停止向前提取；上下文可能不完整。");
           break;
         }
         incomplete(article);
