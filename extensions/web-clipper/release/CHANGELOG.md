@@ -1,5 +1,11 @@
 # memos-web-clipper
 
+## 0.1.2
+
+### Patch Changes
+
+- 0eafed9: 移除 X 帖子剪藏的广告判定，修复带视频上文被误拦截的问题，保留对话断层与顺序检查。
+
 ## 0.1.1
 
 ### Patch Changes
