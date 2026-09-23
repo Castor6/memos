@@ -16,9 +16,9 @@ function fixture(t) {
   git("config", "user.name", "Release Test");
   git("config", "user.email", "release-test@example.invalid");
   const write = (path, text) => { mkdirSync(dirname(join(root, path)), { recursive: true }); writeFileSync(join(root, path), text); };
-  const commit = () => { git("add", "."); git("commit", "-m", "test fixture"); return git("rev-parse", "HEAD"); };
+  const commit = () => { git("add", "--all", "--", ".", ":!node_modules"); git("commit", "-m", "test fixture"); return git("rev-parse", "HEAD"); };
   write("package.json", JSON.stringify({ name: "memos-personal", version: "0.0.0", private: true }, null, 2) + "\n");
-  write(".gitignore", "node_modules\n");
+  write(".gitignore", "node_modules/\n");
   write(".changeset/config.json", readFileSync(join(project, ".changeset/config.json"), "utf8"));
   write(".changeset/changelog.mjs", readFileSync(join(project, ".changeset/changelog.mjs"), "utf8"));
   write("CHANGELOG.md", "# Changelog\n");
