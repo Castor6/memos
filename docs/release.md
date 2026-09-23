@@ -88,7 +88,7 @@ main 的 CI 成功后，`Version Packages` 工作流对仍为当前 main 的提�
 
 附件包含 Linux amd64/arm64 二进制、Chrome / Edge 通用的 `memos-web-clipper-chromium-v<版本>.zip`、`CHANGELOG.md`、`LICENSE`、`release.json`、`image-digest.txt` 和 `SHA256SUMS`。二进制、ZIP 和元数据先核对构建产物的校验清单，再生成包含镜像摘要的完整公开清单；不会公开私有 Registry 地址。与 30 天 Actions artifacts 不同，Release 附件不会因这个保留期限被自动清除。
 
-扩展与服务端从同一个确定提交构建。发布任务使用 Node 24、扩展独立的 pnpm 11.10.0 和公开 `.env.example`，执行 lint、单测、Python 标准库打包测试、类型及生产构建，再生成 ZIP；检查或打包失败会阻断镜像发布。ZIP 保留稳定 Chromium key、不含商店更新地址，包内及本地 manifest 版本取独立的 `extensions/web-clipper/release/package.json`，源码的上游扩展基线不参与 Changesets 升级。扩展从 0.8.2 衔接，版本 PR 同时维护其 `release/CHANGELOG.md`；普通 PR 不手改两套版本/日志。`castor-release.json` 记录扩展版本/构建提交/上游基线及配套 Memos 标签；外部 `release.json.webClipper` 使用扩展自身版本指向对应 ZIP，允许其与 Memos 版本不同。同一扩展版本仍可随多个 Memos Release 重新构建，提交/配套标签变化会改变 ZIP 摘要，但同一 Release 的重试仍须字节一致。公开前验证 ZIP 内部身份与清单，继续采用草稿上传、回读摘要、禁止覆盖同名不同内容的规则。
+扩展与服务端从同一个确定提交构建。发布任务使用 Node 24、扩展独立的 pnpm 11.10.0 和公开 `.env.example`，执行 lint、单测、Python 标准库打包测试、类型及生产构建，再生成 ZIP；检查或打包失败会阻断镜像发布。ZIP 保留稳定 Chromium key、不含商店更新地址，包内及本地 manifest 版本取独立的 `extensions/web-clipper/release/package.json`，源码的上游扩展基线不参与 Changesets 升级。扩展首个独立正式版为 0.1.0；初始 0.0.1 仅是兼容 Chromium 非全零要求的未发布构建占位值，首份 minor changeset 生成 0.1.0。版本 PR 同时维护其 `release/CHANGELOG.md`；普通 PR 不手改两套版本/日志。`castor-release.json` 记录扩展版本/构建提交/上游基线及配套 Memos 标签；外部 `release.json.webClipper` 使用扩展自身版本指向对应 ZIP，允许其与 Memos 版本不同。同一扩展版本仍可随多个 Memos Release 重新构建，提交/配套标签变化会改变 ZIP 摘要，但同一 Release 的重试仍须字节一致。公开前验证 ZIP 内部身份与清单，继续采用草稿上传、回读摘要、禁止覆盖同名不同内容的规则。
 
 下载 ZIP 后须解压，在 Chrome / Edge 扩展管理页开启开发者模式并加载含 `manifest.json` 的目录；后续需手动替换文件并重新加载，不是商店自动更新。安装及版本兼容边界见 [扩展说明](../extensions/web-clipper/README.md)。扩展源码修改要求中文 Changeset，普通 PR 仍不触发正式发布。
 

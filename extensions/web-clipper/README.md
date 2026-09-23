@@ -71,7 +71,7 @@ corepack pnpm build
 
 包含本发布流程的版本 PR 合并后，GitHub Release 提供 `memos-web-clipper-chromium-v<版本>.zip`，Chrome 与 Edge 共用。下载 ZIP 并解压到固定目录，在扩展管理页开启开发者模式，选择「加载已解压的扩展程序」，选中含 `manifest.json` 的目录。它不是 CRX，也不会通过浏览器商店自动更新；更新时替换解压目录中的文件，再点击重新加载。切换目录前停用旧副本，保留原目录直到确认连接、草稿和历史正常。
 
-扩展独立版本由 `release/package.json` 的私有 `memos-web-clipper` 包管理，从 0.8.2 衔接；只有扩展交付内容变化才通过 Changesets 递增，修复选 patch、新功能选 minor、破坏兼容性选 major。Memos 单独更新不会递增扩展版本。本地 `dist/` 与 ZIP manifest 均使用该版本；源码 `package.json` 的 `0.4.1` 继续表示上游基线。`castor-release.json.version` 是扩展版本，`tag` 是配套 Memos Release 标签，`commit` 是本次构建提交。扩展仍随 Memos Release 交付，不另设商店或独立发布通道。同一扩展版本可随多个 Memos Release 提供；构建提交和配套标签不同会使 ZIP 校验和不同，重试同一个 Release 仍禁止覆盖不同内容。Release 的 `release.json` 列出配套 ZIP，`SHA256SUMS` 包含其校验和。安装扩展不等于服务器已升级，Star / Pick up 保存仍要求连接的实例声明对应能力。
+扩展独立版本由 `release/package.json` 的私有 `memos-web-clipper` 包管理，首个独立正式版为 0.1.0；只有扩展交付内容变化才通过 Changesets 递增，修复选 patch、新功能选 minor、破坏兼容性选 major。Memos 单独更新不会递增扩展版本。初始 0.0.1 是未发布的构建占位值（Chromium 不允许全零版本），首份 minor changeset 生成正式 0.1.0。本地 `dist/` 与 ZIP manifest 均使用该版本；源码 `package.json` 的 `0.4.1` 继续表示上游基线。`castor-release.json.version` 是扩展版本，`tag` 是配套 Memos Release 标签，`commit` 是本次构建提交。扩展仍随 Memos Release 交付，不另设商店或独立发布通道。同一扩展版本可随多个 Memos Release 提供；构建提交和配套标签不同会使 ZIP 校验和不同，重试同一个 Release 仍禁止覆盖不同内容。Release 的 `release.json` 列出配套 ZIP，`SHA256SUMS` 包含其校验和。安装扩展不等于服务器已升级，Star / Pick up 保存仍要求连接的实例声明对应能力。
 
 从干净的源码检出构建个人 ZIP（需要 Python 3）：
 

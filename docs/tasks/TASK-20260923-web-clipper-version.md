@@ -18,7 +18,7 @@
 
 ## 讨论结论
 
-- 独立版本从当前个人发行版本 0.8.2 衔接；上游源码基线 0.4.1 保留。
+- 用户选择首个独立正式版为 0.1.0，替代最初提出的 0.8.2 衔接方案；上游源码基线 0.4.1 保留。初始 0.0.1 是未发布构建占位值，以满足 Chromium 禁止全零版本的要求；首份 minor changeset 生成 0.1.0。
 - 扩展仍随 Memos Release 交付；扩展 changeset 同时包含应用发布说明以触发现有统一发布流程。仅 Memos 更新时，扩展版本不变。
 - 根 workspace 只管理两个私有版本包，Web 和扩展的依赖、锁文件、pnpm 版本保持独立。
 
@@ -27,7 +27,7 @@
 - 新增轻量私有版本包 `extensions/web-clipper/release/package.json`，根 Changesets workspace 同时管理应用和扩展；保留扩展源码包的上游基线。
 - 本地 manifest、个人 ZIP 及原有商店打包命令统一读取独立扩展版本，候选清单和公开前验证允许两种版本不同，并继续核对同次发布的标签与提交。
 - 扩展交付变更必须提供自身 changeset；普通 PR 不能改扩展版本或日志。精确再生成检查补充新建 CHANGELOG 的未跟踪文件集合，防止首次发布漏检。
-- 更新发布文档和维护规则，通过根 `corepack pnpm changeset` 生成双方 patch 说明；正式版本由后续版本 PR 生成。
+- 更新发布文档和维护规则，通过根 `corepack pnpm changeset` 生成应用 patch、扩展 minor 说明；正式版本由后续版本 PR 生成。
 
 ## 验证事实与边界
 
@@ -38,7 +38,9 @@
 - `python3 -m unittest discover -s extensions/web-clipper/scripts -p 'test_package*.py'`：24 项，23 通过、1 跳过。大小写碰撞夹具在本机不区分大小写的文件系统无法成立，改用实际 samefile 检测跳过；Linux CI 保留执行。
 - `python3 -m unittest discover -s scripts -p 'test_publish*.py'`：22 项通过，覆盖独立版本 ZIP 身份与历史候选清单路径。
 - Actionlint v1.7.12（`-shellcheck=""`）、`corepack pnpm check:release origin/main` 与完整 PR 差异空白检查通过。
-- 干净检出上实际执行个人 `package-release.py` 和原有 `package.mjs chrome`，两种 ZIP 均成功生成并回读确认 manifest 为独立元数据版本 0.8.2；尚未消费的 patch changeset 由版本 PR 递增。
+- 干净检出上实际执行个人 `package-release.py` 和原有 `package.mjs chrome`，初次两种 ZIP 均成功生成并回读确认版本来源一致；用户随后选择 0.1.0 起点，对应重新验证记录如下。
+
+2026-09-23 起点确认后补充：用户选择首个独立正式版 0.1.0；已重新运行根版本测试，确认应用独立升级保留 0.0.1 构建占位值、扩展 minor 发布生成 0.1.0，精确再生成校验通过；扩展 lint、类型与生产构建再次通过。
 
 ## 未覆盖范围与后续建议
 

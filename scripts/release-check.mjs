@@ -63,7 +63,7 @@ export function checkRelease({ root = process.cwd(), base = "", head = "HEAD", v
       assert.ok(clipper, "Extension version metadata must not be removed");
       assert.equal(clipper.version, JSON.parse(previousClipper).version, "Only Version Packages PRs update the extension version");
     } else if (clipper) {
-      assert.equal(clipper.version, JSON.parse(previous).version, "Independent extension version starts at the existing personal version");
+      assert.equal(clipper.version, "0.0.1", "Independent extension version starts at the unpublished Chromium-compatible placeholder");
     }
     assert.ok(!paths.includes(clipperChangelog), "Only Version Packages PRs update the extension CHANGELOG.md");
     const added = git(root, "diff", "--name-only", "--no-renames", "--diff-filter=A", "-z", base, head).split("\0");

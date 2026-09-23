@@ -31,7 +31,7 @@ const extensionNote = (level = "patch") => `---\n"memos-personal": patch\n"memos
 
 function enableClipper(f) {
   f.write("pnpm-workspace.yaml", 'packages:\n  - "."\n  - "extensions/web-clipper/release"\n');
-  f.write("extensions/web-clipper/release/package.json", JSON.stringify({ name: "memos-web-clipper", version: "0.8.2", private: true }, null, 2) + "\n");
+  f.write("extensions/web-clipper/release/package.json", JSON.stringify({ name: "memos-web-clipper", version: "0.0.1", private: true }, null, 2) + "\n");
   return f.commit();
 }
 
@@ -43,7 +43,7 @@ test("extension changes require their own note and cannot manually bump their ve
   assert.throws(() => checkRelease({ root: f.root, base }), /memos-web-clipper release note/);
   f.write(".changeset/extension.md", extensionNote()); f.commit();
   checkRelease({ root: f.root, base });
-  f.write("extensions/web-clipper/release/package.json", JSON.stringify({ name: "memos-web-clipper", version: "0.8.3", private: true })); f.commit();
+  f.write("extensions/web-clipper/release/package.json", JSON.stringify({ name: "memos-web-clipper", version: "0.0.2", private: true })); f.commit();
   assert.throws(() => checkRelease({ root: f.root, base }), /Only Version Packages PRs update the extension version/);
 });
 
@@ -55,13 +55,13 @@ test("Changesets independently versions the extension and exact regeneration pro
   const generate = () => execFileSync(join(project, "node_modules/.bin/changeset"), ["version"], { cwd: f.root, stdio: "pipe" });
   const extensionVersion = () => JSON.parse(readFileSync(join(f.root, "extensions/web-clipper/release/package.json"))).version;
   generate(); f.commit();
-  assert.equal(extensionVersion(), "0.8.2");
+  assert.equal(extensionVersion(), "0.0.1");
   checkRelease({ root: f.root, base, versionPR: true });
   f.write(".changeset/extension.md", extensionNote("minor"));
   f.write(".changeset/extension-fix.md", extensionNote("patch"));
   base = f.commit();
   generate(); f.commit();
-  assert.equal(extensionVersion(), "0.9.0");
+  assert.equal(extensionVersion(), "0.1.0");
   assert.equal(JSON.parse(readFileSync(join(f.root, "package.json"))).version, "0.1.1");
   checkRelease({ root: f.root, base, versionPR: true });
   f.write("extensions/web-clipper/release/CHANGELOG.md", "篡改日志\n"); f.commit();
