@@ -89,6 +89,17 @@ describe("Options connection methods", () => {
     expect(screen.queryByRole("link", { name: /open memos/i })).not.toBeInTheDocument();
   });
 
+  it("shows a worker failure with retry and keeps direct setup available", async () => {
+    active = baseConn({ status: "error", verificationError: "extension-error" });
+    const { user } = renderWithUser(<Options />);
+
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Check connection" }));
+    expect(active.reverify).toHaveBeenCalledOnce();
+    await user.click(screen.getByRole("button", { name: "Connect directly" }));
+    expect(screen.getByLabelText("Instance URL")).toBeInTheDocument();
+  });
+
   it("persists a language choice and applies it immediately", async () => {
     const { user } = renderWithUser(<Options />);
 

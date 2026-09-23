@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/auth/auth-provider";
+import { ClientError } from "@/lib/errors";
 import type { ConnectionStateResult } from "@/lib/messages";
 import { sendBackgroundRequest } from "@/lib/runtime-client";
+
+export const CONNECTION_CHECK_TIMEOUT_MS = 30_000;
 
 const DISCONNECTED: ConnectionStateResult = {
   source: null,
@@ -25,14 +28,21 @@ export function useMemosConnection(source: "active" | "usememos" = "active") {
     async (refresh = true): Promise<ConnectionStateResult> => {
       const currentGeneration = ++generation.current;
       setIsChecking(true);
+      let timeout: ReturnType<typeof setTimeout> | undefined;
       try {
-        const next = await sendBackgroundRequest({ type: "GET_CONNECTION_STATE", refresh, source });
+        const next = await Promise.race([
+          sendBackgroundRequest({ type: "GET_CONNECTION_STATE", refresh, source }),
+          new Promise<never>((_, reject) => {
+            timeout = setTimeout(() => reject(new ClientError("extension-error")), CONNECTION_CHECK_TIMEOUT_MS);
+          }),
+        ]);
+        if (!next) throw new ClientError("extension-error");
         if (generation.current === currentGeneration) {
           connectionRef.current = next;
           setConnection(next);
         }
         return next;
-      } catch {
+      } catch (error) {
         const current = connectionRef.current;
         const unavailable: ConnectionStateResult = {
           source: current.source,
@@ -40,7 +50,8 @@ export function useMemosConnection(source: "active" | "usememos" = "active") {
           version: current.version,
           displayName: current.displayName,
           status: "error",
-          verificationError: source === "usememos" || isSignedIn ? "auth-unavailable" : "extension-error",
+          verificationError:
+            error instanceof ClientError ? error.kind : source === "usememos" || isSignedIn ? "auth-unavailable" : "extension-error",
           isUsingCachedVersion: Boolean(current.version),
         };
         if (generation.current === currentGeneration) {
@@ -49,6 +60,7 @@ export function useMemosConnection(source: "active" | "usememos" = "active") {
         }
         return unavailable;
       } finally {
+        clearTimeout(timeout);
         if (generation.current === currentGeneration) setIsChecking(false);
       }
     },
@@ -60,6 +72,9 @@ export function useMemosConnection(source: "active" | "usememos" = "active") {
     connectionRef.current = DISCONNECTED;
     setConnection(DISCONNECTED);
     void runCheck(true);
+    return () => {
+      generation.current += 1;
+    };
   }, [runCheck, user?.id]);
 
   return {

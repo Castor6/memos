@@ -2,7 +2,7 @@ import { resolve } from "node:path";
 import { crx } from "@crxjs/vite-plugin";
 import tailwind from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
-import { defineConfig, loadEnv } from "vite";
+import { defaultClientConditions, defineConfig, loadEnv } from "vite";
 import manifest from "./manifest.config";
 
 export default defineConfig(({ mode }) => {
@@ -13,6 +13,11 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react(), tailwind(), crx({ manifest })],
-    resolve: { alias: { "@": resolve(__dirname, "src") } },
+    resolve: {
+      alias: { "@": resolve(__dirname, "src") },
+      // Shared Markdown chunks also run in the background service worker. Prefer
+      // worker-safe exports (notably entity decoding) over DOM-only browser ones.
+      conditions: ["worker", ...defaultClientConditions],
+    },
   };
 });
