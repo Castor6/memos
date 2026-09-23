@@ -5,7 +5,7 @@ import { classify, isReleasable, validateResults } from "./ci.mjs";
 
 test("docs skip heavy jobs; workflow and version PRs check the application", () => {
   assert.deepEqual(classify(["docs/development.md"]), { frontend: false, web_clipper: false, backend: false, proto: false, upgrade: false, workflow: false });
-  for (const result of [classify([".github/workflows/ci.yml"]), classify([], { versionPR: true }), classify([], { full: true })]) {
+  for (const result of [classify([".github/workflows/ci.yml"]), classify([], { full: true })]) {
     assert.ok(result.frontend && result.web_clipper && result.backend && result.proto);
   }
   assert.ok(classify(["proto/api/v1/memo.proto"]).frontend);
@@ -87,4 +87,15 @@ test("the web clipper workflow is routed into the required gate with its own too
   assert.match(workflow, /uses: actions\/upload-artifact@v6/);
   assert.match(workflow, /path: build\/clipper-ci\/\s+if-no-files-found: error/);
   assert.doesNotMatch(workflow, /secrets\.|continue-on-error/);
+});
+
+
+test("version PRs check only the components whose metadata changed", () => {
+  const clipper = classify(["extensions/web-clipper/release/package.json", "extensions/web-clipper/release/CHANGELOG.md"], { versionPR: true });
+  assert.deepEqual(clipper, { frontend: false, web_clipper: true, backend: false, proto: false, upgrade: false, workflow: false });
+  const memos = classify(["package.json", "CHANGELOG.md"], { versionPR: true });
+  assert.ok(memos.frontend && memos.backend && memos.proto);
+  assert.equal(memos.web_clipper, false);
+  const both = classify(["package.json", "extensions/web-clipper/release/package.json"], { versionPR: true });
+  assert.ok(both.frontend && both.web_clipper && both.backend && both.proto);
 });

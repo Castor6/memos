@@ -42,10 +42,71 @@ jobs:
                 !['github-actions[bot]', context.repo.owner].includes(pr.user.login) ||
                 !/^[a-f0-9]{40}$/.test(pr.merge_commit_sha)) throw Error('Expected a merged, trusted version PR');
             core.setOutput('commit', pr.merge_commit_sha);
-  candidate:
+  plan:
     needs: source
+    runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.version.outputs.version }}
+      memos: ${{ steps.plan.outputs.memos }}
+      web_clipper: ${{ steps.plan.outputs.web_clipper }}
+      legacy_web_clipper: ${{ steps.plan.outputs.legacy_web_clipper }}
+      independent: ${{ steps.plan.outputs.independent }}
+      memos_version: ${{ steps.plan.outputs.memos_version }}
+      clipper_version: ${{ steps.plan.outputs.clipper_version }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.source.outputs.commit }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4.2.0
+        with:
+          version: 11.0.1
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Verify generated version diff
+        run: |
+          pnpm install --frozen-lockfile
+          RELEASE_BASE="$(git rev-parse HEAD^)" VERSION_PR=true pnpm check:release
+      - name: Route only changed release versions
+        id: plan
+        run: |
+          node --input-type=module <<'JS'
+          import {readFileSync, appendFileSync, existsSync} from 'node:fs';
+          import {execFileSync} from 'node:child_process';
+          const git = (...args) => execFileSync('git', args, {encoding: 'utf8'}).trim();
+          const version = (file) => {
+            const value = JSON.parse(readFileSync(file, 'utf8')).version;
+            if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(value)) throw Error('Invalid release version');
+            return value;
+          };
+          const changed = (file, current) => {
+            const previous = git('ls-tree', 'HEAD^', '--', file);
+            if (!previous) throw Error('Release version metadata must exist before the version PR');
+            return JSON.parse(git('show', `HEAD^:${file}`)).version !== current;
+          };
+          const memosVersion = version('package.json');
+          const memos = changed('package.json', memosVersion);
+          const clipperFile = 'extensions/web-clipper/release/package.json';
+          const independent = existsSync(clipperFile);
+          const clipperVersion = independent ? version(clipperFile) : memosVersion;
+          const clipper = independent && changed(clipperFile, clipperVersion);
+          if (!memos && !clipper) throw Error('No changed release version');
+          if ((memos && memosVersion === '0.0.0') || (clipper && ['0.0.0', '0.0.1'].includes(clipperVersion))) throw Error('Cannot publish a placeholder');
+          const outputs = {
+            memos, web_clipper: clipper, independent,
+            legacy_web_clipper: memos && !independent && existsSync('extensions/web-clipper/scripts/package-release.py'),
+            memos_version: memosVersion, clipper_version: clipperVersion,
+          };
+          appendFileSync(process.env.GITHUB_OUTPUT, Object.entries(outputs).map(([key, value]) => `${key}=${value}\n`).join(''));
+          JS
+  candidate:
+    needs: [source, plan]
+    if: needs.plan.outputs.memos == 'true'
+    outputs:
+      version: ${{ needs.plan.outputs.memos_version }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
@@ -67,33 +128,17 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version: "1.26.2"
-      - name: Verify generated version diff
+      - name: Test release tooling
         run: |
-          pnpm install --frozen-lockfile
-          RELEASE_BASE="$(git rev-parse HEAD^)" VERSION_PR=true pnpm check:release
           python3 -m unittest discover -s scripts/deploy -p 'test_*.py'
           python3 -m unittest discover -s scripts -p 'test_publish*.py'
-      - name: Read the personal version
-        id: version
-        run: |
-          node --input-type=module <<'JS'
-          import {readFileSync, appendFileSync, existsSync} from 'node:fs';
-          const {version} = JSON.parse(readFileSync('package.json', 'utf8'));
-          if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version) || version === '0.0.0') throw Error('Invalid release version');
-          appendFileSync(process.env.GITHUB_OUTPUT, `version=${version}\n`);
-          // Old version PRs keep their original assets when retried from this workflow.
-          appendFileSync(process.env.GITHUB_OUTPUT, `web_clipper=${existsSync('extensions/web-clipper/scripts/package-release.py')}\n`);
-          const extensionVersionFile = 'extensions/web-clipper/release/package.json';
-          const extensionVersion = existsSync(extensionVersionFile) ? JSON.parse(readFileSync(extensionVersionFile, 'utf8')).version : version;
-          appendFileSync(process.env.GITHUB_OUTPUT, `web_clipper_version=${extensionVersion}\n`);
-          JS
       - uses: pnpm/action-setup@v4.2.0
-        if: steps.version.outputs.web_clipper == 'true'
+        if: needs.plan.outputs.legacy_web_clipper == 'true'
         with:
           version: 11.10.0
           package_json_file: extensions/web-clipper/package.json
       - name: Check and build the web clipper
-        if: steps.version.outputs.web_clipper == 'true'
+        if: needs.plan.outputs.legacy_web_clipper == 'true'
         working-directory: extensions/web-clipper
         run: |
           cp .env.example .env
@@ -103,10 +148,10 @@ jobs:
           python3 -m unittest discover -s scripts -p 'test_package*.py'
           pnpm build
       - name: Package the versioned Chromium extension
-        if: steps.version.outputs.web_clipper == 'true'
+        if: needs.plan.outputs.legacy_web_clipper == 'true'
         run: python3 extensions/web-clipper/scripts/package-release.py --output build/candidate
       - uses: pnpm/action-setup@v4.2.0
-        if: steps.version.outputs.web_clipper == 'true'
+        if: needs.plan.outputs.legacy_web_clipper == 'true'
         with:
           version: 11.0.1
           package_json_file: package.json
@@ -120,9 +165,10 @@ jobs:
           pnpm release
       - name: Build versioned Linux candidates
         env:
-          RELEASE_VERSION: ${{ steps.version.outputs.version }}
-          WEB_CLIPPER: ${{ steps.version.outputs.web_clipper }}
-          WEB_CLIPPER_VERSION: ${{ steps.version.outputs.web_clipper_version }}
+          RELEASE_VERSION: ${{ needs.plan.outputs.memos_version }}
+          WEB_CLIPPER: ${{ needs.plan.outputs.legacy_web_clipper }}
+          WEB_CLIPPER_VERSION: ${{ needs.plan.outputs.clipper_version }}
+          INDEPENDENT_RELEASE: ${{ needs.plan.outputs.independent }}
           CGO_ENABLED: "0"
           GOOS: linux
         run: |
@@ -137,6 +183,8 @@ jobs:
           import {writeFileSync} from 'node:fs';
           const version = process.env.RELEASE_VERSION;
           const release = {version, tag: `castor-v${version}`, commit: process.env.RELEASE_COMMIT};
+          // Old checkouts retain their original artifact schema and publisher.
+          if (process.env.INDEPENDENT_RELEASE === 'true') release.component = 'memos';
           if (process.env.WEB_CLIPPER === 'true') {
             const extensionVersion = process.env.WEB_CLIPPER_VERSION;
             release.webClipper = {version: extensionVersion, file: `memos-web-clipper-chromium-v${extensionVersion}.zip`};
@@ -156,7 +204,7 @@ jobs:
         run: python3 scripts/publish-image.py
       - uses: actions/upload-artifact@v6
         with:
-          name: memos-${{ steps.version.outputs.version }}-${{ needs.source.outputs.commit }}
+          name: memos-${{ needs.plan.outputs.memos_version }}-${{ needs.source.outputs.commit }}
           path: build/candidate/
           retention-days: 30
           if-no-files-found: error
@@ -180,4 +228,68 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_COMMIT: ${{ needs.source.outputs.commit }}
+        run: python3 scripts/publish-github-release.py
+
+  clipper-candidate:
+    needs: [source, plan]
+    if: needs.plan.outputs.web_clipper == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      RELEASE_COMMIT: ${{ needs.source.outputs.commit }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.source.outputs.commit }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4.2.0
+        with:
+          version: 11.10.0
+          package_json_file: extensions/web-clipper/package.json
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: pnpm
+          cache-dependency-path: extensions/web-clipper/pnpm-lock.yaml
+      - name: Check and build the independent web clipper
+        working-directory: extensions/web-clipper
+        run: |
+          cp .env.example .env
+          pnpm install --frozen-lockfile
+          pnpm lint
+          pnpm test
+          python3 -m unittest discover -s scripts -p 'test_package*.py'
+          pnpm build
+      - name: Prepare verified extension candidate
+        run: |
+          python3 -m unittest discover -s scripts -p 'test_publish_github_release.py'
+          python3 extensions/web-clipper/scripts/package-release.py --output build/web-clipper
+          python3 scripts/publish-github-release.py stage-web-clipper
+      - uses: actions/upload-artifact@v6
+        with:
+          name: web-clipper-${{ needs.plan.outputs.clipper_version }}-${{ needs.source.outputs.commit }}
+          path: build/web-clipper/
+          retention-days: 30
+          if-no-files-found: error
+
+  clipper-release:
+    needs: [source, plan, clipper-candidate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.source.outputs.commit }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v6
+        with:
+          name: web-clipper-${{ needs.plan.outputs.clipper_version }}-${{ needs.source.outputs.commit }}
+          path: build/web-clipper/
+      - name: Publish verified extension Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_COMMIT: ${{ needs.source.outputs.commit }}
+          RELEASE_COMPONENT: web-clipper
         run: python3 scripts/publish-github-release.py

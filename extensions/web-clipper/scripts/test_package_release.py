@@ -108,7 +108,7 @@ class ReleasePackageTest(unittest.TestCase):
             self.assertEqual(manifest["key"], PUBLIC_KEY)
             self.assertNotIn("update_url", manifest)
             identity = json.loads(archive.read("castor-release.json"))
-            self.assertEqual(identity, {"version": "1.2.3", "tag": "castor-v2.0.0", "commit": self.git("rev-parse", "HEAD"), "upstreamVersion": "0.4.1"})
+            self.assertEqual(identity, {"version": "1.2.3", "tag": "web-clipper-v1.2.3", "commit": self.git("rev-parse", "HEAD"), "upstreamVersion": "0.4.1"})
             for entry in archive.infolist():
                 self.assertEqual(entry.date_time, (1980, 1, 1, 0, 0, 0))
                 self.assertEqual(entry.external_attr >> 16, 0o100644)
@@ -125,7 +125,7 @@ class ReleasePackageTest(unittest.TestCase):
         self.commit()
         after = PACKAGE.release_identity(self.extension)
         self.assertEqual(before["version"], after["version"])
-        self.assertEqual(after["tag"], "castor-v2.1.0")
+        self.assertEqual(after["tag"], before["tag"])
         with zipfile.ZipFile(self.package()) as archive:
             self.assertEqual(json.loads(archive.read("manifest.json"))["version"], "1.2.3")
 

@@ -71,7 +71,6 @@ def release_identity(extension_root):
     if git(root, "status", "--porcelain", "--untracked-files=normal"):
         raise PackageError("Refusing to package a dirty working tree. Commit or stash source changes first.")
     git(root, "ls-files", "--error-unmatch", "package.json", "extensions/web-clipper/package.json", "extensions/web-clipper/release/package.json", "LICENSE")
-    memos_version = chrome_version(read_json(root / "package.json").get("version"))
     version = chrome_version(read_json(extension_root / "release/package.json").get("version"))
     commit = git(root, "rev-parse", "HEAD")
     if not re.fullmatch(r"[0-9a-f]{40,64}", commit):
@@ -79,7 +78,7 @@ def release_identity(extension_root):
     upstream_version = read_json(extension_root / "package.json").get("version")
     if not isinstance(upstream_version, str) or not upstream_version:
         raise PackageError("The extension package must declare its upstream base version.")
-    return {"version": version, "tag": f"castor-v{memos_version}", "commit": commit, "upstreamVersion": upstream_version}
+    return {"version": version, "tag": f"web-clipper-v{version}", "commit": commit, "upstreamVersion": upstream_version}
 
 
 def collect_files(dist):

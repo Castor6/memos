@@ -9,7 +9,7 @@
 3. 提交 PR。新增功能选 minor，兼容修复选 patch，破坏兼容性选 major；同一版本取最高升级级别。纯文档、测试和不影响交付行为的 CI 修改无需发布说明。
 4. `validate` 通过后合并。版本号和 `CHANGELOG.md` 由机器人统一更新，普通 PR 不手改，也不消耗已经合入 main 的 changeset。
 
-根 workspace 仅纳入根目录 `memos-personal` 和 `extensions/web-clipper/release/` 的 `memos-web-clipper` 两个私有版本包，不发布 npm 包。`web/` 与扩展应用保留独立依赖、锁文件和 pnpm 版本。扩展交付变化时，根目录 `corepack pnpm changeset` 同时选择两个包：扩展按自身变化选择 patch/minor/major，应用包含配套发行说明（仅扩展变化时可选 patch）以触发现有统一 Release。仅应用变化时只选择 `memos-personal`，扩展版本保持不变。Node 24 / pnpm 11.0.1 与现有前端一致。使用 fnm 的电脑可在命令前加 `fnm exec --using 24`。
+根 workspace 仅纳入根目录 `memos-personal` 和 `extensions/web-clipper/release/` 的 `memos-web-clipper` 两个私有版本包，不发布 npm 包。`web/` 与扩展应用保留独立依赖、锁文件和 pnpm 版本。根目录 `corepack pnpm changeset` 只选择变化的组件：仅应用变化选 `memos-personal`，仅扩展变化选 `memos-web-clipper`，两者变化才同时选择。各自按变化选择 patch/minor/major，互不带动版本升级。Node 24 / pnpm 11.0.1 与现有前端一致。使用 fnm 的电脑可在命令前加 `fnm exec --using 24`。
 
 ## CI 检查
 
@@ -18,14 +18,14 @@
 | 检查 | 触发范围 | 内容 |
 | --- | --- | --- |
 | 基础检查 | 所有 PR | CI/版本规则测试、发布说明及版本归属、部署/备份恢复测试、差异空白与本地开发脚本语法 |
-| 前端 | 前端、Proto、工作流修改及版本 PR | 类型、Biome、单元测试、生产构建 |
-| 浏览器扩展 | `extensions/web-clipper/`、Node 版本、工作流修改及版本 PR | 独立 pnpm 11.10.0；Biome、单元测试、打包测试、类型、语言表、生产构建与 Chromium ZIP；提供短期 Actions artifact |
-| 后端 | Go、依赖、Proto、工作流修改及版本 PR | tidy、golangci-lint、store/server/internal/other 测试；store 含三种数据库 |
-| Proto | Proto、工作流修改及版本 PR | Buf lint、格式检查 |
+| 前端 | 前端、Proto、工作流修改及对应组件的版本 PR | 类型、Biome、单元测试、生产构建 |
+| 浏览器扩展 | `extensions/web-clipper/`、Node 版本、工作流修改及对应组件的版本 PR | 独立 pnpm 11.10.0；Biome、单元测试、打包测试、类型、语言表、生产构建与 Chromium ZIP；提供短期 Actions artifact |
+| 后端 | Go、依赖、Proto、工作流修改及对应组件的版本 PR | tidy、golangci-lint、store/server/internal/other 测试；store 含三种数据库 |
+| Proto | Proto、工作流修改及对应组件的版本 PR | Buf lint、格式检查 |
 | 容器升级 | 存储结构/迁移、服务器入口、Docker/入口脚本及升级工作流修改 | 三驱动升级测试、真实容器的安装/升级、入口脚本检查 |
 | 工作流语法 | 工作流文件修改 | 固定版本 Actionlint |
 
-`validate` 检查所有需要执行的任务是否成功，失败、取消、缺少分类或意外跳过都会失败。文档 PR 跳过应用重检查，仍得到完整的合并判断。手动运行普通分支时执行全套检查；版本分支按版本 PR 规则检查。
+`validate` 检查所有需要执行的任务是否成功，失败、取消、缺少分类或意外跳过都会失败。版本 PR 按变化的版本包运行组件检查：仅扩展升级跳过 Web/Go/Proto 检查；仅 Memos 升级不要求扩展构建。文档 PR 跳过应用重检查，仍得到完整的合并判断。手动运行普通分支时执行全套检查；版本分支按版本 PR 规则检查。
 
 Proto 目前保留上游的 lint/格式检查。部分远程生成器未固定版本，生成结果一致性检查需先固定生成工具，另行处理；当前不声称自动检查可重现生成。
 
@@ -66,7 +66,7 @@ main 的 CI 成功后，`Version Packages` 工作流对仍为当前 main 的提�
 
 ## 合并版本 PR 后
 
-`Publish Release` 从可信版本 PR 的确定合并提交重新核对 Changesets 生成结果，构建 Linux amd64/arm64 二进制和 Linux amd64 容器。新安装、登录、持久化与上一版升级冒烟测试全部通过后，才推送 ACR 镜像并推进 `stable`。服务器定时检查该通道；普通 PR 合并不会触发发布。
+`Publish Release` 从可信版本 PR 的确定合并提交重新核对 Changesets 生成结果，对比合并提交与其第一父提交的两个版本包，再分别路由发布。Memos 版本变化时才构建 Linux amd64/arm64 二进制和 Linux amd64 容器。新安装、登录、持久化与上一版升级冒烟测试全部通过后，才推送 ACR 镜像并推进 `stable`。服务器定时检查该通道；普通 PR 合并不会触发发布。
 
 镜像标签为 `castor-v<版本>`、`sha-<完整提交>` 和 `stable`。服务器使用不可变摘要运行镜像。版本标签存在时，重试必须复用对应提交的镜像，不能重新构建覆盖；认证或网络错误不能当作标签不存在。重试旧版本不能把 `stable` 降级。首版升级测试从官方 `ghcr.io/usememos/memos:0.30.0` 开始，后续从上一版个人镜像开始。
 
@@ -84,14 +84,28 @@ main 的 CI 成功后，`Version Packages` 工作流对仍为当前 main 的提�
 
 ## GitHub Release
 
+同一个版本 PR 可以生成零个或一个 Memos Release，以及零个或一个扩展 Release，至少有一个组件版本升级：
+
+| 版本变化 | 执行流程 | 标签与产物 |
+| --- | --- | --- |
+| 仅 Memos | Memos 构建、镜像安装/升级冒烟、ACR/stable、Memos Release | `castor-v<版本>`，二进制、镜像摘要和校验和 |
+| 仅扩展 | 扩展测试、构建、ZIP、扩展 Release；不执行 Memos 或镜像流程 | `web-clipper-v<版本>`，ZIP、扩展日志与校验和 |
+| 两者 | 两条流程分别执行，可指向同一提交，失败分别重试 | 两个独立 Release |
+
+以下镜像流程仅适用于 Memos 版本变化。扩展发布任务不配置 ACR 凭据，也不依赖镜像任务成功；扩展 Release 始终使用 `make_latest: false`，仓库 Latest 保留给 Memos。
+
 普通 PR 不创建 Release。版本 PR 合并后依次完成镜像安装/升级验证、ACR 发布、Actions artifact 归档，再创建 GitHub Release；该阶段使用独立 job 的 `contents: write` 权限，构建任务与普通 CI 仍为只读。
 
-附件包含 Linux amd64/arm64 二进制、Chrome / Edge 通用的 `memos-web-clipper-chromium-v<版本>.zip`、`CHANGELOG.md`、`LICENSE`、`release.json`、`image-digest.txt` 和 `SHA256SUMS`。二进制、ZIP 和元数据先核对构建产物的校验清单，再生成包含镜像摘要的完整公开清单；不会公开私有 Registry 地址。与 30 天 Actions artifacts 不同，Release 附件不会因这个保留期限被自动清除。
+Memos Release 附件包含 Linux amd64/arm64 二进制、`CHANGELOG.md`、`LICENSE`、`release.json`、`image-digest.txt` 和 `SHA256SUMS`。二进制和元数据先核对构建产物的校验清单，再生成包含镜像摘要的完整公开清单；不会公开私有 Registry 地址。与 30 天 Actions artifacts 不同，Release 附件不会因这个保留期限被自动清除。
 
-扩展与服务端从同一个确定提交构建。发布任务使用 Node 24、扩展独立的 pnpm 11.10.0 和公开 `.env.example`，执行 lint、单测、Python 标准库打包测试、类型及生产构建，再生成 ZIP；检查或打包失败会阻断镜像发布。ZIP 保留稳定 Chromium key、不含商店更新地址，包内及本地 manifest 版本取独立的 `extensions/web-clipper/release/package.json`，源码的上游扩展基线不参与 Changesets 升级。扩展首个独立正式版为 0.1.0；初始 0.0.1 仅是兼容 Chromium 非全零要求的未发布构建占位值，首份 minor changeset 生成 0.1.0。版本 PR 同时维护其 `release/CHANGELOG.md`；普通 PR 不手改两套版本/日志。`castor-release.json` 记录扩展版本/构建提交/上游基线及配套 Memos 标签；外部 `release.json.webClipper` 使用扩展自身版本指向对应 ZIP，允许其与 Memos 版本不同。同一扩展版本仍可随多个 Memos Release 重新构建，提交/配套标签变化会改变 ZIP 摘要，但同一 Release 的重试仍须字节一致。公开前验证 ZIP 内部身份与清单，继续采用草稿上传、回读摘要、禁止覆盖同名不同内容的规则。
+扩展版本变化时从同一可信版本 PR 的确定提交独立构建。使用 Node 24、扩展 pnpm 11.10.0 和公开 `.env.example`，执行 lint、单测、Python 打包测试、类型及生产构建，再生成 ZIP。扩展候选和发布任务与 Memos 镜像任务没有依赖；一次 Version PR 同时升级两者时，各自检查成功即可发布自身产物。
+
+扩展 Release 提供 Chrome / Edge 通用的 `memos-web-clipper-chromium-v<扩展版本>.zip`、扩展 `CHANGELOG.md`、`LICENSE`、`release.json` 与 `SHA256SUMS`。ZIP 保留稳定 Chromium key，不含商店更新地址，本地及包内 manifest 使用 `extensions/web-clipper/release/package.json`。首个独立正式版为 0.1.0；初始 0.0.1 仅是 Chromium 可接受的未发布占位值，由首份 minor changeset 生成 0.1.0。上游扩展基线不参与 Changesets 升级。版本 PR 维护其 `release/CHANGELOG.md`，普通 PR 不手改两套版本/日志。
+
+`castor-release.json` 记录扩展版本、`web-clipper-v<版本>` 标签、构建提交及上游基线。外部 `release.json` 的 `component: web-clipper` 标识扩展，`file` 指向 ZIP；Memos 清单使用 `component: memos`，不再捆绑扩展。公开前核对 ZIP 内部身份与校验和，继续采用草稿上传、回读摘要、禁止覆盖同名不同内容的规则。
 
 下载 ZIP 后须解压，在 Chrome / Edge 扩展管理页开启开发者模式并加载含 `manifest.json` 的目录；后续需手动替换文件并重新加载，不是商店自动更新。安装及版本兼容边界见 [扩展说明](../extensions/web-clipper/README.md)。扩展源码修改要求中文 Changeset，普通 PR 仍不触发正式发布。
 
-上传不完整时保留草稿，可在 Actions 重跑失败的 Release job；标签、附件和摘要相符时复用，不重复创建。已有标签指向其它提交、同名附件内容不同或公开 Release 缺少附件时拒绝覆盖，需人工核查。重跑旧草稿不会把较新个人版本的 Latest 标记降级。
+上传不完整时保留草稿，可在 Actions 重跑失败的 Release job；标签、附件和摘要相符时复用，不重复创建。已有标签指向其它提交、同名附件内容不同或公开 Release 缺少附件时拒绝覆盖，需人工核查。重跑旧草稿不会把较新 Memos 版本的 Latest 标记降级；扩展 Release 不参与 Latest 竞争。
 
-Release 发布失败不会撤回已成功发布的镜像，服务器仍可能更新成功；Release 发布成功也不表示服务器已完成更新。继续分别查看发布工作流和服务器部署记录。新流程从包含此工作流的下一个版本 PR 开始，不自动补发历史版本。手动重试旧版本时，按确定提交中是否包含个人扩展打包脚本选择原有流程，历史版本仍保留其原附件集合；包含脚本的新版本不能因构建失败而跳过扩展。
+Release 发布失败不会撤回已成功发布的镜像，服务器仍可能更新成功；Release 发布成功也不表示服务器已完成更新。继续分别查看发布工作流和服务器部署记录。新流程从包含此工作流的下一个版本 PR 开始，不自动补发历史版本。手动重试旧版本时，确定提交中没有独立扩展版本包则保留原流程：存在旧打包脚本的 Memos Release 仍捆绑同版本 ZIP，更早版本保留原附件集合；不会给旧版本强加新标签或新清单。独立版本启用后只发布本次实际升级的组件，任何所需构建失败都不能当作该组件无需发布。

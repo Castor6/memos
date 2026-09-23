@@ -27,7 +27,7 @@ function fixture(t) {
   return { root, git, write, commit, base };
 }
 const note = (level, summary) => `---\n"memos-personal": ${level}\n---\n\n${summary}\n`;
-const extensionNote = (level = "patch") => `---\n"memos-personal": patch\n"memos-web-clipper": ${level}\n---\n\n更新浏览器扩展。\n`;
+const extensionNote = (level = "patch") => `---\n"memos-web-clipper": ${level}\n---\n\n更新浏览器扩展。\n`;
 
 function enableClipper(f) {
   f.write("pnpm-workspace.yaml", 'packages:\n  - "."\n  - "extensions/web-clipper/release"\n');
@@ -62,8 +62,21 @@ test("Changesets independently versions the extension and exact regeneration pro
   base = f.commit();
   generate(); f.commit();
   assert.equal(extensionVersion(), "0.1.0");
-  assert.equal(JSON.parse(readFileSync(join(f.root, "package.json"))).version, "0.1.1");
+  assert.equal(JSON.parse(readFileSync(join(f.root, "package.json"))).version, "0.1.0");
   checkRelease({ root: f.root, base, versionPR: true });
+  // The merged extension-only release must be recognized on main without routing Memos jobs.
+  const eventPath = join(f.root, "event.json");
+  const outputPath = join(f.root, "ci-output");
+  writeFileSync(eventPath, JSON.stringify({ before: base }));
+  execFileSync(process.execPath, [join(project, "scripts/ci.mjs")], { cwd: f.root, stdio: "pipe", env: {
+    ...process.env, GITHUB_EVENT_NAME: "push", GITHUB_REF_NAME: "main", GITHUB_REPOSITORY: "Castor6/memos",
+    GITHUB_EVENT_PATH: eventPath, GITHUB_OUTPUT: outputPath,
+  } });
+  const outputs = Object.fromEntries(readFileSync(outputPath, "utf8").trim().split("\n").map((line) => line.split("=")));
+  assert.equal(outputs.version_pr, "true");
+  assert.equal(outputs.web_clipper, "true");
+  for (const job of ["frontend", "backend", "proto", "upgrade"]) assert.equal(outputs[job], "false", job);
+  rmSync(eventPath); rmSync(outputPath);
   f.write("extensions/web-clipper/release/CHANGELOG.md", "篡改日志\n"); f.commit();
   assert.throws(() => checkRelease({ root: f.root, base, versionPR: true }), /unexpected content/);
 });
@@ -142,4 +155,22 @@ test("multiline release notes generate clean whitespace and pass exact regenerat
   checkRelease({ root: f.root, base, versionPR: true });
   f.write("CHANGELOG.md", changelog.replace("保留旧数据", "篡改生成结果")); f.commit();
   assert.throws(() => checkRelease({ root: f.root, base, versionPR: true }), /unexpected content/);
+});
+
+
+test("an extension note cannot cover Memos behavior; mixed releases version both packages", (t) => {
+  const f = fixture(t);
+  const initial = enableClipper(f);
+  f.write("web/src/App.tsx", "export default 1;\n");
+  f.write(".changeset/extension.md", extensionNote("minor")); f.commit();
+  assert.throws(() => checkRelease({ root: f.root, base: initial }), /memos-personal release note/);
+  f.write(".changeset/server.md", note("minor", "更新 Memos"));
+  const base = f.commit();
+  checkRelease({ root: f.root, base: initial });
+  execFileSync(join(project, "node_modules/.bin/changeset"), ["version"], { cwd: f.root, stdio: "pipe" });
+  f.commit();
+  for (const path of ["package.json", "extensions/web-clipper/release/package.json"]) {
+    assert.equal(JSON.parse(readFileSync(join(f.root, path))).version, "0.1.0");
+  }
+  checkRelease({ root: f.root, base, versionPR: true });
 });

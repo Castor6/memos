@@ -35,7 +35,6 @@ export function checkRelease({ root = process.cwd(), base = "", head = "HEAD", v
     assert.ok(match, `Invalid release note: ${name}`);
     const packages = [...match[1].matchAll(/memos-(personal|web-clipper)/g)].map((entry) => entry[0]);
     assert.equal(new Set(packages).size, packages.length, `Duplicate package in release note: ${name}`);
-    assert.ok(packages.includes("memos-personal"), `Extension releases need a memos-personal note for the shared release: ${name}`);
     notes.set(`.changeset/${name}`, packages);
   }
   // Do not use `changeset status` here: its package-wide change heuristic would
@@ -68,8 +67,8 @@ export function checkRelease({ root = process.cwd(), base = "", head = "HEAD", v
     assert.ok(!paths.includes(clipperChangelog), "Only Version Packages PRs update the extension CHANGELOG.md");
     const added = git(root, "diff", "--name-only", "--no-renames", "--diff-filter=A", "-z", base, head).split("\0");
     assert.ok(paths.filter(note).every((path) => added.includes(path)), "Only Version Packages PRs consume existing release notes");
-    if (paths.some(isReleasable)) {
-      assert.ok(added.some(note), "Shipped behavior changed: add a new .changeset/*.md release note");
+    if (paths.some((path) => isReleasable(path) && (!clipper || !path.startsWith("extensions/web-clipper/")))) {
+      assert.ok(added.some((path) => notes.get(path)?.includes("memos-personal")), "Memos behavior changed: add a new memos-personal release note");
     }
     if (clipper && paths.some((path) => path.startsWith("extensions/web-clipper/") && isReleasable(path))) {
       assert.ok(added.some((path) => notes.get(path)?.includes("memos-web-clipper")), "Extension behavior changed: add a new memos-web-clipper release note");
@@ -90,7 +89,7 @@ export function checkRelease({ root = process.cwd(), base = "", head = "HEAD", v
       ...git(worktree, "diff", "--name-only", "--no-renames", "-z").split("\0"),
       ...git(worktree, "ls-files", "--others", "--exclude-standard", "-z").split("\0"),
     ].filter(Boolean))];
-    assert.ok(expected.includes("package.json"), "No pending release exists on main");
+    assert.ok(expected.includes("package.json") || expected.includes(clipperPackage), "No pending release exists on main");
     assert.deepEqual([...paths].sort(), expected.sort(), "Version PR file set differs from Changesets output");
     for (const path of expected) {
       const generated = existsSync(join(worktree, path)) ? readFileSync(join(worktree, path), "utf8") : null;
