@@ -27,6 +27,46 @@ function fixture(t) {
   return { root, git, write, commit, base };
 }
 const note = (level, summary) => `---\n"memos-personal": ${level}\n---\n\n${summary}\n`;
+const extensionNote = (level = "patch") => `---\n"memos-personal": patch\n"memos-web-clipper": ${level}\n---\n\n更新浏览器扩展。\n`;
+
+function enableClipper(f) {
+  f.write("pnpm-workspace.yaml", 'packages:\n  - "."\n  - "extensions/web-clipper/release"\n');
+  f.write("extensions/web-clipper/release/package.json", JSON.stringify({ name: "memos-web-clipper", version: "0.8.2", private: true }, null, 2) + "\n");
+  return f.commit();
+}
+
+test("extension changes require their own note and cannot manually bump their version", (t) => {
+  const f = fixture(t);
+  const base = enableClipper(f);
+  f.write("extensions/web-clipper/src/background.ts", "export default 1;\n");
+  f.write(".changeset/app-only.md", note("patch", "更新应用")); f.commit();
+  assert.throws(() => checkRelease({ root: f.root, base }), /memos-web-clipper release note/);
+  f.write(".changeset/extension.md", extensionNote()); f.commit();
+  checkRelease({ root: f.root, base });
+  f.write("extensions/web-clipper/release/package.json", JSON.stringify({ name: "memos-web-clipper", version: "0.8.3", private: true })); f.commit();
+  assert.throws(() => checkRelease({ root: f.root, base }), /Only Version Packages PRs update the extension version/);
+});
+
+test("Changesets independently versions the extension and exact regeneration protects both logs", (t) => {
+  const f = fixture(t);
+  enableClipper(f);
+  f.write(".changeset/server.md", note("minor", "仅更新 Memos"));
+  let base = f.commit();
+  const generate = () => execFileSync(join(project, "node_modules/.bin/changeset"), ["version"], { cwd: f.root, stdio: "pipe" });
+  const extensionVersion = () => JSON.parse(readFileSync(join(f.root, "extensions/web-clipper/release/package.json"))).version;
+  generate(); f.commit();
+  assert.equal(extensionVersion(), "0.8.2");
+  checkRelease({ root: f.root, base, versionPR: true });
+  f.write(".changeset/extension.md", extensionNote("minor"));
+  f.write(".changeset/extension-fix.md", extensionNote("patch"));
+  base = f.commit();
+  generate(); f.commit();
+  assert.equal(extensionVersion(), "0.9.0");
+  assert.equal(JSON.parse(readFileSync(join(f.root, "package.json"))).version, "0.1.1");
+  checkRelease({ root: f.root, base, versionPR: true });
+  f.write("extensions/web-clipper/release/CHANGELOG.md", "篡改日志\n"); f.commit();
+  assert.throws(() => checkRelease({ root: f.root, base, versionPR: true }), /unexpected content/);
+});
 
 test("ordinary docs pass; behavior changes require their own new note", (t) => {
   const f = fixture(t);

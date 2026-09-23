@@ -3,6 +3,7 @@
 // Derived extension ID: nebaoebnljalfegiidibihhkebeiklbl
 import { defineManifest } from "@crxjs/vite-plugin";
 import packageJson from "./package.json" with { type: "json" };
+import releaseJson from "./release/package.json" with { type: "json" };
 
 const CRX_KEY =
   "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAmRoLWedC3Tu8Yxa6G7RInn3/lwGxyDXrkzP+9woIELHjA5y6XN3AJp3cPPB1wCWqFu2HZ4Bx2q7whbpbOEPKk2ZTegnTOsYwzCwAr2FBXKWcslXO9obNo0nzx2zUw9Rgu22URa+8k9i8DxLfPxdFaJYciEyg7rFv0X7x9HJcSKirbZ9fuCPUpciCdx8/rTnex/l244SSPMwtMq3I1UZSQCMM4HooexHGgpAJ3ShWIAHjEkRhCYS6wUuJUEFCobdj04UAUGnt73CljG9NFs+ro/tJgDxkIjj75dJ1olMcDj2J2WmSKPO4CzGlmGxLIs6RWFBIvZOnQEWoKrehz3x8TQIDAQAB";
@@ -12,9 +13,9 @@ export default defineManifest({
   key: CRX_KEY,
   default_locale: "en",
   name: "Memos Web Clipper - Castor Trial",
-  // Local builds use the upstream base version; personal release archives use the root Memos version.
-  version: packageJson.version,
-  version_name: `${packageJson.version} Castor trial (Memos 0.7.0)`,
+  // Local builds and release archives share the independently versioned extension metadata.
+  version: releaseJson.version,
+  version_name: `${releaseJson.version} Castor (upstream ${packageJson.version})`,
   description: "__MSG_extensionDescription__",
   icons: {
     16: "icons/icon-16.png",

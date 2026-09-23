@@ -34,13 +34,15 @@ class ReleasePackageTest(unittest.TestCase):
         self.git("config", "user.name", "Release Test")
         (self.root / ".gitignore").write_text("dist/\nartifacts/\nbuild/\n", encoding="utf-8")
         (self.root / "LICENSE").write_text("Copyright (c) Memos\nMIT License\n", encoding="utf-8")
-        (self.root / "package.json").write_text('{"version":"1.2.3"}\n', encoding="utf-8")
+        (self.root / "package.json").write_text('{"version":"2.0.0"}\n', encoding="utf-8")
         (self.extension / "package.json").write_text('{"version":"0.4.1"}\n', encoding="utf-8")
+        (self.extension / "release").mkdir()
+        (self.extension / "release/package.json").write_text('{"version":"1.2.3"}\n', encoding="utf-8")
         self.commit()
         self.manifest = {
             "manifest_version": 3,
-            "version": "0.4.1",
-            "version_name": "0.4.1 Castor trial (Memos 0.7.0)",
+            "version": "1.2.3",
+            "version_name": "1.2.3 Castor (upstream 0.4.1)",
             "name": "Castor Trial",
             "key": PUBLIC_KEY,
             "update_url": "https://example.invalid/update",
@@ -106,7 +108,7 @@ class ReleasePackageTest(unittest.TestCase):
             self.assertEqual(manifest["key"], PUBLIC_KEY)
             self.assertNotIn("update_url", manifest)
             identity = json.loads(archive.read("castor-release.json"))
-            self.assertEqual(identity, {"version": "1.2.3", "tag": "castor-v1.2.3", "commit": self.git("rev-parse", "HEAD"), "upstreamVersion": "0.4.1"})
+            self.assertEqual(identity, {"version": "1.2.3", "tag": "castor-v2.0.0", "commit": self.git("rev-parse", "HEAD"), "upstreamVersion": "0.4.1"})
             for entry in archive.infolist():
                 self.assertEqual(entry.date_time, (1980, 1, 1, 0, 0, 0))
                 self.assertEqual(entry.external_attr >> 16, 0o100644)
@@ -116,6 +118,16 @@ class ReleasePackageTest(unittest.TestCase):
         self.assertEqual(hashlib.sha256(first).digest(), hashlib.sha256(self.package().read_bytes()).digest())
         self.assertEqual((self.dist / "manifest.json").read_bytes(), original_manifest)
         self.assertEqual(json.loads((self.extension / "package.json").read_text())["version"], "0.4.1")
+
+    def test_memos_only_release_keeps_extension_version(self):
+        before = PACKAGE.release_identity(self.extension)
+        (self.root / "package.json").write_text('{"version":"2.1.0"}\n', encoding="utf-8")
+        self.commit()
+        after = PACKAGE.release_identity(self.extension)
+        self.assertEqual(before["version"], after["version"])
+        self.assertEqual(after["tag"], "castor-v2.1.0")
+        with zipfile.ZipFile(self.package()) as archive:
+            self.assertEqual(json.loads(archive.read("manifest.json"))["version"], "1.2.3")
 
     def test_worktree_checkout_is_supported(self):
         worktree = Path(self.temporary.name) / "worktree"
@@ -211,9 +223,10 @@ class ReleasePackageTest(unittest.TestCase):
             self.skipTest("This host cannot create symlinks.")
         self.assert_rejected("Symlinks")
 
-    @unittest.skipIf(os.path.normcase("A") == os.path.normcase("a"), "Case-insensitive filesystem cannot create this fixture.")
     def test_case_colliding_paths_are_rejected(self):
         self.write("assets/App.js", "console.log('duplicate');")
+        if (self.dist / "assets/App.js").samefile(self.dist / "assets/app.js"):
+            self.skipTest("Case-insensitive filesystem cannot create this fixture.")
         self.assert_rejected("duplicate archive path")
 
     def test_dirty_tracked_source_is_rejected(self):

@@ -71,7 +71,7 @@ corepack pnpm build
 
 包含本发布流程的版本 PR 合并后，GitHub Release 提供 `memos-web-clipper-chromium-v<版本>.zip`，Chrome 与 Edge 共用。下载 ZIP 并解压到固定目录，在扩展管理页开启开发者模式，选择「加载已解压的扩展程序」，选中含 `manifest.json` 的目录。它不是 CRX，也不会通过浏览器商店自动更新；更新时替换解压目录中的文件，再点击重新加载。切换目录前停用旧副本，保留原目录直到确认连接、草稿和历史正常。
 
-ZIP 中的扩展版本跟随仓库根目录的 Memos 个人发行版本，`castor-release.json` 记录版本、确定提交与上游扩展基线；源码 `package.json` 的 `0.4.1` 继续表示上游基线。Release 的 `release.json` 列出配套 ZIP，`SHA256SUMS` 包含其校验和。安装扩展不等于服务器已升级，Star / Pick up 保存仍要求连接的实例声明对应能力。
+扩展独立版本由 `release/package.json` 的私有 `memos-web-clipper` 包管理，从 0.8.2 衔接；只有扩展交付内容变化才通过 Changesets 递增，修复选 patch、新功能选 minor、破坏兼容性选 major。Memos 单独更新不会递增扩展版本。本地 `dist/` 与 ZIP manifest 均使用该版本；源码 `package.json` 的 `0.4.1` 继续表示上游基线。`castor-release.json.version` 是扩展版本，`tag` 是配套 Memos Release 标签，`commit` 是本次构建提交。扩展仍随 Memos Release 交付，不另设商店或独立发布通道。同一扩展版本可随多个 Memos Release 提供；构建提交和配套标签不同会使 ZIP 校验和不同，重试同一个 Release 仍禁止覆盖不同内容。Release 的 `release.json` 列出配套 ZIP，`SHA256SUMS` 包含其校验和。安装扩展不等于服务器已升级，Star / Pick up 保存仍要求连接的实例声明对应能力。
 
 从干净的源码检出构建个人 ZIP（需要 Python 3）：
 
@@ -79,12 +79,12 @@ ZIP 中的扩展版本跟随仓库根目录的 Memos 个人发行版本，`casto
 corepack pnpm package:release
 ```
 
-输出在 `artifacts/`。已有构建也可在仓库根目录执行 `python extensions/web-clipper/scripts/package-release.py --output build/candidate`。打包保留 Chromium key、去除 `update_url`，只修改包内版本，不改源码；拒绝未提交改动、开发服务器构建或不完整产物。
+输出在 `artifacts/`。已有构建也可在仓库根目录执行 `python extensions/web-clipper/scripts/package-release.py --output build/candidate`。打包保留 Chromium key、去除 `update_url`，不改源码版本；拒绝未提交改动、开发服务器构建或不完整产物。
 
 `package` / `package:chrome` / `package:edge` / `package:firefox` 继续保留上游商店打包逻辑，另需 zip 等工具。本项目 Release 只提供个人 Chromium 包，不自动提交商店或发布 Firefox 签名包，也不为历史 Release 补发扩展。普通 PR 的扩展 CI 会提供短期 Actions artifact，供试用，不视为正式版本。
 
 ## 后续维护
 
-继续维护关联任务中的实际验证与未覆盖范围。扩展修改触发独立 lint、单测、Python 打包测试、构建和 ZIP 生成，纳入根仓库 `validate`；版本 PR 与工作流修改也运行该检查。扩展交付行为变化需新增根目录 Changeset。不要把检查通过当作扩展商店发布或服务器部署完成。新增界面文案以个人使用的中文为主，上游设置与通用文案仍沿用语言配置。
+继续维护关联任务中的实际验证与未覆盖范围。扩展修改触发独立 lint、单测、Python 打包测试、构建和 ZIP 生成，纳入根仓库 `validate`；版本 PR 与工作流修改也运行该检查。扩展交付行为变化需在根目录运行 `corepack pnpm changeset`，同时选择 `memos-web-clipper` 与 `memos-personal`：前者决定扩展升级级别，后者记录配套交付并触发现有统一 Release；仅应用变化只选择 `memos-personal`。机器人分别生成根目录与 `release/` 下的版本和 CHANGELOG，普通 PR 不手改。不要把检查通过当作扩展商店发布或服务器部署完成。新增界面文案以个人使用的中文为主，上游设置与通用文案仍沿用语言配置。
 
 源码、测试、公共配置示例受版本控制；node_modules、.env、dist、artifacts、真实令牌和浏览器运行数据留在本机。

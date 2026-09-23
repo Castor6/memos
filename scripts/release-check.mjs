@@ -8,6 +8,8 @@ import { isReleasable } from "./ci.mjs";
 
 const project = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const cli = join(project, "node_modules/.bin/changeset");
+const clipperPackage = "extensions/web-clipper/release/package.json";
+const clipperChangelog = "extensions/web-clipper/release/CHANGELOG.md";
 const note = (path) => /^\.changeset\/[^/]+\.md$/.test(path) && path !== ".changeset/README.md";
 const git = (root, ...args) => execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 const files = (root, base, head) => git(root, "diff", "--name-only", "--no-renames", "-z", base, head).split("\0").filter(Boolean);
@@ -25,14 +27,26 @@ export function checkRelease({ root = process.cwd(), base = "", head = "HEAD", v
   assert.equal(pkg.name, "memos-personal");
   assert.equal(pkg.private, true, "Version metadata must never become an npm publication");
   assert.match(pkg.version, /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/);
+  const notes = new Map();
   for (const name of readdirSync(join(root, ".changeset"))) {
     if (!note(`.changeset/${name}`)) continue;
     const content = readFileSync(join(root, ".changeset", name), "utf8");
-    assert.match(content, /^---\r?\n["']?memos-personal["']?: (patch|minor|major)\r?\n---\r?\n\s*\S/, `Invalid release note: ${name}`);
+    const match = content.match(/^---\r?\n((?:["']?memos-(?:personal|web-clipper)["']?: (?:patch|minor|major)\r?\n)+)---\r?\n\s*\S/);
+    assert.ok(match, `Invalid release note: ${name}`);
+    const packages = [...match[1].matchAll(/memos-(personal|web-clipper)/g)].map((entry) => entry[0]);
+    assert.equal(new Set(packages).size, packages.length, `Duplicate package in release note: ${name}`);
+    assert.ok(packages.includes("memos-personal"), `Extension releases need a memos-personal note for the shared release: ${name}`);
+    notes.set(`.changeset/${name}`, packages);
   }
   // Do not use `changeset status` here: its package-wide change heuristic would
   // require notes for docs-only PRs and depends on a local base branch. The
-  // single-package note schema above and application paths below are our policy.
+  // explicit note schema above and application paths below are our policy.
+  const clipper = existsSync(join(root, clipperPackage)) ? JSON.parse(readFileSync(join(root, clipperPackage), "utf8")) : null;
+  if (clipper) {
+    assert.equal(clipper.name, "memos-web-clipper");
+    assert.equal(clipper.private, true);
+    assert.match(clipper.version, /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/);
+  }
   if (!base) return;
   const paths = files(root, base, head);
   const previous = at(root, base, "package.json");
@@ -44,10 +58,21 @@ export function checkRelease({ root = process.cwd(), base = "", head = "HEAD", v
   if (!versionPR) {
     assert.equal(pkg.version, JSON.parse(previous).version, "Only Version Packages PRs update the version");
     assert.ok(!paths.includes("CHANGELOG.md"), "Only Version Packages PRs update CHANGELOG.md");
+    const previousClipper = at(root, base, clipperPackage);
+    if (previousClipper) {
+      assert.ok(clipper, "Extension version metadata must not be removed");
+      assert.equal(clipper.version, JSON.parse(previousClipper).version, "Only Version Packages PRs update the extension version");
+    } else if (clipper) {
+      assert.equal(clipper.version, JSON.parse(previous).version, "Independent extension version starts at the existing personal version");
+    }
+    assert.ok(!paths.includes(clipperChangelog), "Only Version Packages PRs update the extension CHANGELOG.md");
     const added = git(root, "diff", "--name-only", "--no-renames", "--diff-filter=A", "-z", base, head).split("\0");
     assert.ok(paths.filter(note).every((path) => added.includes(path)), "Only Version Packages PRs consume existing release notes");
     if (paths.some(isReleasable)) {
       assert.ok(added.some(note), "Shipped behavior changed: add a new .changeset/*.md release note");
+    }
+    if (clipper && paths.some((path) => path.startsWith("extensions/web-clipper/") && isReleasable(path))) {
+      assert.ok(added.some((path) => notes.get(path)?.includes("memos-web-clipper")), "Extension behavior changed: add a new memos-web-clipper release note");
     }
     return;
   }
@@ -60,7 +85,11 @@ export function checkRelease({ root = process.cwd(), base = "", head = "HEAD", v
     git(root, "worktree", "add", "--detach", worktree, base);
     symlinkSync(join(project, "node_modules"), join(worktree, "node_modules"), "dir");
     execFileSync(cli, ["version"], { cwd: worktree, stdio: "pipe", encoding: "utf8" });
-    const expected = git(worktree, "diff", "--name-only", "--no-renames", "-z").split("\0").filter(Boolean);
+    // A package's first release creates a previously untracked CHANGELOG.md.
+    const expected = [...new Set([
+      ...git(worktree, "diff", "--name-only", "--no-renames", "-z").split("\0"),
+      ...git(worktree, "ls-files", "--others", "--exclude-standard", "-z").split("\0"),
+    ].filter(Boolean))];
     assert.ok(expected.includes("package.json"), "No pending release exists on main");
     assert.deepEqual([...paths].sort(), expected.sort(), "Version PR file set differs from Changesets output");
     for (const path of expected) {

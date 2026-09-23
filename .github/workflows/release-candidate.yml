@@ -83,6 +83,9 @@ jobs:
           appendFileSync(process.env.GITHUB_OUTPUT, `version=${version}\n`);
           // Old version PRs keep their original assets when retried from this workflow.
           appendFileSync(process.env.GITHUB_OUTPUT, `web_clipper=${existsSync('extensions/web-clipper/scripts/package-release.py')}\n`);
+          const extensionVersionFile = 'extensions/web-clipper/release/package.json';
+          const extensionVersion = existsSync(extensionVersionFile) ? JSON.parse(readFileSync(extensionVersionFile, 'utf8')).version : version;
+          appendFileSync(process.env.GITHUB_OUTPUT, `web_clipper_version=${extensionVersion}\n`);
           JS
       - uses: pnpm/action-setup@v4.2.0
         if: steps.version.outputs.web_clipper == 'true'
@@ -119,6 +122,7 @@ jobs:
         env:
           RELEASE_VERSION: ${{ steps.version.outputs.version }}
           WEB_CLIPPER: ${{ steps.version.outputs.web_clipper }}
+          WEB_CLIPPER_VERSION: ${{ steps.version.outputs.web_clipper_version }}
           CGO_ENABLED: "0"
           GOOS: linux
         run: |
@@ -134,13 +138,14 @@ jobs:
           const version = process.env.RELEASE_VERSION;
           const release = {version, tag: `castor-v${version}`, commit: process.env.RELEASE_COMMIT};
           if (process.env.WEB_CLIPPER === 'true') {
-            release.webClipper = {version, file: `memos-web-clipper-chromium-v${version}.zip`};
+            const extensionVersion = process.env.WEB_CLIPPER_VERSION;
+            release.webClipper = {version: extensionVersion, file: `memos-web-clipper-chromium-v${extensionVersion}.zip`};
           }
           writeFileSync('build/candidate/release.json', JSON.stringify(release, null, 2) + '\n');
           JS
           (cd build/candidate && sha256sum memos-linux-* release.json CHANGELOG.md LICENSE > SHA256SUMS)
           if [ "$WEB_CLIPPER" = 'true' ]; then
-            (cd build/candidate && sha256sum "memos-web-clipper-chromium-v$RELEASE_VERSION.zip" >> SHA256SUMS)
+            (cd build/candidate && sha256sum "memos-web-clipper-chromium-v$WEB_CLIPPER_VERSION.zip" >> SHA256SUMS)
           fi
       - name: Test and publish immutable image, then advance stable
         env:

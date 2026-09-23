@@ -77,13 +77,13 @@ class ReleaseTests(unittest.TestCase):
                                                           'version': '0.2.1', 'commit': COMMIT}))
         self.client = FakeGitHub()
 
-    def write_extension(self, *, version='0.2.1', commit=COMMIT, manifest_version='0.2.1'):
+    def write_extension(self, *, version='0.2.1', commit=COMMIT, manifest_version='0.2.1', tag='castor-v0.2.1'):
         with zipfile.ZipFile(self.source / self.extension_name, 'w') as archive:
             archive.writestr('manifest.json', json.dumps({
                 'manifest_version': 3, 'version': manifest_version, 'key': 'public-key',
                 'background': {'service_worker': 'background.js'}, 'action': {'default_popup': 'popup.html'},
             }))
-            archive.writestr('castor-release.json', json.dumps({'version': version, 'tag': 'castor-v' + version, 'commit': commit}))
+            archive.writestr('castor-release.json', json.dumps({'version': version, 'tag': tag, 'commit': commit}))
             archive.writestr('background.js', 'console.log("extension");')
             archive.writestr('popup.html', '<!doctype html><title>Web Clipper</title>')
 
@@ -111,6 +111,20 @@ class ReleaseTests(unittest.TestCase):
         for line in (self.output / 'SHA256SUMS').read_text().splitlines():
             checksum, name = line.split()
             self.assertEqual(m.digest(self.output / name), 'sha256:' + checksum)
+
+    def test_independent_extension_version_is_preserved(self):
+        (self.source / self.extension_name).unlink()
+        self.extension_name = 'memos-web-clipper-chromium-v0.1.3.zip'
+        self.write_extension(version='0.1.3', manifest_version='0.1.3')
+        path = self.source / 'release.json'
+        release = json.loads(path.read_text())
+        release['webClipper'] = {'version': '0.1.3', 'file': self.extension_name}
+        path.write_text(json.dumps(release))
+        self.write_checksums()
+        version, tag, body = self.prepare()
+        self.assertEqual((version, tag), ('0.2.1', 'castor-v0.2.1'))
+        self.assertIn(self.extension_name, body)
+        self.assertEqual(json.loads((self.output / 'release.json').read_text())['webClipper']['version'], '0.1.3')
 
     def test_identity_and_checksums_must_match_before_any_publication(self):
         with self.assertRaisesRegex(RuntimeError, 'identity mismatch'):
@@ -153,7 +167,7 @@ class ReleaseTests(unittest.TestCase):
                     self.prepare()
 
     def test_web_clipper_internal_identity_and_manifest_must_match(self):
-        for override in ({'version': '0.2.0'}, {'commit': 'e' * 40}, {'manifest_version': '0.2.0'}):
+        for override in ({'version': '0.2.0'}, {'commit': 'e' * 40}, {'manifest_version': '0.2.0'}, {'tag': 'castor-v0.2.0'}):
             with self.subTest(override=override):
                 self.write_extension(**override)
                 self.write_checksums()
@@ -265,7 +279,7 @@ class ReleaseWorkflowTests(unittest.TestCase):
         workflow = (Path(__file__).parents[1] / '.github/workflows/release-candidate.yml').read_text(encoding='utf-8')
         scripts = re.findall(r"^          node --input-type=module <<'JS'\n(.*?)^          JS$", workflow, re.M | re.S)
         self.assertEqual(len(scripts), 2)
-        for has_extension in (False, True):
+        for has_extension, independent in ((False, False), (True, False), (True, True)):
             with self.subTest(has_extension=has_extension), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
                 (root / 'package.json').write_text(json.dumps({'version': '0.2.1'}))
@@ -274,21 +288,26 @@ class ReleaseWorkflowTests(unittest.TestCase):
                     package_script = root / 'extensions/web-clipper/scripts/package-release.py'
                     package_script.parent.mkdir(parents=True)
                     package_script.touch()
+                if independent:
+                    version_file = root / 'extensions/web-clipper/release/package.json'
+                    version_file.parent.mkdir(parents=True)
+                    version_file.write_text(json.dumps({'version': '0.1.3'}))
                 env = {**os.environ, 'GITHUB_OUTPUT': str(root / 'outputs'), 'RELEASE_COMMIT': COMMIT}
                 subprocess.run(['node', '--input-type=module'], input=textwrap.dedent(scripts[0]),
                                cwd=root, env=env, text=True, check=True, capture_output=True)
                 values = dict(line.split('=', 1) for line in (root / 'outputs').read_text().splitlines())
                 self.assertEqual(values['version'], '0.2.1')
                 self.assertEqual(values['web_clipper'], str(has_extension).lower())
-                env.update(RELEASE_VERSION=values['version'], WEB_CLIPPER=values['web_clipper'])
+                env.update(RELEASE_VERSION=values['version'], WEB_CLIPPER=values['web_clipper'], WEB_CLIPPER_VERSION=values['web_clipper_version'])
                 subprocess.run(['node', '--input-type=module'], input=textwrap.dedent(scripts[1]),
                                cwd=root, env=env, text=True, check=True, capture_output=True)
                 metadata = json.loads((root / 'build/candidate/release.json').read_text())
                 self.assertEqual(metadata['commit'], COMMIT)
                 self.assertEqual(metadata['tag'], 'castor-v0.2.1')
                 if has_extension:
+                    extension_version = '0.1.3' if independent else '0.2.1'
                     self.assertEqual(metadata['webClipper'], {
-                        'version': '0.2.1', 'file': 'memos-web-clipper-chromium-v0.2.1.zip',
+                        'version': extension_version, 'file': f'memos-web-clipper-chromium-v{extension_version}.zip',
                     })
                 else:
                     self.assertNotIn('webClipper', metadata)

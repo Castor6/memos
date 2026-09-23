@@ -9,7 +9,7 @@
 3. 提交 PR。新增功能选 minor，兼容修复选 patch，破坏兼容性选 major；同一版本取最高升级级别。纯文档、测试和不影响交付行为的 CI 修改无需发布说明。
 4. `validate` 通过后合并。版本号和 `CHANGELOG.md` 由机器人统一更新，普通 PR 不手改，也不消耗已经合入 main 的 changeset。
 
-根目录的 Node 包只用于版本管理，与 `web/` 的依赖和锁文件分开；不发布 npm 包。Node 24 / pnpm 11.0.1 与现有前端一致。使用 fnm 的电脑可在命令前加 `fnm exec --using 24`。
+根 workspace 仅纳入根目录 `memos-personal` 和 `extensions/web-clipper/release/` 的 `memos-web-clipper` 两个私有版本包，不发布 npm 包。`web/` 与扩展应用保留独立依赖、锁文件和 pnpm 版本。扩展交付变化时，根目录 `corepack pnpm changeset` 同时选择两个包：扩展按自身变化选择 patch/minor/major，应用包含配套发行说明（仅扩展变化时可选 patch）以触发现有统一 Release。仅应用变化时只选择 `memos-personal`，扩展版本保持不变。Node 24 / pnpm 11.0.1 与现有前端一致。使用 fnm 的电脑可在命令前加 `fnm exec --using 24`。
 
 ## CI 检查
 
@@ -88,7 +88,7 @@ main 的 CI 成功后，`Version Packages` 工作流对仍为当前 main 的提�
 
 附件包含 Linux amd64/arm64 二进制、Chrome / Edge 通用的 `memos-web-clipper-chromium-v<版本>.zip`、`CHANGELOG.md`、`LICENSE`、`release.json`、`image-digest.txt` 和 `SHA256SUMS`。二进制、ZIP 和元数据先核对构建产物的校验清单，再生成包含镜像摘要的完整公开清单；不会公开私有 Registry 地址。与 30 天 Actions artifacts 不同，Release 附件不会因这个保留期限被自动清除。
 
-扩展与服务端从同一个确定提交构建。发布任务使用 Node 24、扩展独立的 pnpm 11.10.0 和公开 `.env.example`，执行 lint、单测、Python 标准库打包测试、类型及生产构建，再生成 ZIP；检查或打包失败会阻断镜像发布。ZIP 保留稳定 Chromium key、不含商店更新地址，包内 manifest 版本取根目录个人发行版本，源码的上游扩展版本不参与 Changesets 升级。`castor-release.json` 记录版本/提交/上游基线；外部 `release.json.webClipper` 指向对应 ZIP。公开前验证 ZIP 内部身份与清单，继续采用草稿上传、回读摘要、禁止覆盖同名不同内容的规则。
+扩展与服务端从同一个确定提交构建。发布任务使用 Node 24、扩展独立的 pnpm 11.10.0 和公开 `.env.example`，执行 lint、单测、Python 标准库打包测试、类型及生产构建，再生成 ZIP；检查或打包失败会阻断镜像发布。ZIP 保留稳定 Chromium key、不含商店更新地址，包内及本地 manifest 版本取独立的 `extensions/web-clipper/release/package.json`，源码的上游扩展基线不参与 Changesets 升级。扩展从 0.8.2 衔接，版本 PR 同时维护其 `release/CHANGELOG.md`；普通 PR 不手改两套版本/日志。`castor-release.json` 记录扩展版本/构建提交/上游基线及配套 Memos 标签；外部 `release.json.webClipper` 使用扩展自身版本指向对应 ZIP，允许其与 Memos 版本不同。同一扩展版本仍可随多个 Memos Release 重新构建，提交/配套标签变化会改变 ZIP 摘要，但同一 Release 的重试仍须字节一致。公开前验证 ZIP 内部身份与清单，继续采用草稿上传、回读摘要、禁止覆盖同名不同内容的规则。
 
 下载 ZIP 后须解压，在 Chrome / Edge 扩展管理页开启开发者模式并加载含 `manifest.json` 的目录；后续需手动替换文件并重新加载，不是商店自动更新。安装及版本兼容边界见 [扩展说明](../extensions/web-clipper/README.md)。扩展源码修改要求中文 Changeset，普通 PR 仍不触发正式发布。
 

@@ -22,7 +22,7 @@ if (!VALID_TARGETS.has(requestedTarget)) {
   throw new Error(`Unknown target "${requestedTarget}". Use one of: ${[...VALID_TARGETS].join(", ")}`);
 }
 
-const packageJson = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
+const releaseJson = JSON.parse(readFileSync(join(ROOT, "release/package.json"), "utf8"));
 
 const requireTrustedSourceTree = () => {
   // Git resolves the owning checkout for both monorepo subdirectories and worktrees.
@@ -41,8 +41,8 @@ const baseManifestPath = join(DIST, "manifest.json");
 if (!existsSync(baseManifestPath)) throw new Error("dist/manifest.json is missing; run `pnpm build` first.");
 
 const baseManifest = JSON.parse(readFileSync(baseManifestPath, "utf8"));
-if (baseManifest.version !== packageJson.version) {
-  throw new Error(`Version mismatch: package.json is ${packageJson.version}, dist manifest is ${baseManifest.version}.`);
+if (baseManifest.version !== releaseJson.version) {
+  throw new Error(`Version mismatch: release/package.json is ${releaseJson.version}, dist manifest is ${baseManifest.version}.`);
 }
 
 if (requestedTarget === "all") rmSync(ARTIFACTS, { recursive: true, force: true });
@@ -107,7 +107,7 @@ const createStoreStage = (target) => {
 
 const packageManualChromium = () => {
   const stage = createStage("chromium-manual", manualChromiumManifest());
-  const outputPath = join(ARTIFACTS, `memos-web-clipper-chromium-v${packageJson.version}.zip`);
+  const outputPath = join(ARTIFACTS, `memos-web-clipper-chromium-v${releaseJson.version}.zip`);
 
   try {
     zipDirectory(stage, outputPath);
@@ -120,8 +120,8 @@ const packageManualChromium = () => {
 
 const packageChromium = (targets) => {
   const stage = createStoreStage("chromium");
-  const chromePath = join(ARTIFACTS, `memos-web-clipper-chrome-v${packageJson.version}.zip`);
-  const edgePath = join(ARTIFACTS, `memos-web-clipper-edge-v${packageJson.version}.zip`);
+  const chromePath = join(ARTIFACTS, `memos-web-clipper-chrome-v${releaseJson.version}.zip`);
+  const edgePath = join(ARTIFACTS, `memos-web-clipper-edge-v${releaseJson.version}.zip`);
   const primaryPath = targets.includes("chrome") ? chromePath : edgePath;
 
   try {
@@ -139,7 +139,7 @@ const packageChromium = (targets) => {
 
 const packageFirefox = () => {
   const stage = createStoreStage("firefox");
-  const firefoxPath = join(ARTIFACTS, `memos-web-clipper-firefox-v${packageJson.version}.zip`);
+  const firefoxPath = join(ARTIFACTS, `memos-web-clipper-firefox-v${releaseJson.version}.zip`);
 
   try {
     // Mozilla's validator catches Firefox manifest and compatibility problems.

@@ -54,8 +54,12 @@ def prepare(source, destination, commit):
     tag = 'castor-v' + version
     if not re.fullmatch(r'[0-9a-f]{40}', commit) or release.get('commit') != commit or release.get('tag') != tag:
         raise RuntimeError('Candidate release identity mismatch')
-    extension_name = f'memos-web-clipper-chromium-v{version}.zip'
-    if release.get('webClipper') != {'version': version, 'file': extension_name}:
+    extension = release.get('webClipper')
+    extension_version = extension.get('version') if isinstance(extension, dict) else None
+    if not isinstance(extension_version, str) or not re.fullmatch(r'(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)', extension_version):
+        raise RuntimeError('Candidate web clipper metadata mismatch')
+    extension_name = f'memos-web-clipper-chromium-v{extension_version}.zip'
+    if extension != {'version': extension_version, 'file': extension_name}:
         raise RuntimeError('Candidate web clipper metadata mismatch')
     image = json.loads((source / 'image.json').read_text())
     if image.get('commit') != commit or image.get('version') != version:
@@ -74,7 +78,7 @@ def prepare(source, destination, commit):
         if path.is_symlink() or not path.is_file() or digest(path) != checksums.get(name):
             raise RuntimeError('Candidate checksum mismatch: ' + name)
         shutil.copyfile(path, destination / name)
-    verify_web_clipper(source / extension_name, version, tag, commit)
+    verify_web_clipper(source / extension_name, extension_version, tag, commit)
     changelog = (source / 'CHANGELOG.md').read_text()
     sections = re.split(r'^## ', changelog, flags=re.M)
     notes = [s.split('\n', 1)[1].strip() for s in sections[1:] if s.split('\n', 1)[0].strip() == version]
