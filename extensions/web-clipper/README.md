@@ -65,6 +65,8 @@ corepack pnpm build
 
 构建输出为本目录下的 `dist/`。Chrome 打开 `chrome://extensions`，Edge 打开 `edge://extensions`，开启开发者模式并加载该目录。重新构建后，在扩展管理页面点击重新加载，必要时刷新正在剪藏的网页。
 
+`build` 同时运行生产后台启动检查：在没有 DOM、禁止联网的环境中加载实际 Service Worker 及其共享模块，验证连接状态消息可以返回，避免页面专用依赖导致安装后后台启动失败。已有 `dist/` 可单独运行 `corepack pnpm check:worker`。设置页等待连接状态超过 30 秒时会显示扩展错误，并提供重新检查入口。
+
 保留官方 Chromium key，扩展 ID 仍为 `nebaoebnljalfegiidibihhkebeiklbl`。切换到新 dist 时停用此前加载的试用目录或官方扩展，避免同一 ID 的不同副本冲突。旧试用目录 `../../tmp/web-clipper-trial/extension/` 仍保留，本次迁移不会自动更新浏览器已加载的副本。
 
 ## GitHub Release 安装包

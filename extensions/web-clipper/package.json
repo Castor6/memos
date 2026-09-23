@@ -9,7 +9,8 @@
   "scripts": {
     "dev": "vite",
     "validate:locales": "node scripts/validate-locales.mjs",
-    "build": "pnpm validate:locales && tsc --noEmit && vite build",
+    "build": "pnpm validate:locales && tsc --noEmit && vite build && pnpm check:worker",
+    "check:worker": "node scripts/check-worker.mjs",
     "package": "pnpm build && node scripts/package.mjs all",
     "package:chrome": "pnpm build && node scripts/package.mjs chrome",
     "package:edge": "pnpm build && node scripts/package.mjs edge",

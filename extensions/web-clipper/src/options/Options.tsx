@@ -661,7 +661,18 @@ export function Options() {
           ) : ready && !effectiveView ? (
             <ConnectedSummary connection={active} onChange={() => setView("choice")} onDisconnect={() => void disconnect()} />
           ) : effectiveView === "choice" ? (
-            <MethodChoice busy={choosingBusy} onUseMemos={() => void chooseUseMemos()} onDirect={() => setView("direct")} />
+            <div className="space-y-3">
+              {active.verificationError ? (
+                <>
+                  <ErrorNotice kind={active.verificationError} source={active.source} />
+                  <Button variant="outline" disabled={active.isChecking} onClick={() => void active.reverify()}>
+                    {active.isChecking ? <Spinner /> : <RefreshCwIcon />}
+                    {active.isChecking ? t("commonChecking") : t("optionsCheckConnection")}
+                  </Button>
+                </>
+              ) : null}
+              <MethodChoice busy={choosingBusy} onUseMemos={() => void chooseUseMemos()} onDirect={() => setView("direct")} />
+            </div>
           ) : effectiveView === "direct" ? (
             <DirectSetup
               initialUrl={ready && active.source === "direct" ? active.instanceUrl : null}
