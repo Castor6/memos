@@ -12,6 +12,8 @@ importers:
         specifier: 3.0.1
         version: 3.0.1
 
+  extensions/web-clipper/release: {}
+
 packages:
 
   '@changesets/apply-release-plan@8.1.1':

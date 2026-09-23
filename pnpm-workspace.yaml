@@ -1,0 +1,4 @@
+# Only release metadata participates; application dependency trees stay separate.
+packages:
+  - "."
+  - "extensions/web-clipper/release"

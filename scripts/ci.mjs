@@ -20,12 +20,14 @@ export function isReleasable(path) {
 export function classify(paths, { full = false, versionPR = false } = {}) {
   paths = paths.filter((path) => !path.endsWith(".md"));
   const workflow = paths.some((path) => path.startsWith(".github/workflows/"));
-  const all = full || versionPR || workflow;
+  const all = full || workflow;
+  const memosRelease = versionPR && paths.includes("package.json");
+  const clipperRelease = versionPR && paths.includes("extensions/web-clipper/release/package.json");
   return {
-    frontend: all || paths.some((path) => path.startsWith("scripts/pdf/") || path.startsWith("web/") || path.startsWith("proto/") || path === ".node-version"),
-    web_clipper: all || paths.some((path) => path.startsWith("extensions/web-clipper/") || path === ".node-version"),
-    backend: all || paths.some((path) => path.endsWith(".go") || path.startsWith("proto/") || path.startsWith("store/") || ["go.mod", "go.sum", ".golangci.yaml"].includes(path)),
-    proto: all || paths.some((path) => path.startsWith("proto/") && !path.endsWith(".md")),
+    frontend: all || memosRelease || paths.some((path) => path.startsWith("scripts/pdf/") || path.startsWith("web/") || path.startsWith("proto/") || path === ".node-version"),
+    web_clipper: all || clipperRelease || paths.some((path) => path.startsWith("extensions/web-clipper/") || path === ".node-version"),
+    backend: all || memosRelease || paths.some((path) => path.endsWith(".go") || path.startsWith("proto/") || path.startsWith("store/") || ["go.mod", "go.sum", ".golangci.yaml"].includes(path)),
+    proto: all || memosRelease || paths.some((path) => path.startsWith("proto/") && !path.endsWith(".md")),
     upgrade: full || paths.some((path) => path.startsWith("scripts/pdf/") || /^(store\/(db|migration)\/|store\/migrator\.go$|server\/server\.go$)/.test(path) ||
       ["scripts/Dockerfile", "scripts/entrypoint.sh", "scripts/release_smoke_test.sh", ".github/workflows/upgrade-smoke.yml"].includes(path)),
     workflow,
@@ -61,12 +63,15 @@ function plan() {
   const paths = missingBase ? [] : execFileSync("git", ["diff", "--name-only", "--no-renames", "-z", base, head], { encoding: "utf8" }).split("\0").filter(Boolean);
   // A merged version PR arrives as an ordinary push to main. Validate that push
   // against the same generated diff instead of rejecting its version update.
-  if (!pr && !manual && !full && paths.includes("package.json")) {
-    const hasBasePackage = execFileSync("git", ["ls-tree", base, "--", "package.json"], { encoding: "utf8" }).trim();
-    if (hasBasePackage) {
-      const before = JSON.parse(execFileSync("git", ["show", `${base}:package.json`], { encoding: "utf8" }));
-      const after = JSON.parse(readFileSync("package.json", "utf8"));
-      versionPR = before.version !== after.version;
+  if (!pr && !manual && !full) {
+    for (const path of ["package.json", "extensions/web-clipper/release/package.json"]) {
+      if (!paths.includes(path)) continue;
+      const hasBasePackage = execFileSync("git", ["ls-tree", base, "--", path], { encoding: "utf8" }).trim();
+      if (hasBasePackage) {
+        const before = JSON.parse(execFileSync("git", ["show", `${base}:${path}`], { encoding: "utf8" }));
+        const after = JSON.parse(readFileSync(path, "utf8"));
+        versionPR ||= before.version !== after.version;
+      }
     }
   }
   const outputs = { ...classify(paths, { full, versionPR }), base: missingBase ? "" : base, head, version_pr: versionPR };

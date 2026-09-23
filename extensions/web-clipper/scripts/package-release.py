@@ -57,7 +57,7 @@ def read_json(path):
 
 def chrome_version(version):
     if not isinstance(version, str) or not re.fullmatch(r"(?:0|[1-9][0-9]*)(?:\.(?:0|[1-9][0-9]*)){0,3}", version):
-        raise PackageError("The Memos version must contain one to four Chromium-compatible integer components.")
+        raise PackageError("The extension version must contain one to four Chromium-compatible integer components.")
     parts = [int(part) for part in version.split(".")]
     if any(part > 65535 for part in parts) or not any(parts):
         raise PackageError("Chromium version components must be 0..65535 and cannot all be zero.")
@@ -70,15 +70,15 @@ def release_identity(extension_root):
         raise PackageError("The extension must be packaged from the Memos monorepo.")
     if git(root, "status", "--porcelain", "--untracked-files=normal"):
         raise PackageError("Refusing to package a dirty working tree. Commit or stash source changes first.")
-    git(root, "ls-files", "--error-unmatch", "package.json", "extensions/web-clipper/package.json", "LICENSE")
-    version = chrome_version(read_json(root / "package.json").get("version"))
+    git(root, "ls-files", "--error-unmatch", "package.json", "extensions/web-clipper/package.json", "extensions/web-clipper/release/package.json", "LICENSE")
+    version = chrome_version(read_json(extension_root / "release/package.json").get("version"))
     commit = git(root, "rev-parse", "HEAD")
     if not re.fullmatch(r"[0-9a-f]{40,64}", commit):
         raise PackageError("Git HEAD must resolve to a complete commit hash.")
     upstream_version = read_json(extension_root / "package.json").get("version")
     if not isinstance(upstream_version, str) or not upstream_version:
         raise PackageError("The extension package must declare its upstream base version.")
-    return {"version": version, "tag": f"castor-v{version}", "commit": commit, "upstreamVersion": upstream_version}
+    return {"version": version, "tag": f"web-clipper-v{version}", "commit": commit, "upstreamVersion": upstream_version}
 
 
 def collect_files(dist):
@@ -160,8 +160,8 @@ def validate_manifest(files, identity):
         raise PackageError("The built manifest is not valid JSON.") from error
     if not isinstance(manifest, dict) or manifest.get("manifest_version") != 3:
         raise PackageError("The release requires a Manifest V3 Chromium build.")
-    if manifest.get("version") != identity["upstreamVersion"]:
-        raise PackageError("Built manifest version does not match the extension package; rebuild dist/.")
+    if manifest.get("version") != identity["version"]:
+        raise PackageError("Built manifest version does not match the extension release package; rebuild dist/.")
     try:
         key = base64.b64decode(manifest.get("key", ""), validate=True)
         digest = hashlib.sha256(key).hexdigest()[:32]
