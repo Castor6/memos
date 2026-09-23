@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.2
+
+### Patch Changes
+
+- 1d31a0a: 链接预览尚未完成或抓取失败时保持普通链接展示，避免反复闪现加载卡片。
+
 ## 0.8.1
 
 ### Patch Changes
