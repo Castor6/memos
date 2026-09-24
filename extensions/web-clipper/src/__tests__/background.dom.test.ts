@@ -102,6 +102,17 @@ describe("background — storage isolation", () => {
   });
 });
 
+describe("background — editor launcher", () => {
+  it("opens a tab from the toolbar without extracting or saving", async () => {
+    await browserMock.action.onClicked.emit({ id: 7, url: "https://example.com/post" });
+    expect(browserMock.tabs.create).toHaveBeenCalledWith({
+      url: "chrome-extension://test-id/src/popup/index.html?sourceTab=7&sourceUrl=https%3A%2F%2Fexample.com%2Fpost",
+      openerTabId: 7,
+    });
+    expect(browserMock.scripting.executeScript).not.toHaveBeenCalled();
+  });
+});
+
 describe("background — SAVE_MEMO message", () => {
   beforeEach(ready);
 

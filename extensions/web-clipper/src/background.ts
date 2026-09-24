@@ -13,6 +13,7 @@ import {
 import { clearMemoSaveAttempts, savePopupMemo, saveSelectionClip } from "@/background/memo-save";
 import { isTrustedBackgroundRequest, parseBackgroundRequest, type RuntimeSender } from "@/lib/background-protocol";
 import { captureCapabilities, findServerClipStatus, listServerClipRecords } from "@/lib/clip-records";
+import { openClipEditor } from "@/lib/editor-page";
 import { describeSaveError, type SaveErrorKind, toSaveErrorKind } from "@/lib/errors";
 import { applyLocalePreference, getTextDirection, initializeLocalePreference, LOCALE_PREFERENCE_KEY, t, tp } from "@/lib/i18n";
 import { checkVersion, clearCachedVersion } from "@/lib/instance-version";
@@ -27,6 +28,13 @@ type RestrictableStorageArea = typeof browser.storage.local & {
 };
 
 const localeReady = initializeLocalePreference();
+
+// Serialize rapid toolbar clicks so there is only one editor per source URL.
+let openingEditor: Promise<void> = Promise.resolve();
+browser.action.onClicked.addListener((tab) => {
+  openingEditor = openingEditor.catch(() => {}).then(() => openClipEditor(tab));
+  return openingEditor;
+});
 
 // storage.local is exposed to content scripts by default. No content script in this
 // extension needs storage, so keep OAuth and Memos credentials in trusted contexts only.

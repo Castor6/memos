@@ -65,16 +65,21 @@ export function TagEditor({ tags, suggestions, onChange, disabled = false, loadi
     <section aria-label="标签管理" className="min-w-0 space-y-2">
       <div className="flex min-w-0 flex-wrap items-center gap-1.5">
         {tags.map((tag) => (
-          <button
+          <span
             key={tag}
-            type="button"
-            disabled={disabled}
-            aria-label={`移除标签 ${tag}`}
-            className="max-w-full rounded-full bg-accent px-2.5 py-1 text-xs break-words text-accent-foreground hover:bg-muted disabled:opacity-50"
-            onClick={() => onChange(tags.filter((value) => value !== tag))}
+            className="inline-flex max-w-full items-center gap-1 rounded-md bg-accent py-1 ps-2.5 pe-1 text-sm break-words text-accent-foreground"
           >
-            {tag} <span aria-hidden="true">×</span>
-          </button>
+            <span className="min-w-0">{tag}</span>
+            <button
+              type="button"
+              disabled={disabled}
+              aria-label={`移除标签 ${tag}`}
+              className="shrink-0 rounded px-1 hover:bg-muted disabled:opacity-50"
+              onClick={() => onChange(tags.filter((value) => value !== tag))}
+            >
+              <span aria-hidden="true">×</span>
+            </button>
+          </span>
         ))}
         <button
           ref={triggerRef}

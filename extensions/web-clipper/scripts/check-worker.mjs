@@ -38,7 +38,7 @@ const api = {
     onChanged: event(),
   },
   i18n: { getMessage: () => "", getUILanguage: () => "en" },
-  action: { async setTitle() {} },
+  action: { onClicked: event(), async setTitle() {} },
   contextMenus: { onClicked: event(), async removeAll() {}, create() {} },
 };
 globalThis.browser = api;

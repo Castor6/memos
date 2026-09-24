@@ -112,13 +112,19 @@ function build() {
       getUILanguage: vi.fn(() => uiLocale),
     },
     tabs: {
+      get: vi.fn(async (id: number) => ({ id, url: "https://example.com/post", title: "Hello World" })),
+      update: vi.fn(async (id: number, _props: unknown) => ({ id })),
       onUpdated: fakeEvent(),
       onRemoved: fakeEvent(),
-      query: vi.fn(async (_q: unknown) => [] as Array<{ id?: number; url?: string; status?: string; title?: string }>),
+      query: vi.fn(
+        async (_q: unknown) =>
+          [] as Array<{ id?: number; url?: string; pendingUrl?: string; status?: string; title?: string; windowId?: number }>,
+      ),
       create: vi.fn(async (_props: unknown) => ({ id: 999 })),
       remove: vi.fn(async (_id: number) => undefined),
       sendMessage: vi.fn(async (_id: number, _msg: unknown) => undefined as unknown),
     },
+    windows: { update: vi.fn(async (id: number, _props: unknown) => ({ id })) },
     storage: {
       local: makeStorageArea(),
       onChanged: fakeEvent(),
@@ -132,6 +138,7 @@ function build() {
       removeAll: vi.fn(async () => undefined),
     },
     action: {
+      onClicked: fakeEvent(),
       setBadgeText: vi.fn(async (_d: unknown) => undefined),
       setBadgeBackgroundColor: vi.fn(async (_d: unknown) => undefined),
       setTitle: vi.fn(async (_d: unknown) => undefined),

@@ -182,10 +182,13 @@ function captureFallback({ hasSelection, hasArticle, description }: { hasSelecti
   return hasSelection ? {} : { fallbackReason: "no-article" };
 }
 
-export async function captureActivePage(): Promise<PageCapture> {
+export async function captureActivePage(sourceTabId?: number): Promise<PageCapture> {
   let tab: Awaited<ReturnType<typeof browser.tabs.query>>[number] | undefined;
   try {
-    [tab] = await withTimeout(browser.tabs.query({ active: true, currentWindow: true }), TAB_QUERY_TIMEOUT_MS);
+    tab =
+      sourceTabId === undefined
+        ? (await withTimeout(browser.tabs.query({ active: true, currentWindow: true }), TAB_QUERY_TIMEOUT_MS))[0]
+        : await withTimeout(browser.tabs.get(sourceTabId), TAB_QUERY_TIMEOUT_MS);
   } catch (error) {
     return {
       title: "",
@@ -216,7 +219,9 @@ export async function captureActivePage(): Promise<PageCapture> {
       const cap = injection?.result as CapturePayload | null | undefined;
       if (cap) {
         title = title || cap.title;
-        url = url || cap.url;
+        // The source can navigate between metadata lookup and injection. Never label
+        // another page's content with the previous source URL.
+        url = cap.url || url;
         description = cap.description;
         let selectionImages = cap.images ?? [];
         if (cap.selectionHtml) {
