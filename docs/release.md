@@ -104,6 +104,8 @@ Memos Release 附件包含 Linux amd64/arm64 二进制、`CHANGELOG.md`、`LICEN
 
 `castor-release.json` 记录扩展版本、`web-clipper-v<版本>` 标签、构建提交及上游基线。外部 `release.json` 的 `component: web-clipper` 标识扩展，`file` 指向 ZIP；Memos 清单使用 `component: memos`，不再捆绑扩展。公开前核对 ZIP 内部身份与校验和，继续采用草稿上传、回读摘要、禁止覆盖同名不同内容的规则。
 
+扩展入口完整性同时在打包和发布前检查：旧包声明 `action.default_popup` 时必须包含该文件，新包未声明时必须包含独立编辑页 `src/popup/index.html`。界面入口变更需同步检查这两层校验及其测试，不能只验证 ZIP 生成成功。
+
 下载 ZIP 后须解压，在 Chrome / Edge 扩展管理页开启开发者模式并加载含 `manifest.json` 的目录；后续需手动替换文件并重新加载，不是商店自动更新。安装及版本兼容边界见 [扩展说明](../extensions/web-clipper/README.md)。扩展源码修改要求中文 Changeset，普通 PR 仍不触发正式发布。
 
 上传不完整时保留草稿，可在 Actions 重跑失败的 Release job；标签、附件和摘要相符时复用，不重复创建。已有标签指向其它提交、同名附件内容不同或公开 Release 缺少附件时拒绝覆盖，需人工核查。重跑旧草稿不会把较新 Memos 版本的 Latest 标记降级；扩展 Release 不参与 Latest 竞争。
