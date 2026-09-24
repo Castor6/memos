@@ -1,5 +1,11 @@
 # memos-web-clipper
 
+## 0.2.0
+
+### Minor Changes
+
+- 31bed01: 剪藏编辑改为独立标签页，优先展示个人产出，标签置于模块顶部，原内容和完整保存预览可直接切换。输入框随内容增高，取消嵌套纵向滚动；Enter、Shift + Enter、Ctrl + Enter 均换行，使用按钮保存。重复打开复用编辑页，原网页关闭或跳转后仍保留草稿。
+
 ## 0.1.2
 
 ### Patch Changes
