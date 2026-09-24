@@ -77,15 +77,17 @@ class ReleaseTests(unittest.TestCase):
                                                           'version': '0.2.1', 'commit': COMMIT}))
         self.client = FakeGitHub()
 
-    def write_extension(self, *, version='0.2.1', commit=COMMIT, manifest_version='0.2.1', tag='castor-v0.2.1'):
+    def write_extension(self, *, version='0.2.1', commit=COMMIT, manifest_version='0.2.1', tag='castor-v0.2.1',
+                        editor=False, include_entry=True):
         with zipfile.ZipFile(self.source / self.extension_name, 'w') as archive:
             archive.writestr('manifest.json', json.dumps({
                 'manifest_version': 3, 'version': manifest_version, 'key': 'public-key',
-                'background': {'service_worker': 'background.js'}, 'action': {'default_popup': 'popup.html'},
+                'background': {'service_worker': 'background.js'}, 'action': {} if editor else {'default_popup': 'popup.html'},
             }))
             archive.writestr('castor-release.json', json.dumps({'version': version, 'tag': tag, 'commit': commit}))
             archive.writestr('background.js', 'console.log("extension");')
-            archive.writestr('popup.html', '<!doctype html><title>Web Clipper</title>')
+            if include_entry:
+                archive.writestr('src/popup/index.html' if editor else 'popup.html', '<!doctype html><title>Web Clipper</title>')
 
     def write_checksums(self):
         names = sorted(p for p in self.source.iterdir() if p.name not in ('SHA256SUMS', 'image.json'))
@@ -195,6 +197,30 @@ class ReleaseTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'Invalid web clipper archive'):
             self.prepare()
 
+    def test_web_clipper_editor_without_popup_is_accepted(self):
+        self.write_extension(editor=True)
+        self.write_checksums()
+        self.prepare()
+        self.assertEqual((self.source / self.extension_name).read_bytes(), (self.output / self.extension_name).read_bytes())
+
+    def test_web_clipper_missing_entry_is_rejected_for_both_interfaces(self):
+        for editor in (False, True):
+            with self.subTest(editor=editor):
+                self.write_extension(editor=editor, include_entry=False)
+                self.write_checksums()
+                with self.assertRaisesRegex(RuntimeError, 'manifest mismatch'):
+                    self.prepare()
+        self.assertEqual(self.client.mutations, [])
+
+    def test_editor_entry_cannot_replace_a_declared_missing_popup(self):
+        self.write_extension(include_entry=False)
+        with zipfile.ZipFile(self.source / self.extension_name, 'a') as archive:
+            archive.writestr('src/popup/index.html', '<!doctype html><title>Editor</title>')
+        self.write_checksums()
+        with self.assertRaisesRegex(RuntimeError, 'manifest mismatch'):
+            self.prepare()
+        self.assertEqual(self.client.mutations, [])
+
     def test_draft_upload_verification_then_publish_and_retry_noop(self):
         identity = self.prepare()
         self.publish(identity)
@@ -296,7 +322,7 @@ class IndependentClipperTests(unittest.TestCase):
         self.output = self.root / 'public'
         self.output.mkdir()
         self.extension_name = 'memos-web-clipper-chromium-v0.1.0.zip'
-        self.write_extension(version='0.1.0', manifest_version='0.1.0', tag='web-clipper-v0.1.0')
+        self.write_extension(version='0.1.0', manifest_version='0.1.0', tag='web-clipper-v0.1.0', editor=True)
         m.stage_web_clipper(self.root, self.source, COMMIT)
         self.client = FakeGitHub()
 

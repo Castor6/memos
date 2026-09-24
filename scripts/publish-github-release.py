@@ -42,7 +42,7 @@ def verify_web_clipper(path, version, tag, commit):
             if (manifest.get('manifest_version') != 3 or manifest.get('version') != version
                     or not manifest.get('key') or 'update_url' in manifest
                     or manifest.get('background', {}).get('service_worker') not in names
-                    or manifest.get('action', {}).get('default_popup') not in names):
+                    or manifest.get('action', {}).get('default_popup', 'src/popup/index.html') not in names):
                 raise RuntimeError('Web clipper manifest mismatch')
     except (zipfile.BadZipFile, KeyError, ValueError, AttributeError) as error:
         raise RuntimeError('Invalid web clipper archive') from error
