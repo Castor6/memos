@@ -28,12 +28,11 @@ export default defineManifest({
       16: "icons/action-16.png",
       32: "icons/action-32.png",
     },
-    default_popup: "src/popup/index.html",
     default_title: "__MSG_actionTitle__",
   },
   options_ui: { page: "src/options/index.html", open_in_tab: true },
   background: { service_worker: "src/background.ts", type: "module" },
-  // "scripting": the popup captures the page's selection via executeScript so it works even on
+  // "scripting": the editor captures the source page's selection via executeScript so it works even on
   // tabs whose content script is stale (opened before the extension was installed or updated).
   permissions: ["storage", "identity", "contextMenus", "activeTab", "scripting"],
   // Broad host access is required: the clipper reads arbitrary instance origins and, when saving

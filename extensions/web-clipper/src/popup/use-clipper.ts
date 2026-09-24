@@ -2,8 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import browser from "webextension-polyfill";
 import { parseCaptureData } from "@/lib/capture-data";
 import { composeCaptureMemo, formatCapturedPosts, utf8Bytes } from "@/lib/capture-format";
-import { type CaptureData, type CaptureKind, type ClipSaveStatus, normalizeClipSourceUrl } from "@/lib/clip-records";
+import type { CaptureData, CaptureKind, ClipSaveStatus } from "@/lib/clip-records";
 import type { ConnectionSource } from "@/lib/connection-config";
+import { captureSourceKey as draftPageUrl, type EditorSource, findEditorSource } from "@/lib/editor-page";
 import { composeMemoContent } from "@/lib/format";
 import { estimatedArchivedBytes, markdownImageUrls } from "@/lib/markdown-images";
 import type { Visibility } from "@/lib/memos-client";
@@ -64,19 +65,6 @@ async function bounded<T>(promise: Promise<T>, message: string, milliseconds: nu
   }
 }
 
-const draftPageUrl = (url: string) => {
-  try {
-    const parsed = new URL(url);
-    const status = parsed.pathname.match(/^\/([\w]+)\/status\/(\d+)/);
-    if (/^(?:(?:www|mobile)\.)?(?:x\.com|twitter\.com)$/.test(parsed.hostname) && status) {
-      return `https://x.com/${status[1]}/status/${status[2]}`;
-    }
-  } catch {
-    // Unsupported URLs are handled before extraction; metadata reads remain harmless.
-  }
-  return normalizeClipSourceUrl(url);
-};
-
 function restoreDraft(value: unknown, mode: CaptureKind, pageUrl: string): Draft | null {
   if (!value || typeof value !== "object") return null;
   const raw = value as Record<string, unknown>;
@@ -119,7 +107,7 @@ function restoreDraft(value: unknown, mode: CaptureKind, pageUrl: string): Draft
 }
 
 /** Manual capture with account-scoped drafts and durable, retryable save operations. */
-export function useClipper(expectation: SaveExpectation | null, template: string | null) {
+export function useClipper(expectation: SaveExpectation | null, template: string | null, source?: EditorSource | null) {
   const [tab, setTab] = useState<Tab | null>(null);
   const [tabReady, setTabReady] = useState(false);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -168,8 +156,12 @@ export function useClipper(expectation: SaveExpectation | null, template: string
   useEffect(() => {
     mounted.current = true;
     let active = true;
-    void bounded(browser.tabs.query({ active: true, currentWindow: true }), "读取标签页超时", 750)
-      .then(([current]) => {
+    const metadata: Promise<Tab | null> =
+      source === undefined
+        ? browser.tabs.query({ active: true, currentWindow: true }).then(([current]) => current ?? null)
+        : Promise.resolve(source);
+    void bounded(metadata, "读取标签页超时", 750)
+      .then((current) => {
         if (active) setTab(current ?? null);
       })
       .catch(() => {
@@ -179,6 +171,7 @@ export function useClipper(expectation: SaveExpectation | null, template: string
         if (active) setTabReady(true);
       });
     const onUpdated = (id: number, change: { url?: string }, updated: Tab) => {
+      if (source !== undefined) return;
       if (id === tabRef.current?.id && change.url) setTab({ ...tabRef.current, ...updated, url: change.url });
     };
     browser.tabs.onUpdated.addListener(onUpdated);
@@ -188,7 +181,7 @@ export function useClipper(expectation: SaveExpectation | null, template: string
       extraction.current++;
       browser.tabs.onUpdated.removeListener(onUpdated);
     };
-  }, []);
+  }, [source]);
 
   const persist = useCallback((next: Draft, targetScope: string): Promise<boolean> => {
     const write = writes.current
@@ -398,11 +391,14 @@ export function useClipper(expectation: SaveExpectation | null, template: string
       setNotice(null);
       try {
         let next: Draft;
+        const targetTab = source ? await bounded(findEditorSource(source), "读取原网页超时，请重试。", 750) : tab;
         const isXDetail = /^https:\/\/(?:(?:www|mobile)\.)?(?:x\.com|twitter\.com)\/\w+\/status\/\d+(?:[/?#]|$)/i.test(tab?.url ?? "");
         if (mode === "STAR" && !isXDetail) {
-          const captured = await captureActivePage();
+          const captured = await captureActivePage(source ? targetTab?.id : undefined);
+          if (source && !captured.url) throw new Error("原网页已关闭或无法读取，当前草稿已保留。请重新打开原网页后点击扩展图标。");
           if (!/^https?:\/\//i.test(captured.url)) throw new Error("当前页面不是可保存的网页，请打开普通网页后再使用 Star。");
-          if (draftPageUrl(captured.url) !== pageUrl) throw new Error("页面已切换，请重新打开扩展后提取。");
+          if (draftPageUrl(captured.url) !== pageUrl)
+            throw new Error("原网页已切换，请回到原页面后重新提取，或在新页面点击扩展图标。当前草稿已保留。");
           const original = composeMemoContent({
             bodyMarkdown: captured.selectionMarkdown || captured.articleMarkdown,
             title: captured.title,
@@ -431,9 +427,9 @@ export function useClipper(expectation: SaveExpectation | null, template: string
             operation: null,
           };
         } else {
-          if (!isXDetail || tab?.id === undefined) throw new Error("请打开你自己的 X 回复或引用帖详情页，再使用 Pick up。");
+          if (!isXDetail || targetTab?.id === undefined) throw new Error("请打开你自己的 X 回复或引用帖详情页，再使用 Pick up。");
           const [injected] = await bounded(
-            browser.scripting.executeScript({ target: { tabId: tab.id }, func: captureXPage, args: [mode] }),
+            browser.scripting.executeScript({ target: { tabId: targetTab.id }, func: captureXPage, args: [mode] }),
             "X 页面提取超时，请展开帖子后重试。",
             2_000,
           );
@@ -480,7 +476,7 @@ export function useClipper(expectation: SaveExpectation | null, template: string
         }
       }
     },
-    [expectation, accountKey, scope, pageUrl, tab, template, applyDraft, persist],
+    [expectation, accountKey, scope, pageUrl, tab, template, source, applyDraft, persist],
   );
 
   const content = draft ? (draft.operation?.content ?? composeCaptureMemo(draft.capture, draft.original)) : "";

@@ -102,7 +102,7 @@ describe("fixed capture corpus", () => {
   it.each(corpus)("captures the best available content or an intentional fallback: $name", async (fixture) => {
     document.head.innerHTML = `<title>Corpus page</title>${fixture.head ?? ""}`;
     document.body.innerHTML = fixture.body;
-    browserMock.tabs.query.mockResolvedValue([{ id: 7, title: "Corpus page", url: "https://example.com/corpus" }]);
+    browserMock.tabs.query.mockResolvedValue([{ id: 7, title: "Corpus page", url: window.location.href }]);
     browserMock.scripting.executeScript.mockImplementation(async (options: unknown) => {
       const { func, args } = options as { func: (...a: unknown[]) => unknown; args?: unknown[] };
       return [{ result: func(...(args ?? [])) }];
@@ -111,7 +111,7 @@ describe("fixed capture corpus", () => {
     const { result } = renderHook(() => usePageCapture(true));
     await waitFor(() => expect(result.current).not.toBeNull());
 
-    expect(result.current?.url).toBe("https://example.com/corpus");
+    expect(result.current?.url).toBe(window.location.href);
     expect(result.current?.description).toBe(fixture.expectedDescription);
 
     if (fixture.expectsArticle) {

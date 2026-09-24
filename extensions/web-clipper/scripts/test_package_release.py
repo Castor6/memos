@@ -84,6 +84,13 @@ class ReleasePackageTest(unittest.TestCase):
         self.manifest.update(values)
         self.write("manifest.json", json.dumps(self.manifest))
 
+    def test_editor_entry_is_required_without_action_popup(self):
+        self.update_manifest(action={"default_icon": {"16": "icons/icon.png"}})
+        self.assertTrue(self.package().exists())
+        (self.dist / "src/popup/index.html").unlink()
+        with self.assertRaises(PACKAGE.PackageError):
+            self.package()
+
     def assert_rejected(self, message):
         with self.assertRaisesRegex(PACKAGE.PackageError, message):
             self.package()

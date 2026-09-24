@@ -69,7 +69,15 @@ function AttachmentImage({ path, alt, title, connection }: { path: string; alt?:
 }
 
 /** Render captured Markdown with sanitized HTML, including the source details fold. */
-export function MarkdownPreview({ content, connection }: { content: string; connection?: PreviewConnection }) {
+export function MarkdownPreview({
+  content,
+  connection,
+  expanded = false,
+}: {
+  content: string;
+  connection?: PreviewConnection;
+  expanded?: boolean;
+}) {
   return (
     <div className="markdown-preview">
       <ReactMarkdown
@@ -77,6 +85,12 @@ export function MarkdownPreview({ content, connection }: { content: string; conn
         rehypePlugins={[rehypeRaw, [rehypeSanitize, previewSchema]]}
         urlTransform={previewUrlTransform}
         components={{
+          ...(expanded
+            ? {
+                details: ({ children }: { children?: React.ReactNode }) => <section>{children}</section>,
+                summary: ({ children }: { children?: React.ReactNode }) => (children === "展开原内容" ? null : <h3>{children}</h3>),
+              }
+            : {}),
           a: ({ children, href, title }) => (
             <a href={href} title={title} target="_blank" rel="noopener noreferrer">
               {children}

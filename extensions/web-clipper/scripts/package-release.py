@@ -176,7 +176,8 @@ def validate_manifest(files, identity):
     if not all(isinstance(value, dict) for value in (background, action, options)):
         raise PackageError("The built manifest has invalid background, action, or options definitions.")
     require_resource(background.get("service_worker"), files)
-    require_resource(action.get("default_popup"), files)
+    # The trusted editor entry remains packaged even though the action now opens a tab.
+    require_resource(action.get("default_popup", "src/popup/index.html"), files)
     require_resource(options.get("page"), files)
     for icons in (manifest.get("icons", {}), action.get("default_icon", {})):
         if not isinstance(icons, (str, dict)):

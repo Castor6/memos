@@ -109,6 +109,31 @@ describe("useClipper manual capture and durable drafts", () => {
     expect(saves()).toHaveLength(0);
   });
 
+  it("preserves and restores a bound draft after the original page navigates or closes", async () => {
+    const source = { id: 4, url: page.url };
+    const { result, unmount } = renderHook(() => useClipper(expectation, null, source));
+    await waitReady(result);
+    await act(async () => result.current.start("STAR"));
+    expect(captureActivePage).toHaveBeenCalledWith(4);
+    await act(async () => result.current.update({}, { comment: "Keep this thought" }));
+    await act(async () => {
+      await browserMock.tabs.onUpdated.emit(4, { url: "https://other.example.com" }, { id: 4, url: "https://other.example.com" });
+    });
+    expect(result.current.draft?.capture.comment).toBe("Keep this thought");
+    browserMock.tabs.get.mockRejectedValue(new Error("closed"));
+    browserMock.tabs.query.mockResolvedValue([]);
+    await act(async () => result.current.start("STAR", true));
+    expect(result.current.notice).toContain("当前草稿已保留");
+    expect(result.current.draft?.capture.comment).toBe("Keep this thought");
+    unmount();
+    const reopened = renderHook(() => useClipper(expectation, null, source));
+    await waitReady(reopened.result);
+    expect(reopened.result.current.draft?.capture.comment).toBe("Keep this thought");
+    await act(async () => {
+      expect((await reopened.result.current.save()).ok).toBe(true);
+    });
+  });
+
   it("Star accepts ordinary websites and prefers the selected content with the configured template", async () => {
     const { result } = renderHook(() => useClipper(expectation, "{{title}}\n{{content}}\n{{url}}"));
     await waitReady(result);

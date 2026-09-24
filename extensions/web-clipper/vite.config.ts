@@ -13,6 +13,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react(), tailwind(), crx({ manifest })],
+    build: { rollupOptions: { input: { editor: resolve(__dirname, "src/popup/index.html") } } },
     resolve: {
       alias: { "@": resolve(__dirname, "src") },
       // Shared Markdown chunks also run in the background service worker. Prefer

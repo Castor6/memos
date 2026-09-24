@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { browserMock } from "@/test/browser-mock";
 import { act, renderHook, waitFor } from "@/test/render";
-import { PAGE_INJECTION_TIMEOUT_MS, usePageCapture } from "../page-capture";
+import { captureActivePage, PAGE_INJECTION_TIMEOUT_MS, usePageCapture } from "../page-capture";
 
 describe("usePageCapture", () => {
   beforeEach(() => {
@@ -30,6 +30,16 @@ describe("usePageCapture", () => {
     expect(result.current?.description).toBe("A page about greetings");
     expect(result.current?.images).toEqual(["https://cdn.example.com/a.png"]);
     expect(result.current?.articleMarkdown).toBe("");
+  });
+
+  it("reports the injected URL when the source navigates between metadata and injection", async () => {
+    browserMock.scripting.executeScript.mockResolvedValue([
+      { result: { title: "Moved", url: "https://other.example.com/post", selectionHtml: "<p>Other page</p>" } },
+    ]);
+    const result = await captureActivePage(7);
+    expect(result.url).toBe("https://other.example.com/post");
+    expect(browserMock.tabs.query).not.toHaveBeenCalled();
+    expect(browserMock.tabs.get).toHaveBeenCalledWith(7);
   });
 
   it("keeps an image-only selection instead of extracting the entire article", async () => {

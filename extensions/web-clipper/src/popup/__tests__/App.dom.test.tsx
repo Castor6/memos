@@ -3,7 +3,7 @@ import type { ClipSaveStatus } from "@/lib/clip-records";
 import type { PopupState } from "@/lib/popup-state";
 import { App } from "@/popup/App";
 import { browserMock } from "@/test/browser-mock";
-import { renderWithUser, screen, waitFor } from "@/test/render";
+import { fireEvent, renderWithUser, screen, waitFor } from "@/test/render";
 
 const capture = {
   title: "Hello World",
@@ -112,11 +112,60 @@ describe("App — manual capture workspace", () => {
     expect(browserMock.scripting.executeScript).not.toHaveBeenCalled();
   });
 
+  it("uses every Enter variant for newlines and only saves with an explicit action", async () => {
+    const { user } = await startStar();
+    const thought = screen.getByRole("textbox", { name: "我的思考" });
+    await user.type(thought, "first{Enter}second");
+    await user.keyboard("{Shift>}{Enter}{/Shift}");
+    await user.keyboard("{Control>}{Enter}{/Control}");
+    expect(thought).toHaveValue("first\nsecond\n\n");
+    fireEvent.keyDown(thought, { key: "Enter", ctrlKey: true, isComposing: true });
+    expect(thought).toHaveValue("first\nsecond\n\n");
+    expect(browserMock.runtime.sendMessage.mock.calls.some(([r]) => (r as { type: string }).type === "SAVE_MEMO")).toBe(false);
+    await user.click(screen.getByRole("tab", { name: "原内容" }));
+    await user.click(screen.getByRole("button", { name: "编辑原内容" }));
+    await user.click(screen.getByRole("textbox", { name: "原内容" }));
+    await user.keyboard("{Control>}{Enter}{/Control}");
+    expect(browserMock.runtime.sendMessage.mock.calls.some(([r]) => (r as { type: string }).type === "SAVE_MEMO")).toBe(false);
+    await user.click(screen.getByRole("button", { name: /save to memos/i }));
+    await screen.findByRole("button", { name: "另存一条" });
+  });
+
+  it("switches full-width views without losing edits or leaving collapsed source content", async () => {
+    const { user, container } = await startStar();
+    const thought = screen.getByRole("textbox", { name: "我的思考" });
+    expect(
+      screen.getByRole("region", { name: "标签管理" }).compareDocumentPosition(thought) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    await user.type(thought, "My thought");
+    await user.click(screen.getByRole("tab", { name: "原内容" }));
+    expect(screen.getByText("Captured body")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "编辑原内容" }));
+    await user.clear(screen.getByRole("textbox", { name: "原内容" }));
+    await user.type(screen.getByRole("textbox", { name: "原内容" }), "<details><summary>Source</summary><p>Full source</p></details>");
+    await user.click(screen.getByRole("tab", { name: "保存预览" }));
+    expect(screen.getByText("Full source")).toBeVisible();
+    expect(container.querySelector("details")).toBeNull();
+    expect(screen.getByText("My thought")).toBeVisible();
+    await user.click(screen.getByRole("tab", { name: "我的产出" }));
+    expect(screen.getByRole("textbox", { name: "我的思考" })).toHaveValue("My thought");
+  });
+
+  it("keeps an explicitly bound source when the editor itself is the active tab", async () => {
+    browserMock.tabs.query.mockResolvedValue([{ id: 99, url: "chrome-extension://test-id/src/popup/index.html" }]);
+    const { user } = renderWithUser(<App source={{ id: 7, url: capture.url }} />);
+    const star = await screen.findByRole("button", { name: "Star" });
+    await waitFor(() => expect(star).toBeEnabled());
+    await user.click(star);
+    await screen.findByRole("textbox", { name: "我的思考" });
+    expect(browserMock.scripting.executeScript).toHaveBeenCalledWith(expect.objectContaining({ target: { tabId: 7 } }));
+  });
+
   it("Star captures an ordinary website only on click and saves thoughts first", async () => {
     const { user } = await startStar();
     await user.type(screen.getByRole("textbox", { name: "我的思考" }), "This is the insight I noticed.");
     await user.click(screen.getByRole("button", { name: /save to memos/i }));
-    await screen.findByRole("button", { name: /saved to memos/i });
+    await screen.findByRole("button", { name: "另存一条" });
     const save = browserMock.runtime.sendMessage.mock.calls
       .map(([request]) => request as Record<string, any>)
       .find((r) => r.type === "SAVE_MEMO")!;
@@ -134,11 +183,11 @@ describe("App — manual capture workspace", () => {
     await user.click(screen.getByRole("button", { name: /添加标签/ }));
     await user.type(screen.getByRole("combobox", { name: "搜索或新建标签" }), "自己的想法{Enter}");
     await user.type(screen.getByRole("textbox", { name: "我的思考" }), "**值得回顾**");
-    await user.click(screen.getByText("预览完整保存内容"));
+    await user.click(screen.getByRole("tab", { name: "保存预览" }));
     expect(screen.getByRole("heading", { name: "我的思考" })).toBeInTheDocument();
     expect(screen.getByText("值得回顾").tagName).toBe("STRONG");
     await user.click(screen.getByRole("button", { name: /save to memos/i }));
-    await screen.findByRole("button", { name: /saved to memos/i });
+    await screen.findByRole("button", { name: "另存一条" });
     const save = browserMock.runtime.sendMessage.mock.calls
       .map(([request]) => request as Record<string, unknown>)
       .find((r) => r.type === "SAVE_MEMO")!;
@@ -192,9 +241,7 @@ describe("App — manual capture workspace", () => {
     const embeddedLabel = screen.getByTitle(embedded);
     expect(embeddedLabel.textContent!.length).toBeLessThan(180);
     expect(embeddedLabel).not.toHaveAttribute("href");
-    await waitFor(() => expect(screen.queryByRole("button", { name: /saved to memos/i })).not.toBeInTheDocument(), {
-      timeout: 2500,
-    });
+    expect(screen.getByRole("button", { name: "另存一条" })).toBeEnabled();
     expect(screen.getByText("图片下载失败")).toBeVisible();
     await user.type(screen.getByRole("textbox", { name: "我的思考" }), "Updated thought");
     expect(screen.queryByText("未转存的图片（已保留原链接）")).not.toBeInTheDocument();
@@ -223,7 +270,7 @@ describe("App — manual capture workspace", () => {
     expect(await screen.findByText(/your instance timed out/i)).toBeInTheDocument();
     wireSaveResult();
     await user.click(screen.getByRole("button", { name: /try again/i }));
-    await screen.findByRole("button", { name: /saved to memos/i });
+    await screen.findByRole("button", { name: "另存一条" });
     const saves = browserMock.runtime.sendMessage.mock.calls
       .map(([r]) => r as Record<string, unknown>)
       .filter((r) => r.type === "SAVE_MEMO");
