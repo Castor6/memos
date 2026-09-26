@@ -1,6 +1,5 @@
 # Web Clipper 开发约定
 
-- 当前模块用于个人深度定制，先阅读 `README.md` 和 `../../docs/tasks/TASK-20260922-web-clipper-compatibility.md`，交接后续写原任务。
 - 这是 Memos 仓库内的独立前端子项目，依赖和锁文件在本目录，不是 Git 子模块；使用本目录固定的 pnpm 版本。
 - 在本目录运行 `corepack pnpm install --frozen-lockfile`、`corepack pnpm lint`、`corepack pnpm test`、`corepack pnpm build`。构建需要本地 `.env`，准备方式见 README。
 - 日常通过 `dist/` 加载已解压扩展。`package:release` 用 Python 3 标准库生成个人 Chromium ZIP，要求干净检出；manifest 与 ZIP 使用 `release/package.json` 的独立扩展版本；源码 `package.json` 保留上游基线，不手改发布版本。其他 `package*` 保留上游商店逻辑，不自动提交商店。
