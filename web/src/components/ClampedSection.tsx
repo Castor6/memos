@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { createContext, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useTranslate } from "@/utils/i18n";
 
@@ -8,6 +8,8 @@ export const CLAMP_PREVIEW_HEIGHT_PX = 360;
 // Only fold when content is taller than this, so cards barely over the preview aren't
 // clamped for the sake of a few hidden pixels.
 export const CLAMP_TRIGGER_HEIGHT_PX = 420;
+
+export const ExpandClampedSectionContext = createContext<(() => void) | undefined>(undefined);
 
 interface ClampedSectionProps {
   /** When false, children render untouched with no measurement. */
@@ -44,10 +46,14 @@ const ClampedSection = ({ enabled, children, characterLimit = 0, textLength = 0 
     return () => observer.disconnect();
   }, [enabled, textTooLong]);
 
+  const expandForDetails = useCallback(() => {
+    if (enabled) setExpanded(true);
+  }, [enabled]);
+
   const collapsed = enabled && (clamped || textTooLong) && !expanded;
 
   return (
-    <>
+    <ExpandClampedSectionContext.Provider value={expandForDetails}>
       <div
         className={cn("relative w-full", collapsed && "overflow-hidden")}
         style={collapsed ? { maxHeight: CLAMP_PREVIEW_HEIGHT_PX } : undefined}
@@ -69,7 +75,7 @@ const ClampedSection = ({ enabled, children, characterLimit = 0, textLength = 0 
           {collapsed ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />}
         </button>
       )}
-    </>
+    </ExpandClampedSectionContext.Provider>
   );
 };
 

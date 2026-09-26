@@ -1,7 +1,7 @@
 const preferences = vi.hoisted(() => ({ enterToSave: false }));
 vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => ({ userGeneralSetting: preferences }) }));
 
-import { act, fireEvent, render } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { createRef } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import Editor from "@/components/MemoEditor/Editor";
@@ -34,13 +34,63 @@ describe("mounted rich editor keyboard flows", () => {
     const { ref, body } = mount();
     act(() => ref.current!.formatting!.run("insertDetails"));
     act(() => ref.current!.insertText!("Title"));
-    expect(body.querySelector("details summary")).toHaveTextContent("Title");
+    expect(body.querySelector(".editable-details summary")).toHaveTextContent("Title");
     fireEvent.keyDown(body, { key: "Enter", code: "Enter", shiftKey: true });
     act(() => ref.current!.insertText!("Body"));
     expect(body.querySelector("[data-details-body]")).toHaveTextContent("Body");
     fireEvent.keyDown(body, { key: "ArrowDown", code: "ArrowDown" });
     act(() => ref.current!.insertText!("Continue"));
-    expect(body.querySelector("details + p")).toHaveTextContent("Continue");
+    expect(body.querySelector(".editable-details + p")).toHaveTextContent("Continue");
+  });
+
+  it("folds without changing Markdown and reopens when the caret enters the body", () => {
+    const { ref, body, onContentChange } = mount();
+    act(() => ref.current!.formatting!.run("insertDetails"));
+    act(() => ref.current!.insertText!("Title"));
+    fireEvent.keyDown(body, { key: "Enter", code: "Enter", shiftKey: true });
+    act(() => ref.current!.insertText!("Body"));
+    const fold = body.querySelector(".editable-details")!;
+    const before = ref.current!.getMarkdown();
+    onContentChange.mockClear();
+    fireEvent.click(fold.querySelector(".memo-details-close")!);
+    expect(fold).toHaveAttribute("data-expanded", "false");
+    expect(ref.current!.getMarkdown()).toBe(before);
+    expect(onContentChange).not.toHaveBeenCalled();
+    // Closing moves the selection to the title, so typing cannot edit hidden text.
+    act(() => ref.current!.insertText!("New "));
+    expect(fold.querySelector("summary")).toHaveTextContent("New Title");
+    expect(fold).toHaveAttribute("data-expanded", "false");
+    fireEvent.keyDown(body, { key: "Enter", code: "Enter", shiftKey: true });
+    expect(fold).toHaveAttribute("data-expanded", "true");
+    act(() => ref.current!.insertText!("More "));
+    expect(fold.querySelector("[data-details-body]")).toHaveTextContent("More Body");
+    fireEvent.click(fold.querySelector(".memo-details-toggle")!);
+    expect(fold).toHaveAttribute("data-expanded", "false");
+    fireEvent.click(fold.querySelector(".memo-details-toggle")!);
+    expect(fold).toHaveAttribute("data-expanded", "true");
+    const saved = ref.current!.getMarkdown();
+    act(() => ref.current!.setMarkdown(saved));
+    expect(ref.current!.getMarkdown()).toBe(saved);
+    expect(body.querySelector(".editable-details summary")).toHaveTextContent("New Title");
+  });
+
+  it("shows the compact command order and keeps the selection when applying strikethrough", async () => {
+    const { ref, body } = mount("Selected text");
+    act(() => ref.current!.focus());
+    act(() => ref.current!.selectAll());
+    await waitFor(() => expect(screen.getByRole("toolbar", { name: "选中文字格式" })).toBeVisible());
+    for (const name of ["加粗", "斜体", "下划线", "删除线", "高亮", "链接"])
+      expect(screen.getByRole("button", { name, exact: true })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "更多文字格式" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "行内代码", exact: true })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "清除文字格式", exact: true })).not.toBeInTheDocument();
+    expect([...screen.getByRole("toolbar", { name: "选中文字格式" }).querySelectorAll("button")].map((button) => button.getAttribute("aria-label")))
+      .toEqual(["加粗", "斜体", "下划线", "删除线", "高亮", "链接"]);
+    const strike = screen.getByRole("button", { name: "删除线", exact: true });
+    fireEvent.mouseDown(strike);
+    fireEvent.click(strike);
+    expect(body.querySelector("s")).toHaveTextContent("Selected text");
+    expect(ref.current!.getMarkdown()).toContain("~~Selected text~~");
   });
 
   it("honors Enter-to-save while Shift+Enter enters the folding body; Ctrl/Cmd+Enter invokes submit in normal mode", () => {
@@ -102,7 +152,7 @@ describe("mounted rich editor keyboard flows", () => {
     act(() => ref.current!.selectAll());
     expect(ref.current!.formatting!.canRun!("convertDetails")).toBe(true);
     act(() => ref.current!.formatting!.run("convertDetails"));
-    expect(body.querySelector("details summary")).toHaveTextContent("Title");
+    expect(body.querySelector(".editable-details summary")).toHaveTextContent("Title");
     act(() => ref.current!.setMarkdown("<details><summary>Incomplete"));
     act(() => ref.current!.selectAll());
     expect(ref.current!.formatting!.canRun!("convertDetails")).toBe(false);

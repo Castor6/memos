@@ -11,6 +11,7 @@ import rehypeSanitize from "rehype-sanitize";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 import { memoUrlTransform, SANITIZE_SCHEMA } from "@/components/MemoContent/constants";
+import { DetailsBlock } from "@/components/MemoContent/DetailsBlock";
 import { currencySafeMathOptions, remarkCurrencySafeMath } from "@/utils/remark-plugins/remark-currency-safe-math";
 import { detailsFence, parseDetailsSource } from "./editable-details";
 import "katex/dist/katex.min.css";
@@ -109,6 +110,7 @@ function PreservedView({ node }: NodeViewProps) {
   return (
     <NodeViewWrapper contentEditable={false} className="rounded border border-dashed p-2 my-2" title="原有内容已保留，可在前后继续编辑">
       <ReactMarkdown
+        components={{ details: DetailsBlock }}
         urlTransform={memoUrlTransform}
         remarkPlugins={[remarkCurrencySafeMath, remarkGfm, remarkBreaks]}
         rehypePlugins={[rehypeRaw, [rehypeSanitize, SANITIZE_SCHEMA], rehypeKatex]}
