@@ -13,8 +13,7 @@ import { FOCUS_MODE_STYLES } from "./constants";
 import { useAudioRecorder, useAutoSave, useFocusMode, useMemoInit, useMemoSave } from "./hooks";
 import { errorService, transcriptionService } from "./services";
 import { EditorProvider, useEditorContext, useEditorSelector } from "./state";
-import { EditorToolbar, FormattingToolbar } from "./Toolbar";
-import QuickTools from "./Toolbar/QuickTools";
+import { EditorToolbar } from "./Toolbar";
 import type { MemoEditorProps } from "./types";
 import type { LocalFile } from "./types/attachment";
 import type { EditorController } from "./types/editorController";
@@ -256,7 +255,7 @@ const MemoEditorImpl: React.FC<MemoEditorProps> = ({
           !isFocusMode && className,
         )}
       >
-        <EditorTags editing={Boolean(memo)} ready={isInitialized} />
+        <EditorTags editing={Boolean(memo)} ready={isInitialized} onFocusContent={() => editorRef.current?.focus()} />
 
         {(memoName || (!memo && hasTimestamp)) && (
           <div className="w-full -mb-1">
@@ -283,12 +282,7 @@ const MemoEditorImpl: React.FC<MemoEditorProps> = ({
         <div className="w-full flex flex-col gap-2">
           <EditorMetadata memoName={memoName} />
           <EditorToolbar
-            formattingTools={
-              <>
-                <FormattingToolbar expanded controllerRef={editorRef} className="w-auto shrink-0" />
-                <QuickTools controllerRef={editorRef} />
-              </>
-            }
+            controllerRef={editorRef}
             onInsertReference={(target) =>
               editorRef.current?.insertFile?.(`/${target.name}`, "memos:reference", target.snippet || "笔记引用")
             }

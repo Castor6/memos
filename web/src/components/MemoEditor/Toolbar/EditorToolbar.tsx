@@ -1,15 +1,22 @@
-import type { FC } from "react";
+import { Maximize2Icon, Minimize2Icon, MoreHorizontalIcon, RedoIcon, UndoIcon } from "lucide-react";
+import { type FC, useRef } from "react";
 import { Button } from "@/components/ui/button";
+import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
 import type { Location, Visibility } from "@/types/proto/api/v1/memo_service_pb";
 import { useTranslate } from "@/utils/i18n";
+import { useEditorActiveState, useElementWidth } from "../hooks";
 import { validationService } from "../services";
 import { useEditorContext, useEditorSelector } from "../state";
 import type { EditorToolbarProps } from "../types";
+import { CommandMenu } from "./CommandMenu";
+import { FormattingToolbar } from "./FormattingToolbar";
 import InsertMenu from "./InsertMenu";
+import QuickTools from "./QuickTools";
 import VisibilitySelector from "./VisibilitySelector";
 
 export const EditorToolbar: FC<EditorToolbarProps> = ({
-  formattingTools,
+  controllerRef,
   onInsertReference,
   onSave,
   onCancel,
@@ -17,6 +24,12 @@ export const EditorToolbar: FC<EditorToolbarProps> = ({
   onAudioRecorderClick,
 }) => {
   const t = useTranslate();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const width = useElementWidth(rootRef);
+  const narrow = width > 0 && width < 560;
+  const compact = width > 0 && width < 390;
+  const active = useEditorActiveState(controllerRef);
+  const isFocusMode = useEditorSelector((s) => s.ui.isFocusMode);
   const { actions, dispatch } = useEditorContext();
   // Subscribe to narrow/derived slices so typing (which only changes content)
   // doesn't re-render the toolbar or the heavy InsertMenu it hosts. `valid`
@@ -40,9 +53,13 @@ export const EditorToolbar: FC<EditorToolbarProps> = ({
   };
 
   return (
-    <div className="w-full min-w-0 flex flex-row justify-between items-center gap-2 mb-2">
-      <div className="min-w-0 flex flex-row items-center gap-1 overflow-x-auto py-1 [&>*]:shrink-0">
+    <div ref={rootRef} className={cn("w-full min-w-0 flex justify-between gap-1 mb-2", narrow ? "flex-col" : "flex-row items-center")}>
+      <div className="min-w-0 flex items-center gap-0 py-1 [&>*]:shrink-0" role="toolbar" aria-label="编辑工具">
+        <QuickTools controllerRef={controllerRef} compact={width > 0 && width < 310} />
+        <FormattingToolbar controllerRef={controllerRef} compact={compact} />
         <InsertMenu
+          controllerRef={controllerRef}
+          compact={compact}
           onInsertReference={onInsertReference}
           isUploading={isUploading}
           location={location}
@@ -51,11 +68,29 @@ export const EditorToolbar: FC<EditorToolbarProps> = ({
           memoName={memoName}
           onAudioRecorderClick={onAudioRecorderClick}
         />
-        {formattingTools}
-        <VisibilitySelector value={visibility} onChange={handleVisibilityChange} />
+        <CommandMenu
+          onReturnFocus={() => controllerRef.current?.focus()}
+          label="更多"
+          icon={MoreHorizontalIcon}
+          compact={compact}
+          controller={controllerRef.current?.formatting}
+          active={active}
+          items={[
+            { id: "undo", label: "撤销", icon: UndoIcon },
+            { id: "redo", label: "重做", icon: RedoIcon },
+          ]}
+        >
+          <DropdownMenuSeparator />
+          <DropdownMenuItem className="min-h-11" onClick={handleToggleFocusMode}>
+            {isFocusMode ? <Minimize2Icon className="size-4" /> : <Maximize2Icon className="size-4" />}
+            {isFocusMode ? t("editor.exit-focus-mode") : t("editor.focus-mode")}
+          </DropdownMenuItem>
+        </CommandMenu>
       </div>
 
-      <div className="shrink-0 flex flex-row justify-end items-center gap-1">
+      <div className={cn("shrink-0 flex items-center gap-1", narrow ? "w-full" : "justify-end")}>
+        <VisibilitySelector value={visibility} onChange={handleVisibilityChange} />
+        {narrow && <span className="flex-1" />}
         {onCancel && (
           <Button variant="ghost" size="sm" onClick={onCancel} disabled={isSaving}>
             {t("common.cancel")}

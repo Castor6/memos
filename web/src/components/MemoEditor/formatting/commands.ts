@@ -1,13 +1,21 @@
 import {
   BoldIcon,
+  CodeIcon,
+  EraserIcon,
+  FoldVerticalIcon,
+  HighlighterIcon,
   ItalicIcon,
   LinkIcon,
   ListIcon,
   ListOrderedIcon,
   ListTodoIcon,
   type LucideIcon,
+  QuoteIcon,
+  RedoIcon,
   SquareCodeIcon,
   StrikethroughIcon,
+  UnderlineIcon,
+  UndoIcon,
 } from "lucide-react";
 import type { Translations } from "@/utils/i18n";
 
@@ -43,10 +51,21 @@ export type EditorCommandId =
   | "heading1"
   | "heading2"
   | "heading3"
-  | "link";
+  | "link"
+  | "underline"
+  | "highlight"
+  | "blockquote"
+  | "clearFormatting"
+  | "undo"
+  | "redo"
+  | "insertDetails"
+  | "convertDetails";
 
 /** Which marks/blocks are active at the current selection (toolbar highlighting). */
 export interface ActiveFormatState {
+  underline: boolean;
+  highlight: boolean;
+  blockquote: boolean;
   bold: boolean;
   italic: boolean;
   strikethrough: boolean;
@@ -60,6 +79,9 @@ export interface ActiveFormatState {
 }
 
 export const EMPTY_ACTIVE_FORMATS: ActiveFormatState = {
+  underline: false,
+  highlight: false,
+  blockquote: false,
   bold: false,
   italic: false,
   strikethrough: false,
@@ -79,7 +101,7 @@ export interface EditorCommandContext {
 
 /** Toolbar grouping — the toolbar builds each group by filtering on this.
  *  `mark` = inline formatting, `block` = line/block-level (lists, code block). */
-export type EditorCommandGroup = "mark" | "block" | "heading" | "link";
+export type EditorCommandGroup = "mark" | "block" | "heading" | "link" | "action";
 
 export interface EditorCommand {
   id: EditorCommandId;
@@ -91,6 +113,15 @@ export interface EditorCommand {
 }
 
 export const EDITOR_COMMANDS: EditorCommand[] = [
+  { id: "underline", labelKey: "editor.format.underline", icon: UnderlineIcon, group: "mark" },
+  { id: "highlight", labelKey: "editor.format.highlight", icon: HighlighterIcon, group: "mark" },
+  { id: "code", labelKey: "editor.format.inline-code", icon: CodeIcon, group: "mark" },
+  { id: "blockquote", labelKey: "editor.format.blockquote", icon: QuoteIcon, group: "block" },
+  { id: "clearFormatting", labelKey: "editor.format.clear", icon: EraserIcon, group: "action" },
+  { id: "undo", labelKey: "editor.format.undo", icon: UndoIcon, group: "action" },
+  { id: "redo", labelKey: "editor.format.redo", icon: RedoIcon, group: "action" },
+  { id: "insertDetails", labelKey: "editor.format.details", icon: FoldVerticalIcon, group: "action" },
+  { id: "convertDetails", labelKey: "editor.format.convert-details", icon: FoldVerticalIcon, group: "action" },
   {
     id: "bold",
     labelKey: "editor.format.bold",
@@ -179,8 +210,7 @@ export function isCommandActive(active: ActiveFormatState, id: EditorCommandId):
       return active.headingLevel === 2;
     case "heading3":
       return active.headingLevel === 3;
-    // The remaining ids (marks, blocks, link) map 1:1 to the snapshot.
     default:
-      return active[id];
+      return id in active ? active[id as keyof ActiveFormatState] === true : false;
   }
 }

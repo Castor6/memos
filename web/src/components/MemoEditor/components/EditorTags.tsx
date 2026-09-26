@@ -10,7 +10,15 @@ import { useEditorContext, useEditorSelector } from "../state";
 
 const EMPTY_TAGS: string[] = [];
 
-export default function EditorTags({ editing, ready = true }: { editing: boolean; ready?: boolean }) {
+export default function EditorTags({
+  editing,
+  ready = true,
+  onFocusContent,
+}: {
+  editing: boolean;
+  ready?: boolean;
+  onFocusContent?: () => void;
+}) {
   const { actions, dispatch } = useEditorContext();
   const tags = useEditorSelector((state) => state.metadata.tags ?? EMPTY_TAGS);
   const { userTagsSetting } = useAuth();
@@ -86,7 +94,16 @@ export default function EditorTags({ editing, ready = true }: { editing: boolean
           setActiveIndex(0);
         }}
       >
-        <PopoverTrigger ref={triggerRef} className="px-2 py-1 text-sm text-muted-foreground rounded-md hover:bg-muted">
+        <PopoverTrigger
+          ref={triggerRef}
+          className="px-2 py-1 text-sm text-muted-foreground rounded-md hover:bg-muted"
+          onKeyDown={(event) => {
+            if (event.key === "Tab" && !event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey && !open && onFocusContent) {
+              event.preventDefault();
+              onFocusContent();
+            }
+          }}
+        >
           ＋ 添加标签
         </PopoverTrigger>
         <PopoverContent

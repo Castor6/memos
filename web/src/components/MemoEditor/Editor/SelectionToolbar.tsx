@@ -1,49 +1,106 @@
 import type { Editor } from "@tiptap/core";
 import { useEditorState } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
-import { BoldIcon, CodeIcon, HighlighterIcon, ItalicIcon, StrikethroughIcon } from "lucide-react";
+import {
+  BoldIcon,
+  CodeIcon,
+  EraserIcon,
+  HighlighterIcon,
+  ItalicIcon,
+  LinkIcon,
+  MoreHorizontalIcon,
+  PanelTopCloseIcon,
+  StrikethroughIcon,
+  UnderlineIcon,
+} from "lucide-react";
+import { useState } from "react";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { isCommandActive } from "../formatting/commands";
+import { CommandMenu, TOOL_TRIGGER } from "../Toolbar/CommandMenu";
+import { LinkEditorDialog } from "../Toolbar/LinkEditorDialog";
+import type { FormattingController } from "../types/editorController";
 
-export default function SelectionToolbar({ editor }: { editor: Editor }) {
-  const active = useEditorState({
+export default function SelectionToolbar({ editor, controller }: { editor: Editor; controller: FormattingController }) {
+  const [linkOpen, setLinkOpen] = useState(false);
+  const state = useEditorState({
     editor,
-    selector: ({ editor }) => ({
-      bold: editor.isActive("bold"),
-      italic: editor.isActive("italic"),
-      strike: editor.isActive("strike"),
-      code: editor.isActive("code"),
-      highlight: editor.isActive("highlight"),
+    selector: () => ({
+      active: controller.getActiveFormats(),
+      hasDetails: /<\/?(?:details|summary)\b/i.test(controller.getSelectedText?.() ?? ""),
     }),
   });
   const commands = [
-    { id: "bold", label: "加粗", icon: BoldIcon, run: () => editor.chain().focus().toggleBold().run() },
-    { id: "italic", label: "斜体", icon: ItalicIcon, run: () => editor.chain().focus().toggleItalic().run() },
-    { id: "strike", label: "删除线", icon: StrikethroughIcon, run: () => editor.chain().focus().toggleStrike().run() },
-    { id: "code", label: "行内代码", icon: CodeIcon, run: () => editor.chain().focus().toggleCode().run() },
-    { id: "highlight", label: "高亮", icon: HighlighterIcon, run: () => editor.chain().focus().toggleHighlight().run() },
+    { id: "bold", label: "加粗", icon: BoldIcon },
+    { id: "italic", label: "斜体", icon: ItalicIcon },
+    { id: "underline", label: "下划线", icon: UnderlineIcon },
+    { id: "highlight", label: "高亮", icon: HighlighterIcon },
   ] as const;
   return (
-    <BubbleMenu
-      editor={editor}
-      options={{ placement: "top", offset: 8 }}
-      className="z-50 flex rounded-lg border bg-popover p-1 shadow-md"
-      role="toolbar"
-      aria-label="选中文字格式"
-    >
-      {commands.map(({ id, label, icon: Icon, run }) => (
+    <>
+      <BubbleMenu
+        editor={editor}
+        options={{ placement: "top", offset: 8, flip: { padding: 8 }, shift: { padding: 8 } }}
+        className="z-50 flex max-w-[calc(100vw-16px)] rounded-lg border bg-popover p-1 shadow-md"
+        role="toolbar"
+        aria-label="选中文字格式"
+      >
+        {commands.map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            type="button"
+            title={label}
+            aria-label={label}
+            aria-pressed={isCommandActive(state.active, id)}
+            className={cn(TOOL_TRIGGER, isCommandActive(state.active, id) && "bg-accent text-accent-foreground")}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => controller.run(id)}
+          >
+            <Icon className="size-4" />
+          </button>
+        ))}
         <button
-          key={id}
           type="button"
-          title={label}
-          aria-label={label}
-          aria-pressed={active[id]}
-          className={cn("rounded p-2 hover:bg-muted", active[id] && "bg-accent")}
+          title="链接"
+          aria-label="链接"
+          aria-pressed={state.active.link}
+          className={cn(TOOL_TRIGGER, state.active.link && "bg-accent")}
           onMouseDown={(event) => event.preventDefault()}
-          onClick={run}
+          onClick={() => {
+            controller.captureSelection?.();
+            setLinkOpen(true);
+          }}
         >
-          <Icon className="size-4" />
+          <LinkIcon className="size-4" />
         </button>
-      ))}
-    </BubbleMenu>
+        <CommandMenu
+          onReturnFocus={() => editor.commands.focus()}
+          label="更多文字格式"
+          icon={MoreHorizontalIcon}
+          compact
+          controller={controller}
+          active={state.active}
+          items={[
+            { id: "strikethrough", label: "删除线", icon: StrikethroughIcon },
+            { id: "code", label: "行内代码", icon: CodeIcon },
+            { id: "clearFormatting", label: "清除文字格式", icon: EraserIcon },
+          ]}
+        >
+          {state.hasDetails && (
+            <DropdownMenuItem
+              className="min-h-11"
+              onClick={() => {
+                controller.restoreSelection?.();
+                controller.run("convertDetails");
+              }}
+            >
+              <PanelTopCloseIcon className="size-4" />
+              转换为折叠区
+            </DropdownMenuItem>
+          )}
+        </CommandMenu>
+      </BubbleMenu>
+      <LinkEditorDialog onReturnFocus={() => editor.commands.focus()} open={linkOpen} onOpenChange={setLinkOpen} controller={controller} />
+    </>
   );
 }

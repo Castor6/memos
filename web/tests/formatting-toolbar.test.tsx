@@ -5,8 +5,6 @@ import { type ActiveFormatState, EMPTY_ACTIVE_FORMATS } from "@/components/MemoE
 import { FormattingToolbar } from "@/components/MemoEditor/Toolbar/FormattingToolbar";
 import type { EditorController } from "@/components/MemoEditor/types/editorController";
 
-// Match the repo convention: t echoes the i18n key (no i18next backend in tests),
-// so accessible names below are the keys themselves.
 vi.mock("@/utils/i18n", () => ({ useTranslate: () => (key: string) => key }));
 
 // Base UI menus reach for layout/pointer APIs jsdom doesn't implement.
@@ -19,6 +17,8 @@ beforeAll(() => {
 
 function makeController(opts: { active?: Partial<ActiveFormatState>; getSelectedText?: () => string } = {}) {
   const run = vi.fn();
+  const captureSelection = vi.fn();
+  const restoreSelection = vi.fn();
   const activeFormats: ActiveFormatState = { ...EMPTY_ACTIVE_FORMATS, ...opts.active };
   const controller: EditorController = {
     focus: () => {},
@@ -31,12 +31,14 @@ function makeController(opts: { active?: Partial<ActiveFormatState>; getSelected
     selectAll: () => {},
     formatting: {
       run,
+      captureSelection,
+      restoreSelection,
       getActiveFormats: () => activeFormats,
       getSelectedText: opts.getSelectedText ?? (() => ""),
       subscribe: () => () => {},
     },
   };
-  return { controller, run };
+  return { controller, run, captureSelection, restoreSelection };
 }
 
 function renderToolbar(controller: EditorController, onExit = vi.fn()) {
@@ -48,31 +50,37 @@ function renderToolbar(controller: EditorController, onExit = vi.fn()) {
 
 describe("FormattingToolbar", () => {
   it("runs the bold command when the bold button is clicked", () => {
-    const { controller, run } = makeController();
+    const { controller, run, captureSelection, restoreSelection } = makeController();
     renderToolbar(controller);
-    fireEvent.click(screen.getByRole("button", { name: "editor.format.bold" }));
+    fireEvent.click(screen.getByRole("button", { name: "文字" }));
+    expect(captureSelection).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole("menuitem", { name: "加粗" }));
+    expect(restoreSelection).toHaveBeenCalled();
+    expect(restoreSelection.mock.invocationCallOrder[0]).toBeLessThan(run.mock.invocationCallOrder[0]);
     expect(run).toHaveBeenCalledWith("bold");
   });
 
   it("runs the heading command when a heading level is chosen", () => {
     const { controller, run } = makeController();
     renderToolbar(controller);
-    fireEvent.click(screen.getByRole("button", { name: "editor.format.heading" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "editor.format.heading-2" }));
+    fireEvent.click(screen.getByRole("button", { name: "段落" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "标题 2" }));
     expect(run).toHaveBeenCalledWith("heading2");
   });
 
-  it("reflects active marks via aria-pressed", () => {
-    const { controller } = makeController({ active: { bold: true } });
+  it("shows active marks without exposing every formatting action in the bottom row", () => {
+    const { controller } = makeController({ active: { underline: true } });
     renderToolbar(controller);
-    expect(screen.getByRole("button", { name: "editor.format.bold" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("button", { name: "editor.format.italic" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.queryByRole("button", { name: "下划线" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "文字" }));
+    expect(screen.getByRole("menuitem", { name: /下划线.*已应用/ })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "清除文字格式" })).toBeInTheDocument();
   });
 
   it("calls onExit when the exit button is clicked", () => {
     const { controller } = makeController();
     const { onExit } = renderToolbar(controller);
-    fireEvent.click(screen.getByRole("button", { name: "editor.exit-focus-mode" }));
+    fireEvent.click(screen.getByRole("button", { name: "退出专注模式" }));
     expect(onExit).toHaveBeenCalledTimes(1);
   });
 });

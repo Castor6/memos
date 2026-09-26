@@ -60,7 +60,7 @@ export const SANITIZE_SCHEMA = {
       "loading",
     ],
   },
-  tagNames: [...(defaultSchema.tagNames || []), "iframe", "mark"],
+  tagNames: [...(defaultSchema.tagNames || []), "iframe", "mark", "u"],
   protocols: {
     ...defaultSchema.protocols,
     href: [...(defaultSchema.protocols?.href || []), ...HANDOFF_LINK_PROTOCOLS],
