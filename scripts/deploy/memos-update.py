@@ -46,8 +46,9 @@ def sha256(path):
 
 
 class Updater:
-    def __init__(self, config):
+    def __init__(self, config, config_path=None):
         self.config = config
+        self.config_path = Path(config_path) if config_path else None
         self.app = Path(config["app_dir"]).resolve()
         self.state = Path(config["state_dir"]).resolve()
         self.backups = Path(config["backup_dir"]).resolve()
@@ -57,6 +58,16 @@ class Updater:
         self.repo = config["image_repository"]
         if not re.fullmatch(r"[a-z0-9.-]+/[a-z0-9_./-]+", self.repo):
             raise ValueError("Invalid registry repository")
+        self.repositories = config.get("image_repositories", {})
+        if self.repositories and (set(self.repositories) != {"acr", "ghcr"} or
+                any(not isinstance(value, str) or not re.fullmatch(r"[a-z0-9.-]+/[a-z0-9_./-]+", value)
+                    for value in self.repositories.values()) or self.repo not in self.repositories.values()):
+            raise ValueError("Invalid image_repositories")
+        retained = config.get("retained_image_repositories", [])
+        if not isinstance(retained, list) or any(not isinstance(value, str) or
+                not re.fullmatch(r"[a-z0-9.-]+/[a-z0-9_./-]+", value) for value in retained):
+            raise ValueError("Invalid retained_image_repositories")
+        self.retained_repositories = set(retained) | set(self.repositories.values()) | {self.repo}
         for path in (self.app, self.state, self.backups):
             if str(path) in ("/", "/opt", "/etc", "/var", "/var/lib"):
                 raise ValueError("Use dedicated application/state/backup directories")
@@ -130,7 +141,88 @@ class Updater:
         digests = [value for value in info.get("RepoDigests", []) if value.startswith(self.repo + "@sha256:")]
         if len(digests) != 1 or not re.fullmatch(re.escape(self.repo) + r"@sha256:[0-9a-f]{64}", digests[0]):
             raise RuntimeError("Expected one registry digest")
-        return {"image": digests[0], "version": version, "commit": commit}
+        return {"image": digests[0], "image_id": info["Id"], "version": version, "commit": commit}
+
+    def running_identity(self):
+        container = self.compose("ps", "--status", "running", "-q", "memos")
+        if not container:
+            raise RuntimeError("Existing service must be running")
+        image_id = json.loads(self.run("docker", "inspect", container))[0]["Image"]
+        info = json.loads(self.run("docker", "image", "inspect", image_id))[0]
+        labels = info["Config"].get("Labels") or {}
+        version = labels.get("org.opencontainers.image.version", "")
+        commit = labels.get("org.opencontainers.image.revision", "")
+        version_tuple(version)
+        if (labels.get("org.opencontainers.image.source") != "https://github.com/Castor6/memos" or
+                not re.fullmatch(r"[0-9a-f]{40}", commit) or
+                info.get("Id") != image_id or info.get("Architecture") != "amd64" or info.get("Os") != "linux"):
+            raise RuntimeError("Unexpected running image identity")
+        deployed = self.read_state("deployed.json")
+        return {"image_id": image_id, "image": deployed.get("image", ""), "version": version, "commit": commit}
+
+    def failed_candidate(self, candidate):
+        failed = self.read_state("failed.json")
+        return (failed.get("image") == candidate["image"] or
+                (failed.get("version") == candidate["version"] and failed.get("commit") == candidate["commit"]))
+
+    def status(self):
+        selected = next((name for name, repo in self.repositories.items() if repo == self.repo), "unknown")
+        result = {"application": "Memos", "selected_channel": selected, "pending": self.pending.exists(),
+                  "maintenance": self.marker.exists()}
+        failed = self.read_state("failed.json")
+        if failed:
+            result["failed_release"] = {key: failed.get(key) for key in ("version", "commit")}
+        try:
+            running = self.running_identity()
+            result["running_verified"] = True
+            result["running"] = {key: running[key] for key in ("version", "commit", "image_id")}
+        except Exception as error:
+            result["running_verified"] = False
+            result["running_error"] = str(error)
+        return result
+
+    def switch_channel(self, channel, dry_run=False):
+        if channel not in self.repositories:
+            raise ValueError("Unknown image channel")
+        if self.pending.exists() or self.marker.exists():
+            raise RuntimeError("Unfinished deployment; inspect pending.json and recover before retrying")
+        if self.config_path is None:
+            raise RuntimeError("Switch requires a configuration file")
+        old = self.running_identity()
+        deployed = self.read_state("deployed.json")
+        if deployed and (any(deployed.get(key) != old[key] for key in ("version", "commit")) or
+                (deployed.get("image_id") and deployed["image_id"] != old["image_id"])):
+            raise RuntimeError("Running container differs from recorded deployment")
+        profile = self.profile()
+        if profile.get("needsSetup") or any(profile.get(key) != old[key] for key in ("version", "commit")):
+            raise RuntimeError("Running service identity differs from its image")
+        original_repo = self.repo
+        self.repo = self.repositories[channel]
+        try:
+            candidate = self.candidate()
+            same_content = candidate["image_id"] == old["image_id"]
+            same_release = candidate["version"] == old["version"] and candidate["commit"] == old["commit"]
+            if same_content != same_release:
+                raise RuntimeError("Target image identity differs from running release")
+            if not same_content and version_tuple(candidate["version"]) <= version_tuple(old["version"]):
+                raise RuntimeError("Target channel would downgrade or replace the running version")
+            if self.failed_candidate(candidate):
+                raise RuntimeError("Target release previously failed; inspect before switching")
+            if not dry_run and self.repo != original_repo:
+                backup = self.state / ("config-before-switch-" + str(time.time_ns()) + ".json")
+                shutil.copy2(self.config_path, backup)
+                os.chmod(backup, 0o600)
+                self.config["image_repository"] = self.repo
+                write_json(self.config_path, self.config)
+            print(json.dumps({"selected_channel": channel, "candidate_version": candidate["version"],
+                              "same_running_image": same_content, "configuration_changed": not dry_run and self.repo != original_repo,
+                              "source_switch_complete": not dry_run, "application_updated": False, "dry_run": dry_run,
+                              "message": "仅验证目标镜像，未修改来源" if dry_run else
+                                         "已校验并保存镜像来源；新版本等待定时更新器升级" if not same_content else
+                                         "镜像内容未变，已切换来源，服务无需重启"}, ensure_ascii=False))
+        except Exception:
+            self.repo = original_repo
+            raise
 
     def data_snapshot(self):
         database = self.app / "data" / "memos_prod.db"
@@ -257,9 +349,10 @@ class Updater:
                 continue
             digests = info.get("RepoDigests") or []
             # Only the configured repository and the two historical upstream repositories.
-            repos = (self.repo, "ghcr.io/usememos/memos", "neosmemo/memos")
+            repos = self.retained_repositories | {"ghcr.io/usememos/memos", "neosmemo/memos"}
             source = (info.get("Config", {}).get("Labels") or {}).get("org.opencontainers.image.source")
-            if source != "https://github.com/Castor6/memos" and not any(d.startswith(repo + "@sha256:") for d in digests for repo in repos):
+            if source != "https://github.com/Castor6/memos" or (digests and not all(
+                    any(d.startswith(repo + "@sha256:") for repo in repos) for d in digests)):
                 continue
             images.append(info["Id"])
         return {"keep_backups": keep, "remove_backups": remove, "remove_images": images,
@@ -329,9 +422,14 @@ class Updater:
         if candidate["image"] == deployed.get("image"):
             print("Already running the published digest")
             return
+        if deployed and "image_id" in candidate:
+            running = self.running_identity()
+            if all(candidate[key] == running[key] for key in ("image_id", "version", "commit")):
+                print("Already running the published image content")
+                return
         if deployed and version_tuple(candidate["version"]) <= version_tuple(deployed["version"]):
             raise RuntimeError("Release channel would downgrade or replace an existing version")
-        if not retry and self.read_state("failed.json").get("image") == candidate["image"]:
+        if not retry and self.failed_candidate(candidate):
             raise RuntimeError("This digest previously failed; inspect logs and explicitly retry")
         old = self.profile()
         if old.get("needsSetup"):
@@ -387,21 +485,33 @@ def main():
     parser.add_argument("--config", default="/etc/memos-update/config.json")
     parser.add_argument("--dry-run", action="store_true", help="Download and validate only, without stopping the app")
     parser.add_argument("--cleanup-dry-run", action="store_true", help="Preview retention under the update lock; no pull, update or deletion")
+    parser.add_argument("--switch-channel", choices=("acr", "ghcr"))
+    parser.add_argument("--status", action="store_true")
     parser.add_argument("--retry", action="store_true", help="Retry a previously failed digest after investigation")
     args = parser.parse_args()
-    if args.cleanup_dry_run and (args.dry_run or args.retry):
-        parser.error("--cleanup-dry-run cannot be combined with update options")
+    if args.cleanup_dry_run and (args.dry_run or args.retry or args.switch_channel or args.status):
+        parser.error("--cleanup-dry-run cannot be combined with other modes")
+    if args.status and (args.dry_run or args.retry or args.switch_channel):
+        parser.error("--status cannot be combined with other modes")
+    if args.switch_channel and args.retry:
+        parser.error("--retry cannot be combined with --switch-channel")
     os.umask(0o077)
-    updater = Updater(json.loads(Path(args.config).read_text()))
+    updater = Updater(json.loads(Path(args.config).read_text()), args.config)
     # nginx workers must be able to stat the marker, but state files stay private.
     os.chmod(updater.state, 0o755)
     with (updater.state / "update.lock").open("a") as lock:
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
+            if args.switch_channel or args.status:
+                raise RuntimeError("Another deployment is active")
             print("Another deployment is active")
             return
-        if args.cleanup_dry_run:
+        if args.status:
+            print(json.dumps(updater.status(), ensure_ascii=False, indent=2))
+        elif args.switch_channel:
+            updater.switch_channel(args.switch_channel, args.dry_run)
+        elif args.cleanup_dry_run:
             updater.cleanup(dry_run=True)
         else:
             updater.update(args.dry_run, args.retry)

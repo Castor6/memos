@@ -55,7 +55,9 @@ class RetentionTests(unittest.TestCase):
         if args[:3] == ("docker", "image", "inspect"):
             if args[3:] == ("current",):
                 return json.dumps([{"Id": image_id(99)}])
-            return json.dumps([{"Id": i, "RepoDigests": [self.images[i] + "@" + i]} for i in args[3:]])
+            return json.dumps([{"Id": i, "RepoDigests": [self.images[i] + "@" + i],
+                                "Config": {"Labels": {"org.opencontainers.image.source":
+                                    "https://github.com/Castor6/memos"}}} for i in args[3:]])
         if args[:3] == ("docker", "image", "rm"):
             if self.fail_remove:
                 raise RuntimeError("image busy")
@@ -105,6 +107,24 @@ class RetentionTests(unittest.TestCase):
         self.images[image_id(1)] = "unrelated/service"
         self.assertEqual(self.plan()["remove_images"], [image_id(2)])
         self.assertNotIn(image_id(50), self.plan()["remove_images"])
+
+    def test_retained_registry_image_can_be_removed_but_unknown_alias_is_kept(self):
+        ghcr = "ghcr.io/castor6/memos"
+        self.u.retained_repositories.add(ghcr)
+        self.images[image_id(2)] = ghcr
+        self.assertEqual(self.plan()["remove_images"], [image_id(1), image_id(2)])
+        original = self.u.run
+        def docker(*args, **kwargs):
+            result = original(*args, **kwargs)
+            if args[:3] == ("docker", "image", "inspect") and args[3:] != ("current",):
+                items = json.loads(result)
+                for item in items:
+                    if item["Id"] == image_id(2):
+                        item["RepoDigests"].append("unknown.example/other@" + image_id(2))
+                return json.dumps(items)
+            return result
+        self.u.run = docker
+        self.assertEqual(self.plan()["remove_images"], [image_id(1)])
 
     def test_recorded_dangling_personal_image_is_still_owned(self):
         original = self.u.run

@@ -1,0 +1,47 @@
+name: Copy Published Image
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Existing formal version, for example 0.9.0 (never rebuilt)
+        type: string
+        required: true
+      channel:
+        description: Destination registry
+        type: choice
+        options: [ghcr, acr]
+        required: true
+      advance_stable:
+        description: Also advance stable (never moves backwards)
+        type: boolean
+        default: false
+permissions:
+  contents: read
+  packages: write
+concurrency:
+  group: release-candidate
+  cancel-in-progress: false
+jobs:
+  transfer:
+    if: github.repository == 'Castor6/memos' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - run: sudo apt-get update && sudo apt-get install -y skopeo
+      - name: Copy verified existing release without rebuilding
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GHCR_IMAGE: ghcr.io/castor6/memos
+          ACR_IMAGE: ${{ vars.ACR_IMAGE }}
+          ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
+          ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
+          VERSION: ${{ inputs.version }}
+          CHANNEL: ${{ inputs.channel }}
+          ADVANCE_STABLE: ${{ inputs.advance_stable }}
+        run: |
+          args=()
+          if [ "$ADVANCE_STABLE" = true ]; then args+=(--advance-stable); fi
+          python3 scripts/publish-image.py transfer --version "$VERSION" --channel "$CHANNEL" "${args[@]}"

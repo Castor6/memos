@@ -66,11 +66,11 @@ main 的 CI 成功后，`Version Packages` 工作流对仍为当前 main 的提�
 
 ## 合并版本 PR 后
 
-`Publish Release` 从可信版本 PR 的确定合并提交重新核对 Changesets 生成结果，对比合并提交与其第一父提交的两个版本包，再分别路由发布。Memos 版本变化时才构建 Linux amd64/arm64 二进制和 Linux amd64 容器。新安装、登录、持久化与上一版升级冒烟测试全部通过后，才推送 ACR 镜像并推进 `stable`。服务器定时检查该通道；普通 PR 合并不会触发发布。
+`Publish Release` 从可信版本 PR 的确定合并提交重新核对 Changesets 生成结果，对比合并提交与其第一父提交的两个版本包，再分别路由发布。Memos 版本变化时才构建 Linux amd64/arm64 二进制和 Linux amd64 容器。新安装、登录、持久化与上一版升级冒烟测试全部通过后，才生成一次 OCI 镜像产物，再独立并行推送 ACR / GHCR 并各自推进 `stable`。服务器定时检查该通道；普通 PR 合并不会触发发布。
 
 镜像标签为 `castor-v<版本>`、`sha-<完整提交>` 和 `stable`。服务器使用不可变摘要运行镜像。版本标签存在时，重试必须复用对应提交的镜像，不能重新构建覆盖；认证或网络错误不能当作标签不存在。重试旧版本不能把 `stable` 降级。首版升级测试从官方 `ghcr.io/usememos/memos:0.30.0` 开始，后续从上一版个人镜像开始。
 
-仓库变量 `ACR_REGISTRY`、`ACR_IMAGE` 指定发布目标；Secrets `ACR_USERNAME`、`ACR_PASSWORD` 保存发布凭据。GitHub 不持有服务器 SSH 密钥。工作流也支持在 main 手动输入已经合并的版本 PR 编号重试，会重新验证 PR 来源和完整版本差异。二进制、校验和、镜像摘要记录保留在 Actions artifacts 30 天；这与令牌有效期无关。镜像发布与 Actions 产物归档成功后，独立的 `github-release` job 创建 `castor-v<版本>` Git 标签和同名 GitHub Release。标签固定到版本 PR 的确定合并提交；更新说明取该版本 CHANGELOG，先草稿上传并校验所有附件，再公开。
+仓库变量 `ACR_REGISTRY`、`ACR_IMAGE` 指定发布目标；Secrets `ACR_USERNAME`、`ACR_PASSWORD` 保存发布凭据。GitHub 不持有服务器 SSH 密钥。工作流也支持在 main 手动输入已经合并的版本 PR 编号重试，会重新验证 PR 来源和完整版本差异；发布工具固定为本次可信 workflow SHA，构建源码仍固定版本 PR 合并提交。二进制、校验和、镜像摘要记录保留在 Actions artifacts 30 天；这与令牌有效期无关。Actions 产物归档且至少一路镜像发布成功后，独立的 `github-release` job 创建 `castor-v<版本>` Git 标签和同名 GitHub Release。标签固定到版本 PR 的确定合并提交；更新说明取该版本 CHANGELOG，先草稿上传并校验所有附件，再公开。
 
 部署脚本与安装、恢复步骤见 [自动部署说明](deployment.md)。实际上线状态和验证证据见 [自动部署任务](tasks/TASK-20260916-automated-deployment.md)。
 
@@ -88,13 +88,13 @@ main 的 CI 成功后，`Version Packages` 工作流对仍为当前 main 的提�
 
 | 版本变化 | 执行流程 | 标签与产物 |
 | --- | --- | --- |
-| 仅 Memos | Memos 构建、镜像安装/升级冒烟、ACR/stable、Memos Release | `castor-v<版本>`，二进制、镜像摘要和校验和 |
+| 仅 Memos | Memos 构建、镜像安装/升级冒烟、ACR 与 GHCR/stable、Memos Release | `castor-v<版本>`，二进制、镜像摘要和校验和 |
 | 仅扩展 | 扩展测试、构建、ZIP、扩展 Release；不执行 Memos 或镜像流程 | `web-clipper-v<版本>`，ZIP、扩展日志与校验和 |
 | 两者 | 两条流程分别执行，可指向同一提交，失败分别重试 | 两个独立 Release |
 
 以下镜像流程仅适用于 Memos 版本变化。扩展发布任务不配置 ACR 凭据，也不依赖镜像任务成功；扩展 Release 始终使用 `make_latest: false`，仓库 Latest 保留给 Memos。
 
-普通 PR 不创建 Release。版本 PR 合并后依次完成镜像安装/升级验证、ACR 发布、Actions artifact 归档，再创建 GitHub Release；该阶段使用独立 job 的 `contents: write` 权限，构建任务与普通 CI 仍为只读。
+普通 PR 不创建 Release。版本 PR 合并后依次完成镜像安装/升级验证、OCI artifact 归档、ACR / GHCR 独立发布，再创建 GitHub Release；该阶段使用独立 job 的 `contents: write` 权限，构建任务与普通 CI 仍为只读。
 
 Memos Release 附件包含 Linux amd64/arm64 二进制、`CHANGELOG.md`、`LICENSE`、`release.json`、`image-digest.txt` 和 `SHA256SUMS`。二进制和元数据先核对构建产物的校验清单，再生成包含镜像摘要的完整公开清单；不会公开私有 Registry 地址。与 30 天 Actions artifacts 不同，Release 附件不会因这个保留期限被自动清除。
 
@@ -111,3 +111,15 @@ Memos Release 附件包含 Linux amd64/arm64 二进制、`CHANGELOG.md`、`LICEN
 上传不完整时保留草稿，可在 Actions 重跑失败的 Release job；标签、附件和摘要相符时复用，不重复创建。已有标签指向其它提交、同名附件内容不同或公开 Release 缺少附件时拒绝覆盖，需人工核查。重跑旧草稿不会把较新 Memos 版本的 Latest 标记降级；扩展 Release 不参与 Latest 竞争。
 
 Release 发布失败不会撤回已成功发布的镜像，服务器仍可能更新成功；Release 发布成功也不表示服务器已完成更新。继续分别查看发布工作流和服务器部署记录。新流程从包含此工作流的下一个版本 PR 开始，不自动补发历史版本。手动重试旧版本时，确定提交中没有独立扩展版本包则保留原流程：存在旧打包脚本的 Memos Release 仍捆绑同版本 ZIP，更早版本保留原附件集合；不会给旧版本强加新标签或新清单。独立版本启用后只发布本次实际升级的组件，任何所需构建失败都不能当作该组件无需发布。
+
+## 双仓发布与补传
+
+Memos 仅构建和测试一次，以 `build/candidate/image.oci.tar` 保存确定镜像；两路 `registry` matrix 使用 `skopeo copy --preserve-digests`，保证镜像摘要一致。GHCR 固定为 `ghcr.io/castor6/memos`，使用本次 workflow 的 `GITHUB_TOKEN`（packages: write）；ACR 继续使用现有变量和 Secrets。candidate 读取上一正式 GitHub Release 的 `release.json`、`image-digest.txt`，验证两附件的 `SHA256SUMS`、正式非草稿非预发布状态并绑定 Git 标签提交，再从 GHCR 优先、ACR 备用取得同摘要镜像，并核验版本、提交、来源及 Linux amd64。下载失败也切备用来源；两边都不可用则停止，不能跳过升级测试。
+
+两路上传 `fail-fast: false`，每路发布步骤总上限 15 分钟，每次镜像复制上限 5 分钟、最多 3 次，重试间隔 5 秒。任一路失败使整体 Actions 标红；成功通道的 stable 已可独立拉取，不等另一通道。汇总列明各通道结果；至少一路成功即可发布原有兼容格式的 GitHub Release，两路失败则不发布。现存版本及 sha 标签必须完全匹配固定摘要，stable 不得倒退。
+
+Actions 的 `Copy Published Image` 用于单路补传和历史转存，须在 main 运行，输入版本数字（例如 `0.9.0`）与目标渠道。它使用当前可信工具和正式 Release 固定摘要，不重建旧版。默认只复制版本与 sha 标签；仅最新正式版本允许启用 `advance_stable`，脚本仍禁止回退。原仓库必须可读取该摘要；双仓都无镜像时不会伪造补传成功。所有发布与转存共享并发锁。Actions 产物保留 30 天；历史镜像保留仍取决于仓库策略及漏传后的补齐。
+
+每份候选 OCI artifact 上传成功后，candidate job 写入 `memos/registry-candidate` commit status 持久收据（版本、摘要、对应 Actions run/artifact），此步骤成功才启动双仓上传。收据需要 candidate job 的 statuses:write 与 actions:read；不包含凭据。重试优先读取正式 Release，否则已有收据必须恢复并验证原 artifact；过期、缺失、身份不符或网络不确定均拒绝重建。首次没有收据时，一边仓库不可用不妨碍构建后向另一边发布。artifact 名含 run attempt，避免同一 run 重试冲突；收据不可替换为不同摘要。
+
+同一 Actions run 重跑时，各渠道只在本次发布成功后覆盖自己的 `published-<channel>` 结果 artifact；仅重跑失败任务会保留另一路此前验证通过的结果，汇总仍核对版本、提交和摘要。Memos 候选含二进制的 artifact 使用 attempt 独立名称，不覆盖持久收据引用的原产物；独立扩展候选则在重新完整验证成功后允许覆盖同名 artifact，防止整次重跑出现同名冲突。

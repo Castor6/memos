@@ -22,6 +22,21 @@
 
 更新器先拉取 `stable`，核对来源标签、个人版本、提交、平台和仓库摘要。相同摘要不操作，已部署后禁止降低版本或替换同版本摘要，之前失败的摘要不会自动反复尝试。
 
+### 手动选择镜像来源
+
+配置保留 `image_repository` 为当前来源，并在 `image_repositories` 中列出 `acr` 和 `ghcr` 的完整仓库路径。`retained_image_repositories` 保留曾用仓库，供旧镜像和备份的清理判断使用。两个仓库都需事先提供经过发布验证的 `stable` 镜像，且服务器有对应只读拉取权限。
+
+以下命令均使用现有部署锁；`--status` 不拉取镜像，输出所选来源、运行版本与事务状态。切换命令先拉取目标 `stable` 并核对版本、提交和镜像内容，再备份配置到状态目录，原子更新 `image_repository`。`--dry-run` 仅验证，不改配置。若目标与正在运行的镜像内容相同，不停止服务、不备份应用数据；若目标为更高版本，只保存新来源，等待定时更新器按原有备份、健康检查与恢复流程升级。
+
+```sh
+python3 /usr/local/lib/memos-update/memos-update.py --status
+python3 /usr/local/lib/memos-update/memos-update.py --switch-channel ghcr --dry-run
+python3 /usr/local/lib/memos-update/memos-update.py --switch-channel ghcr
+python3 /usr/local/lib/memos-update/memos-update.py --switch-channel acr
+```
+
+命令返回的 `source_switch_complete` 仅表示来源选择命令完成，`same_running_image` 表示目标镜像内容已在运行；切源命令的 `application_updated` 始终为 false。新版本仍须查看下次更新器运行结果。拉取失败、降级、同版本不同内容、曾失败版本或未完成事务都会拒绝切换并保留原配置。切换前应先安装支持双仓的宿主机更新器脚本；仅修改镜像内代码不会更新宿主机脚本。
+
 准备更新时，Nginx 暂时返回带 `X-Memos-Maintenance: 1` 的 503。脚本确认该入口生效后停止应用，对 SQLite 做完整性检查，记录用户/笔记/附件数量及附件哈希，备份应用和配置并比较归档。备份空间不足或备份失败会恢复旧应用，不切换镜像。
 
 新镜像通过 Compose overlay 按摘要启动。只有版本、提交、初始化状态、前端入口和原数据检查通过，才记录部署结果并结束维护。失败则停止候选版本，校验归档哈希，恢复升级前数据库、附件和 Compose，再启动原镜像。失败候选数据保留在备份目录，便于排查。

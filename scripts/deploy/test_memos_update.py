@@ -68,6 +68,7 @@ class UpdateTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.updater = FakeUpdater(Path(self.temp.name))
 
+
     def test_pull_failure_never_stops_live_service(self):
         self.updater.failure = "pull"
         with self.assertRaises(RuntimeError):
@@ -209,6 +210,83 @@ class BackupTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "checksum mismatch"):
             self.updater.restore()
         self.assertEqual(self.updater.data_snapshot(), self.updater.snapshot)
+
+
+class ChannelSwitchTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        root = Path(self.temp.name)
+        self.updater = FakeUpdater(root)
+        self.acr = self.updater.repo
+        self.ghcr = "ghcr.io/castor6/memos"
+        self.updater.repositories = {"acr": self.acr, "ghcr": self.ghcr}
+        self.updater.retained_repositories = {self.acr, self.ghcr}
+        self.updater.config.update(image_repositories=self.updater.repositories,
+                                   retained_image_repositories=[self.acr, self.ghcr])
+        self.updater.config_path = root / "config.json"
+        module.write_json(self.updater.config_path, self.updater.config)
+        self.old = {"image": self.acr + "@sha256:" + "a" * 64,
+                    "image_id": "sha256:" + "b" * 64, "version": "0.9.0", "commit": "c" * 40}
+        self.target = {**self.old, "image": self.ghcr + "@sha256:" + "d" * 64}
+        self.updater.running_identity = lambda: self.old.copy()
+        self.updater.profile = lambda: {"version": self.old["version"], "commit": self.old["commit"], "needsSetup": False}
+        self.updater.candidate = lambda: self.target.copy()
+
+    def test_same_content_switch_saves_config_and_does_not_restart(self):
+        self.updater.switch_channel("ghcr")
+        self.assertEqual(json.loads(self.updater.config_path.read_text())["image_repository"], self.ghcr)
+        self.assertEqual(len(list(self.updater.state.glob("config-before-switch-*.json"))), 1)
+        self.assertNotIn("stop", self.updater.events)
+        module.write_json(self.updater.state / "deployed.json", self.old)
+        self.updater.update()
+        self.assertNotIn("stop", self.updater.events)
+
+    def test_status_is_read_only(self):
+        result = self.updater.status()
+        self.assertEqual(result["selected_channel"], "acr")
+        self.assertEqual(result["running"]["image_id"], self.old["image_id"])
+        self.assertNotIn("pull", self.updater.events)
+
+    def test_switch_rejects_busy_lock(self):
+        argv = ["memos-update.py", "--config", str(self.updater.config_path), "--switch-channel", "ghcr"]
+        with patch.object(module.sys, "argv", argv), patch.object(module.fcntl, "flock", side_effect=BlockingIOError):
+            with self.assertRaisesRegex(RuntimeError, "Another deployment is active"):
+                module.main()
+        self.assertEqual(json.loads(self.updater.config_path.read_text())["image_repository"], self.acr)
+
+    def test_dry_run_and_pull_failure_leave_config_unchanged(self):
+        self.updater.switch_channel("ghcr", dry_run=True)
+        self.assertEqual(json.loads(self.updater.config_path.read_text())["image_repository"], self.acr)
+        def failed():
+            raise RuntimeError("pull failed")
+        self.updater.candidate = failed
+        with self.assertRaisesRegex(RuntimeError, "pull failed"):
+            self.updater.switch_channel("ghcr")
+        self.assertEqual(json.loads(self.updater.config_path.read_text())["image_repository"], self.acr)
+
+    def test_rejects_downgrade_pending_and_failed_release_across_registry(self):
+        self.target.update(version="0.8.0", commit="e" * 40, image_id="sha256:" + "f" * 64)
+        with self.assertRaisesRegex(RuntimeError, "downgrade"):
+            self.updater.switch_channel("ghcr")
+        self.target.update(version="0.9.1")
+        module.write_json(self.updater.state / "failed.json", {"version": "0.9.1", "commit": "e" * 40,
+                                                                "image": self.acr + "@sha256:" + "9" * 64})
+        with self.assertRaisesRegex(RuntimeError, "previously failed"):
+            self.updater.switch_channel("ghcr")
+        (self.updater.state / "pending.json").write_text("{}")
+        with self.assertRaisesRegex(RuntimeError, "Unfinished deployment"):
+            self.updater.switch_channel("ghcr")
+
+    def test_config_write_failure_keeps_previous_source_and_backup(self):
+        with patch.object(module, "write_json", side_effect=OSError("write failed")):
+            with self.assertRaisesRegex(OSError, "write failed"):
+                self.updater.switch_channel("ghcr")
+        self.assertEqual(json.loads(self.updater.config_path.read_text())["image_repository"], self.acr)
+        backups = list(self.updater.state.glob("config-before-switch-*.json"))
+        self.assertEqual(len(backups), 1)
+        self.assertEqual(json.loads(backups[0].read_text())["image_repository"], self.acr)
+        self.assertEqual(self.updater.repo, self.acr)
 
 
 if __name__ == "__main__":
