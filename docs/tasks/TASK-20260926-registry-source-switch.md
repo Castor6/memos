@@ -26,6 +26,8 @@
 
 同日将更新器及对应测试复制到服务器 `/var/tmp` 的独立临时目录，在该目录运行 `python3 -m unittest -v test_memos_update test_sayseed_update`：两项目共 51 项全部通过，Memos 20 项无跳过。测试脚本经审查不会调用生产 Docker 或路径，临时目录在测试后删除；未修改生产配置、镜像或应用。
 
+随后完整发现 `scripts/deploy/test_retention.py` 两项失败：原夹具未设置 OCI 来源标签，而新清理规则只删除来源与仓库均可确认的镜像。已修正夹具为本项目来源标签，并新增双仓镜像可清理、含未知仓库别名时保留的边界测试。`python3 -m unittest discover -s scripts/deploy -p 'test_*.py'` 在本机共 35 项，33 通过、2 项因平台跳过；相同脚本与全部部署测试复制到服务器 `/var/tmp` 后 35 项全部通过，临时目录已删除。未修改生产脚本或配置。
+
 ## 未覆盖范围与后续建议
 
 云助手命令预设、GHCR 当前 `stable` 的就绪状态以及生产切源演练由私有运维流程确认。目标仓库内容虽可通过本地镜像 ID 验证，本地单元测试不能代替实际 Registry 与 Docker 行为。
