@@ -6,7 +6,7 @@
 
 - Linux amd64、Docker Compose、Python 3、GNU tar、SQLite 数据库，服务名为 `memos`。
 - 应用目录包含 `compose.yaml` 和 `data/memos_prod.db`，附件保留在 `data/` 内。
-- 使用深圳免费 ACR 个人版私有仓库。该产品按官方约定限开发测试、无 SLA，用户已选择此限制；镜像拉取失败不停止旧服务。
+- 默认使用 GHCR，保留 ACR 作为按需选择的备用渠道；每次只拉取所选仓库，镜像拉取失败不停止旧服务。
 - 发布凭据放在 GitHub Secrets；服务器应使用仅允许拉取目标仓库的 RAM 用户。实际主机、密钥和密码仅在私有运维目录保存。
 
 ## 安装与首次运行

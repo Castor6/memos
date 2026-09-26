@@ -61,20 +61,24 @@ class TransferTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             module.identity(candidate, SOURCE)
 
-    def test_transfer_verifies_release_before_writing_and_stable_last(self):
-        events = []
-        def inspect(ref, missing=False):
-            return None if missing else image()
-        def run(*args, **kwargs):
-            events.append(args)
-            return ''
-        with patch.object(module, 'inspect', side_effect=inspect), patch.object(module, 'run', side_effect=run), \
-                patch.object(module, 'verify_release', side_effect=lambda *a: events.append(('verified',))):
-            module.transfer(SOURCE, 'origin/image', 'target/image', 'castor-v')
-        self.assertEqual(events[0], ('verified',))
-        self.assertEqual([e[-1] for e in events[1:]], ['docker://target/image:castor-v1.2.0',
-                         'docker://target/image:sha-' + 'b' * 40, 'docker://target/image:stable'])
-        self.assertTrue(all('--preserve-digests' in e for e in events[1:]))
+    def test_transfer_verifies_both_projects_before_writing_and_stable_last(self):
+        for source, prefix in [('Castor6/memos', 'castor-v'), ('Castor6/sayseed', 'v')]:
+            with self.subTest(source=source):
+                events = []
+                candidate = image()
+                candidate['Labels']['org.opencontainers.image.source'] = 'https://github.com/' + source
+                def inspect(ref, missing=False):
+                    return None if missing else candidate
+                def run(*args, **kwargs):
+                    events.append(args)
+                    return ''
+                with patch.object(module, 'inspect', side_effect=inspect), patch.object(module, 'run', side_effect=run), \
+                        patch.object(module, 'verify_release', side_effect=lambda *a: events.append(('verified', a[1]))):
+                    module.transfer(source, 'origin/image', 'target/image', prefix)
+                self.assertEqual(events[0], ('verified', prefix + '1.2.0'))
+                self.assertEqual([e[-1] for e in events[1:]], ['docker://target/image:' + prefix + '1.2.0',
+                                 'docker://target/image:sha-' + 'b' * 40, 'docker://target/image:stable'])
+                self.assertTrue(all('--preserve-digests' in e for e in events[1:]))
 
     def test_unverified_release_never_copies(self):
         with patch.object(module, 'inspect', return_value=image()), \
