@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "agentnotes": {
+      "source": "Castor6/agentnotes",
+      "sourceType": "github",
+      "skillPath": "skills/agentnotes/SKILL.md",
+      "computedHash": "c9c5763ab7c3a7917c3b2de1f84d0f0c2525ec2949d8fb8d44024c323c568a45"
+    }
+  }
+}

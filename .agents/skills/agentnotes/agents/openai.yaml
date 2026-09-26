@@ -1,0 +1,4 @@
+interface:
+  display_name: "AgentNotes"
+  short_description: "Record requirements, decisions, and task outcomes"
+  default_prompt: "Use $agentnotes to capture the agreed requirements and design decisions from this discussion in a task note."
