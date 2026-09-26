@@ -2,7 +2,7 @@
   "app_dir": "/opt/memos",
   "state_dir": "/var/lib/memos-update",
   "backup_dir": "/opt/backups/memos-update",
-  "image_repository": "ghcr.io/castor6/memos",
+  "image_repository": "YOUR-REGISTRY/YOUR-NAMESPACE/memos",
   "profile_url": "http://127.0.0.1:5230/api/v1/instance/profile",
   "public_health_url": "https://YOUR-HOST/healthz",
   "ca_file": "/etc/memos-update/ca.pem",
@@ -11,8 +11,5 @@
     "/etc/memos-update"
   ],
   "backup_keep_count": 3,
-  "backup_keep_days": 30,
-  "retained_image_repositories": [
-    "registry.example.com/namespace/memos"
-  ]
+  "backup_keep_days": 30
 }

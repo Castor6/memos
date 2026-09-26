@@ -66,11 +66,11 @@ main 的 CI 成功后，`Version Packages` 工作流对仍为当前 main 的提�
 
 ## 合并版本 PR 后
 
-`Publish Release` 从可信版本 PR 的确定合并提交重新核对 Changesets 生成结果，对比合并提交与其第一父提交的两个版本包，再分别路由发布。Memos 版本变化时才构建 Linux amd64/arm64 二进制和 Linux amd64 容器。新安装、登录、持久化与上一版升级冒烟测试全部通过后，才推送所选仓库的镜像并推进 `stable`。服务器定时检查该通道；普通 PR 合并不会触发发布。
+`Publish Release` 从可信版本 PR 的确定合并提交重新核对 Changesets 生成结果，对比合并提交与其第一父提交的两个版本包，再分别路由发布。Memos 版本变化时才构建 Linux amd64/arm64 二进制和 Linux amd64 容器。新安装、登录、持久化与上一版升级冒烟测试全部通过后，才推送 ACR 镜像并推进 `stable`。服务器定时检查该通道；普通 PR 合并不会触发发布。
 
 镜像标签为 `castor-v<版本>`、`sha-<完整提交>` 和 `stable`。服务器使用不可变摘要运行镜像。版本标签存在时，重试必须复用对应提交的镜像，不能重新构建覆盖；认证或网络错误不能当作标签不存在。重试旧版本不能把 `stable` 降级。首版升级测试从官方 `ghcr.io/usememos/memos:0.30.0` 开始，后续从上一版个人镜像开始。
 
-仓库变量 `IMAGE_CHANNEL` 显式选择发布目标，默认为 GHCR；GHCR 使用任务令牌和 `packages: write`。选择 ACR 时，`ACR_REGISTRY`、`ACR_IMAGE` 指定备用仓库，Secrets `ACR_USERNAME`、`ACR_PASSWORD` 保存其发布凭据。GitHub 不持有服务器 SSH 密钥。工作流也支持在 main 手动输入已经合并的版本 PR 编号重试，会重新验证 PR 来源和完整版本差异。二进制、校验和、镜像摘要记录保留在 Actions artifacts 30 天；这与令牌有效期无关。镜像发布与 Actions 产物归档成功后，独立的 `github-release` job 创建 `castor-v<版本>` Git 标签和同名 GitHub Release。标签固定到版本 PR 的确定合并提交；更新说明取该版本 CHANGELOG，先草稿上传并校验所有附件，再公开。
+仓库变量 `ACR_REGISTRY`、`ACR_IMAGE` 指定发布目标；Secrets `ACR_USERNAME`、`ACR_PASSWORD` 保存发布凭据。GitHub 不持有服务器 SSH 密钥。工作流也支持在 main 手动输入已经合并的版本 PR 编号重试，会重新验证 PR 来源和完整版本差异。二进制、校验和、镜像摘要记录保留在 Actions artifacts 30 天；这与令牌有效期无关。镜像发布与 Actions 产物归档成功后，独立的 `github-release` job 创建 `castor-v<版本>` Git 标签和同名 GitHub Release。标签固定到版本 PR 的确定合并提交；更新说明取该版本 CHANGELOG，先草稿上传并校验所有附件，再公开。
 
 部署脚本与安装、恢复步骤见 [自动部署说明](deployment.md)。实际上线状态和验证证据见 [自动部署任务](tasks/TASK-20260916-automated-deployment.md)。
 
@@ -88,13 +88,13 @@ main 的 CI 成功后，`Version Packages` 工作流对仍为当前 main 的提�
 
 | 版本变化 | 执行流程 | 标签与产物 |
 | --- | --- | --- |
-| 仅 Memos | Memos 构建、镜像安装/升级冒烟、所选仓库/stable、Memos Release | `castor-v<版本>`，二进制、镜像摘要和校验和 |
+| 仅 Memos | Memos 构建、镜像安装/升级冒烟、ACR/stable、Memos Release | `castor-v<版本>`，二进制、镜像摘要和校验和 |
 | 仅扩展 | 扩展测试、构建、ZIP、扩展 Release；不执行 Memos 或镜像流程 | `web-clipper-v<版本>`，ZIP、扩展日志与校验和 |
 | 两者 | 两条流程分别执行，可指向同一提交，失败分别重试 | 两个独立 Release |
 
 以下镜像流程仅适用于 Memos 版本变化。扩展发布任务不配置 ACR 凭据，也不依赖镜像任务成功；扩展 Release 始终使用 `make_latest: false`，仓库 Latest 保留给 Memos。
 
-普通 PR 不创建 Release。版本 PR 合并后依次完成镜像安装/升级验证、所选仓库发布、Actions artifact 归档，再创建 GitHub Release；该阶段使用独立 job 的 `contents: write` 权限，构建任务仅额外获得镜像包写权限，普通 CI 仍为只读。
+普通 PR 不创建 Release。版本 PR 合并后依次完成镜像安装/升级验证、ACR 发布、Actions artifact 归档，再创建 GitHub Release；该阶段使用独立 job 的 `contents: write` 权限，构建任务与普通 CI 仍为只读。
 
 Memos Release 附件包含 Linux amd64/arm64 二进制、`CHANGELOG.md`、`LICENSE`、`release.json`、`image-digest.txt` 和 `SHA256SUMS`。二进制和元数据先核对构建产物的校验清单，再生成包含镜像摘要的完整公开清单；不会公开私有 Registry 地址。与 30 天 Actions artifacts 不同，Release 附件不会因这个保留期限被自动清除。
 
@@ -111,7 +111,3 @@ Memos Release 附件包含 Linux amd64/arm64 二进制、`CHANGELOG.md`、`LICEN
 上传不完整时保留草稿，可在 Actions 重跑失败的 Release job；标签、附件和摘要相符时复用，不重复创建。已有标签指向其它提交、同名附件内容不同或公开 Release 缺少附件时拒绝覆盖，需人工核查。重跑旧草稿不会把较新 Memos 版本的 Latest 标记降级；扩展 Release 不参与 Latest 竞争。
 
 Release 发布失败不会撤回已成功发布的镜像，服务器仍可能更新成功；Release 发布成功也不表示服务器已完成更新。继续分别查看发布工作流和服务器部署记录。新流程从包含此工作流的下一个版本 PR 开始，不自动补发历史版本。手动重试旧版本时，确定提交中没有独立扩展版本包则保留原流程：存在旧打包脚本的 Memos Release 仍捆绑同版本 ZIP，更早版本保留原附件集合；不会给旧版本强加新标签或新清单。独立版本启用后只发布本次实际升级的组件，任何所需构建失败都不能当作该组件无需发布。
-
-## 镜像渠道选择
-
-默认发布 GHCR；`IMAGE_CHANNEL=acr` 时发布 ACR，现有 ACR 凭据本身不再隐式选择渠道。平时只发布一个仓库，已发布版本需要转仓时使用 `Transfer Release Image`。详细切换顺序和服务器配置见 [部署说明](deployment.md#发布渠道与按需转仓)。

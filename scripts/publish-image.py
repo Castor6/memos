@@ -8,8 +8,6 @@ import re
 import subprocess
 import time
 
-from registry_channel import credentials
-
 
 def run(*args, **kwargs):
     return subprocess.run(args, check=True, text=True, **kwargs)
@@ -51,7 +49,8 @@ def push(image):
 
 
 def publish():
-    registry, repo, username, password = credentials("Castor6/memos")
+    registry = os.environ["ACR_REGISTRY"]
+    repo = os.environ["ACR_IMAGE"]
     commit = os.environ["RELEASE_COMMIT"]
     version = json.loads(Path("package.json").read_text())["version"]
     version_tuple(version)
@@ -64,7 +63,8 @@ def publish():
     version_image = repo + ":castor-v" + version
     stable_image = repo + ":stable"
     source = "https://github.com/Castor6/memos"
-    run("docker", "login", registry, "--username", username, "--password-stdin", input=password + "\n")
+    password = os.environ.pop("ACR_PASSWORD")
+    run("docker", "login", registry, "--username", os.environ["ACR_USERNAME"], "--password-stdin", input=password + "\n")
     password = ""
     try:
         if exists(stable_image):
