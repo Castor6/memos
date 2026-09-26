@@ -19,6 +19,7 @@ import { remarkSplitMixedTaskLists } from "@/utils/remark-plugins/remark-split-m
 import { remarkTag } from "@/utils/remark-plugins/remark-tag";
 import { CodeBlock } from "./CodeBlock";
 import { memoUrlTransform, SANITIZE_SCHEMA } from "./constants";
+import { DetailsBlock } from "./DetailsBlock";
 import { MarkdownRenderContext, rootMarkdownRenderContext } from "./MarkdownRenderContext";
 import { Mention } from "./Mention";
 import { AnchorLink, Blockquote, Heading, HorizontalRule, Image, InlineCode, Link, List, ListItem, Paragraph } from "./markdown";
@@ -84,6 +85,7 @@ export const MemoMarkdownRendererCore = ({
   mathRehypePlugins = [],
 }: MemoMarkdownRendererCoreProps) => {
   const markdownComponents: Components = {
+    details: DetailsBlock,
     input: ({ node, ...inputProps }) => {
       if (node && isTaskListItemElement(node)) {
         return <TaskListItem {...inputProps} node={node} />;

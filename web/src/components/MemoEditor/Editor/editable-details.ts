@@ -1,5 +1,6 @@
 import { type Editor, type JSONContent, Node } from "@tiptap/core";
 import { fromMarkdown } from "mdast-util-from-markdown";
+import { detailsNodeView } from "./details-node-view";
 import { prepareMarkdown } from "./preserved-content";
 
 export const DETAILS_LANGUAGE = "memos-editable-details";
@@ -210,6 +211,7 @@ export const Details = Node.create({
   isolating: true,
   parseHTML: () => [{ tag: "details" }],
   renderHTML: () => ["details", { open: "", class: "editable-details" }, 0],
+  addNodeView: () => detailsNodeView,
   markdownTokenName: "editableDetails",
   markdownTokenizer: {
     name: "editableDetails",

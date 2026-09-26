@@ -1,0 +1,114 @@
+.memo-details {
+  position: relative;
+  margin: 0.65rem 0;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  min-width: 0;
+}
+.memo-details summary {
+  font-weight: 600;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.memo-details > .memo-details-body,
+.memo-details [data-details-body] {
+  padding-left: 1rem;
+}
+.memo-details-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.25rem;
+}
+.memo-details-close {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.375rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+.memo-details-close:hover,
+.memo-details-toggle:hover {
+  background: var(--muted);
+  color: var(--foreground);
+}
+.memo-details-close:focus-visible,
+.memo-details-toggle:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.memo-details.editable-details summary {
+  display: block;
+  padding-left: 1.5rem;
+  cursor: text;
+  min-height: 1.65em;
+}
+.memo-details-toggle {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.65em;
+  border-radius: 0.25rem;
+  cursor: pointer;
+}
+.memo-details-toggle::before {
+  content: "";
+  width: 0.4rem;
+  height: 0.4rem;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+}
+.memo-details-toggle[aria-expanded="true"]::before {
+  transform: rotate(45deg);
+}
+.editable-details[data-expanded="false"] > .memo-details-footer,
+.editable-details[data-expanded="false"] > .memo-details-content > [data-details-body] {
+  display: none;
+}
+
+details.memo-details > summary {
+  position: relative;
+  display: block;
+  list-style: none;
+  padding-left: 1.5rem;
+  line-height: 1.65;
+}
+details.memo-details > summary::-webkit-details-marker {
+  display: none;
+}
+details.memo-details > summary::before {
+  content: "";
+  position: absolute;
+  left: 0.25rem;
+  top: 0.6em;
+  width: 0.4rem;
+  height: 0.4rem;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+}
+details.memo-details[open] > summary::before {
+  transform: rotate(45deg);
+}
+.memo-details-close::after {
+  content: "";
+  width: 0.35rem;
+  height: 0.35rem;
+  margin: 0.2rem;
+  border-top: 1.5px solid currentColor;
+  border-left: 1.5px solid currentColor;
+  transform: translateY(0.1rem) rotate(45deg);
+}
+.memo-details .memo-details-body p,
+.memo-details [data-details-body] p {
+  margin: 0.35rem 0;
+  line-height: 1.65;
+}

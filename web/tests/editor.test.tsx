@@ -143,7 +143,7 @@ describe("rich editor round trips", () => {
       } else if (content.startsWith('<details>')) {
         expect(saved).toContain('<summary>概要</summary>');
         expect(saved).toContain('原始内容');
-        expect(document.querySelector('.rich-editor details summary')).toHaveTextContent('概要');
+        expect(document.querySelector('.rich-editor .editable-details summary')).toHaveTextContent('概要');
         expect(document.querySelector('.rich-editor [data-details-body]')).toHaveTextContent('原始内容');
       } else expect(saved.trim()).toBe(content);
       expect(saved).not.toContain('memos-preserved-content');
