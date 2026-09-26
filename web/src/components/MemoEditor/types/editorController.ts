@@ -6,7 +6,7 @@ import type { ActiveFormatState, EditorCommandContext, EditorCommandId } from ".
  * for the editor's internal CodeMirror/DOM APIs.
  */
 export interface EditorController {
-  focus(position?: "end"): void;
+  focus(position?: "start" | "end"): void;
   insertText?(text: string): void;
   insertFile?(src: string, title: string, label: string): void;
   replaceFile?(src: string, replacement: string): void;
@@ -40,6 +40,14 @@ export interface EditorController {
 export interface FormattingController {
   /** Run a catalog command (e.g. "bold", "heading2", "link"). */
   run(command: EditorCommandId, ctx?: EditorCommandContext): void;
+  /** Whether the command can apply at the current selection. */
+  canRun?(command: EditorCommandId): boolean;
+  /** Plain text at the selection, including paragraph boundaries. */
+  getSelectedText?(): string;
+  /** Preserve a mapped selection and stored marks while a menu takes focus. */
+  captureSelection?(): void;
+  /** Restore the selection before executing a menu action. */
+  restoreSelection?(): void;
   /** Snapshot of which marks/blocks are active at the current selection. */
   getActiveFormats(): ActiveFormatState;
   /** Register a listener fired on every transaction/selection change. Returns an unsubscribe. */

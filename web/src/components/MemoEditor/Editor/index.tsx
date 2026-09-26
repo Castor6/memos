@@ -7,13 +7,15 @@ import TaskList from "@tiptap/extension-task-list";
 import { Markdown } from "@tiptap/markdown";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
-import { type EditorCommandId, EMPTY_ACTIVE_FORMATS } from "../formatting/commands";
 import type { EditorController } from "../types/editorController";
+import { Details, DetailsBody, DetailsSummary } from "./editable-details";
+import { MarkdownUnderline } from "./markdown-underline";
 import { InlineMedia } from "./media";
 import { PreservedContent, prepareMarkdown } from "./preserved-content";
+import { createRichFormattingController } from "./rich-formatting";
 import SelectionToolbar from "./SelectionToolbar";
 import "./rich-editor.css";
 
@@ -32,12 +34,20 @@ const Editor = forwardRef<EditorController, EditorProps>((props, ref) => {
   const { userGeneralSetting } = useAuth();
   const current = useRef({ ...props, enterToSave: userGeneralSetting?.enterToSave ?? false });
   current.current = { ...props, enterToSave: userGeneralSetting?.enterToSave ?? false };
-  const listeners = useRef(new Set<() => void>());
   const lastEmitted = useRef(props.initialContent);
   const editor = useEditor({
     editable: !props.readOnly,
     extensions: [
-      StarterKit.configure({ trailingNode: false, link: { openOnClick: false }, heading: { levels: [1, 2, 3, 4, 5, 6] } }),
+      StarterKit.configure({
+        underline: false,
+        trailingNode: false,
+        link: { openOnClick: false },
+        heading: { levels: [1, 2, 3, 4, 5, 6] },
+      }),
+      MarkdownUnderline,
+      Details,
+      DetailsSummary,
+      DetailsBody,
       TableKit,
       TaskList,
       TaskItem.configure({ nested: true }),
@@ -52,6 +62,10 @@ const Editor = forwardRef<EditorController, EditorProps>((props, ref) => {
         addKeyboardShortcuts() {
           const newline = () =>
             this.editor.commands.first(({ commands }) => [
+              () => {
+                const { $from } = this.editor.state.selection;
+                return $from.parent.type.name === "detailsSummary" && commands.setTextSelection($from.after() + 2);
+              },
               () => commands.splitListItem("taskItem"),
               () => commands.splitListItem("listItem"),
               () => commands.liftListItem("taskItem"),
@@ -109,8 +123,12 @@ const Editor = forwardRef<EditorController, EditorProps>((props, ref) => {
       lastEmitted.current = markdown;
       current.current.onContentChange(markdown);
     },
-    onTransaction: () => listeners.current.forEach((listener) => listener()),
   });
+
+  const formatting = useMemo(
+    () => (editor ? createRichFormattingController(editor, () => Boolean(current.current.readOnly)) : undefined),
+    [editor],
+  );
 
   useEffect(() => {
     // Toggling editability must not emit the old document over a successful reset.
@@ -132,7 +150,7 @@ const Editor = forwardRef<EditorController, EditorProps>((props, ref) => {
     ref,
     () => ({
       focus: (position) => {
-        editor?.commands.focus(position);
+        if (!current.current.readOnly) editor?.commands.focus(position);
       },
       hasFocus: () => editor?.isFocused ?? false,
       isEmpty: () => editor?.isEmpty ?? true,
@@ -141,14 +159,17 @@ const Editor = forwardRef<EditorController, EditorProps>((props, ref) => {
         editor?.commands.setContent(prepareMarkdown(text), { contentType: "markdown" });
       },
       insertMarkdown: (text) => {
-        editor?.chain().focus().insertContent(prepareMarkdown(text), { contentType: "markdown" }).run();
+        if (!current.current.readOnly) editor?.chain().focus().insertContent(prepareMarkdown(text), { contentType: "markdown" }).run();
       },
       insertText: (text) => {
+        if (current.current.readOnly) return;
+        formatting?.restoreSelection?.();
         if (editor) editor.view.dispatch(editor.state.tr.insertText(text));
         editor?.commands.focus();
       },
       insertFile: (src, title, alt) => {
-        if (!editor) return;
+        if (!editor || current.current.readOnly) return;
+        formatting?.restoreSelection?.();
         editor.chain().focus().setImage({ src, title, alt }).run();
         // Leave a text caret after the block so continued typing cannot replace it.
         let after = -1;
@@ -179,99 +200,17 @@ const Editor = forwardRef<EditorController, EditorProps>((props, ref) => {
         editor?.commands.selectAll();
       },
       edit: (action) => {
-        if (!editor) return;
-        const chain = editor.chain().focus();
-        if (action === "undo") chain.undo().run();
-        if (action === "redo") chain.redo().run();
-        if (action === "clear") chain.unsetAllMarks().clearNodes().run();
-        if (action === "highlight") chain.toggleHighlight().run();
-        if (action === "blockquote") chain.toggleBlockquote().run();
-        if (action === "code") chain.toggleCode().run();
+        formatting?.run(action === "clear" ? "clearFormatting" : action);
       },
-      formatting: {
-        run: (id: EditorCommandId, context) => {
-          if (!editor) return;
-          const chain = editor.chain().focus();
-          switch (id) {
-            case "bold":
-              chain.toggleBold().run();
-              break;
-            case "italic":
-              chain.toggleItalic().run();
-              break;
-            case "strikethrough":
-              chain.toggleStrike().run();
-              break;
-            case "code":
-              chain.toggleCode().run();
-              break;
-            case "codeBlock":
-              chain.toggleCodeBlock().run();
-              break;
-            case "bulletList":
-              chain.toggleBulletList().run();
-              break;
-            case "orderedList":
-              chain.toggleOrderedList().run();
-              break;
-            case "taskList":
-              chain.toggleTaskList().run();
-              break;
-            case "paragraph":
-              chain.setParagraph().run();
-              break;
-            case "heading1":
-              chain.toggleHeading({ level: 1 }).run();
-              break;
-            case "heading2":
-              chain.toggleHeading({ level: 2 }).run();
-              break;
-            case "heading3":
-              chain.toggleHeading({ level: 3 }).run();
-              break;
-            case "link":
-              if (context?.url) {
-                if (editor.state.selection.empty)
-                  chain.insertContent({ type: "text", text: context.url, marks: [{ type: "link", attrs: { href: context.url } }] }).run();
-                else chain.setLink({ href: context.url }).run();
-              } else chain.unsetLink().run();
-              break;
-          }
-        },
-        getActiveFormats: () => ({
-          ...EMPTY_ACTIVE_FORMATS,
-          bold: editor?.isActive("bold") ?? false,
-          italic: editor?.isActive("italic") ?? false,
-          strikethrough: editor?.isActive("strike") ?? false,
-          code: editor?.isActive("code") ?? false,
-          codeBlock: editor?.isActive("codeBlock") ?? false,
-          bulletList: editor?.isActive("bulletList") ?? false,
-          orderedList: editor?.isActive("orderedList") ?? false,
-          taskList: editor?.isActive("taskList") ?? false,
-          link: editor?.isActive("link") ?? false,
-          headingLevel: editor?.isActive("heading", { level: 1 })
-            ? 1
-            : editor?.isActive("heading", { level: 2 })
-              ? 2
-              : editor?.isActive("heading", { level: 3 })
-                ? 3
-                : null,
-        }),
-        subscribe: (listener) => {
-          listeners.current.add(listener);
-          return () => {
-            listeners.current.delete(listener);
-          };
-        },
-      },
+      formatting,
     }),
-    [editor],
+    [editor, formatting],
   );
 
   return (
     <>
       <EditorContent editor={editor} className={cn("w-full min-h-24", props.className, props.isFocusMode && "flex-1")} />
-      {editor && <SelectionToolbar editor={editor} />}
+      {editor && formatting && <SelectionToolbar editor={editor} controller={formatting} />}
     </>
   );
 });

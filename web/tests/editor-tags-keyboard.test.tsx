@@ -1,7 +1,10 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { createRef } from "react";
 import { describe, expect, it, vi } from "vitest";
 import EditorTags from "@/components/MemoEditor/components/EditorTags";
+import Editor from "@/components/MemoEditor/Editor";
 import { EditorProvider } from "@/components/MemoEditor/state";
+import type { EditorController } from "@/components/MemoEditor/types/editorController";
 
 vi.mock("@/contexts/MemoFilterContext", () => ({ useMemoFilterContext: () => ({ filters: [] }) }));
 vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => ({}) }));
@@ -58,4 +61,32 @@ it("focuses the tag search without scrolling the document", async () => {
   await waitFor(() => expect(input).toHaveFocus());
   expect(focus.mock.calls.some(([options]) => options?.preventScroll === true)).toBe(true);
   focus.mockRestore();
+});
+
+it.each(["", "- [ ] "])("moves from the tag trigger into the editable body for %j", async (content) => {
+  const ref = createRef<EditorController>();
+  render(
+    <EditorProvider>
+      <EditorTags editing={false} onFocusContent={() => ref.current?.focus()} />
+      <Editor ref={ref} className="test" initialContent={content} placeholder="" onContentChange={vi.fn()} onFiles={vi.fn()} onSubmit={vi.fn()} />
+    </EditorProvider>,
+  );
+  const trigger = screen.getByRole("button", { name: "＋ 添加标签" });
+  fireEvent.click(trigger);
+  const input = await screen.findByRole("combobox");
+  fireEvent.change(input, { target: { value: "生活" } });
+  fireEvent.keyDown(input, { key: "Enter" });
+  await waitFor(() => expect(screen.queryByRole("combobox")).toBeNull());
+  await waitFor(() => expect(trigger).toHaveFocus());
+  fireEvent.keyDown(trigger, { key: "Tab" });
+  await waitFor(() => expect(screen.getByRole("textbox", { name: "正文" })).toHaveFocus());
+  ref.current?.insertText?.("继续填写");
+  expect(ref.current?.getMarkdown()).toContain(content ? "- [ ] 继续填写" : "继续填写");
+});
+
+it("does not intercept backward Tab navigation", () => {
+  const focus = vi.fn();
+  render(<EditorProvider><EditorTags editing onFocusContent={focus} /></EditorProvider>);
+  fireEvent.keyDown(screen.getByRole("button", { name: "＋ 添加标签" }), { key: "Tab", shiftKey: true });
+  expect(focus).not.toHaveBeenCalled();
 });

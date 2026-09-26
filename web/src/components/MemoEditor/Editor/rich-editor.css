@@ -133,3 +133,22 @@
   max-height: 20rem;
   object-fit: contain;
 }
+
+.rich-editor .editable-details {
+  margin: 0.65rem 0;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+}
+.rich-editor .editable-details > summary {
+  font-weight: 600;
+  cursor: text;
+}
+.rich-editor .editable-details > summary:empty::after {
+  content: attr(data-placeholder);
+  color: var(--muted-foreground);
+  pointer-events: none;
+}
+.rich-editor [data-details-body] {
+  padding-left: 1rem;
+}

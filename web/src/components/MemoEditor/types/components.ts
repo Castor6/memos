@@ -1,5 +1,7 @@
+import type { RefObject } from "react";
 import type { Location, Memo, Visibility } from "@/types/proto/api/v1/memo_service_pb";
 import type { AudioRecorderStatus } from "../hooks/useAudioRecorder";
+import type { EditorController } from "./editorController";
 
 export interface MemoEditorProps {
   isTodo?: boolean;
@@ -29,7 +31,7 @@ export interface EditorContentProps {
 }
 
 export interface EditorToolbarProps {
-  formattingTools?: React.ReactNode;
+  controllerRef: RefObject<EditorController | null>;
   onInsertReference?: (memo: { name: string; snippet: string }) => void;
   onSave: () => void;
   onCancel?: () => void;
