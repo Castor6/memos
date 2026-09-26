@@ -53,6 +53,41 @@ describe("captureXPage", () => {
     expect(result.warnings.join(" ")).toContain("可能未加载完整对话");
   });
 
+  it.each(["STAR", "PICK_UP"] as const)("captures an edited post with a history timestamp in %s mode", (kind) => {
+    page(post("300", "me", "Edited body").replace('status/300"', 'status/300/history"'));
+    const result = captureXPage(kind);
+    expect(result.error).toBeUndefined();
+    expect(result.capture?.sourceUrl).toBe("https://x.com/me/status/300");
+    expect(result.capture?.posts[0]).toMatchObject({
+      id: "300",
+      url: "https://x.com/me/status/300",
+      content: "Edited body",
+      author: "@me",
+      publishedAt: "2026-09-22T08:00:00.000Z",
+    });
+    expect(result.isOwnPost).toBe(true);
+  });
+
+  it("keeps edited ancestors and quotes attributed to their canonical posts", () => {
+    page(
+      post("200", "parent", "Edited parent").replace('status/200"', 'status/200/history"') +
+        post("300", "me", "My reply", quote().replace('status/150"', 'status/150/history"')),
+    );
+    const result = captureXPage("PICK_UP");
+    expect(result.capture?.posts.map(({ url }) => url)).toEqual([
+      "https://x.com/parent/status/200",
+      "https://x.com/quoted/status/150",
+      "https://x.com/me/status/300",
+    ]);
+    expect(result.capture?.comment).toBe("My reply");
+  });
+
+  it("does not treat the edit-history page as a current post detail", () => {
+    vi.stubGlobal("location", new URL("https://x.com/me/status/300/history"));
+    page(post("300", "me", "Old revision"));
+    expect(captureXPage("PICK_UP").capture).toBeNull();
+  });
+
   it("keeps short posts, line breaks, links, emoji text, and only actual post media", () => {
     page(
       post(
