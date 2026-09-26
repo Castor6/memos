@@ -1,0 +1,39 @@
+name: Transfer Release Image
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Destination channel for the latest published application image
+        required: true
+        type: choice
+        options: [ghcr, acr]
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: release-candidate
+  cancel-in-progress: false
+
+jobs:
+  transfer:
+    if: github.repository == 'Castor6/memos' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Install digest-preserving image copy tool
+        run: sudo apt-get update && sudo apt-get install -y skopeo
+      - name: Copy only the latest verified release
+        env:
+          TARGET: ${{ inputs.target }}
+          GH_TOKEN: ${{ github.token }}
+          ACR_REGISTRY: ${{ vars.ACR_REGISTRY }}
+          ACR_IMAGE: ${{ vars.ACR_IMAGE }}
+          ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
+          ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
+        run: python3 scripts/transfer-image.py --target "$TARGET"

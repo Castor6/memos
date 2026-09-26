@@ -103,6 +103,9 @@ jobs:
           appendFileSync(process.env.GITHUB_OUTPUT, Object.entries(outputs).map(([key, value]) => `${key}=${value}\n`).join(''));
           JS
   candidate:
+    permissions:
+      contents: read
+      packages: write
     needs: [source, plan]
     if: needs.plan.outputs.memos == 'true'
     outputs:
@@ -197,6 +200,8 @@ jobs:
           fi
       - name: Test and publish immutable image, then advance stable
         env:
+          IMAGE_CHANNEL: ${{ vars.IMAGE_CHANNEL || 'ghcr' }}
+          GH_TOKEN: ${{ github.token }}
           ACR_REGISTRY: ${{ vars.ACR_REGISTRY }}
           ACR_IMAGE: ${{ vars.ACR_IMAGE }}
           ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
