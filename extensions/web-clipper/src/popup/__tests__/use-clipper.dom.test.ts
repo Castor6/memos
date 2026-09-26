@@ -497,7 +497,7 @@ describe("useClipper manual capture and durable drafts", () => {
     await waitReady(result);
     await act(async () => result.current.start("PICK_UP"));
     expect(result.current.draft).toBeNull();
-    expect(result.current.notice).toContain("X 回复");
+    expect(result.current.notice).toContain("X 发帖、回复或引用帖");
     expect(browserMock.scripting.executeScript).not.toHaveBeenCalled();
   });
 

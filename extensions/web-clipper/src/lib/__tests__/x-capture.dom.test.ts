@@ -218,12 +218,20 @@ describe("captureXPage", () => {
     expect(captureXPage("PICK_UP").capture?.posts.map(({ id }) => id)).toEqual(["300"]);
   });
 
-  it("reports unloaded parent content and truncated text without silently dropping the user's reply", () => {
+  it("reports truncated text without treating missing context as an error", () => {
     page(post("300", "me", "Only visible part", '<button data-testid="tweet-text-show-more-link">Show more</button>'));
     const result = captureXPage("PICK_UP");
     expect(result.capture?.comment).toBe("Only visible part");
     expect(result.warnings.join(" ")).toContain("正文尚未展开");
-    expect(result.warnings.join(" ")).toContain("未提供可确认的回应对象");
+    expect(result.warnings).toHaveLength(1);
+  });
+
+  it.each(["时间线：对话", "Timeline: Home"])("captures standalone posts without missing-context warnings in %s", (region) => {
+    page(post("300", "me", "My own post"), region);
+    const result = captureXPage("PICK_UP");
+    expect(result.capture?.posts.map(({ id }) => id)).toEqual(["300"]);
+    expect(result.capture?.comment).toBe("My own post");
+    expect(result.warnings).toEqual([]);
   });
 
   it("distinguishes another author's post from a missing signed-in identity", () => {

@@ -44,6 +44,34 @@ describe("capture rendering", () => {
     expect(content).toContain("2026-09-22T00:00:00Z");
   });
 
+  it("omits absent context for a standalone post while preserving its text, images and source", () => {
+    const image = "https://pbs.twimg.com/media/own";
+    const standalone: CaptureData = {
+      ...capture,
+      context: "",
+      posts: [{ ...capture.posts[1]!, images: [image] }],
+    };
+    const content = composeCaptureMemo(standalone, formatCapturedPosts(standalone));
+    expect(content).toContain(`My reply\n\n![](<${image}>)`);
+    expect(content).toContain(`[我的原帖](${capture.sourceUrl})`);
+    expect(content).not.toContain("## Context & thinking");
+    expect(content).not.toContain("## What they put down");
+    expect(content).not.toContain("上文未加载");
+  });
+
+  it("omits blank source content even for a reply while retaining personal context", () => {
+    const content = composeCaptureMemo(capture, " \n ");
+    expect(content).toContain("## Context & thinking\n\nWhy I replied");
+    expect(content).not.toContain("What they put down");
+    expect(content).not.toContain("上文未加载");
+  });
+
+  it.each([true, false])("preserves empty-source pending request bodies with legacy labels %s", (legacyLabels) => {
+    const content = composeCaptureMemo(capture, "", legacyLabels, false);
+    expect(content).toContain(`[我的原回复](${capture.sourceUrl})`);
+    expect(content).toContain(`## ${legacyLabels ? "回应内容与上文" : "What they put down"}\n\n上文未加载；请通过原回复链接查看。`);
+  });
+
   it("folds long sources without truncating them or hiding personal thoughts", () => {
     const body = "Original passage.\n".repeat(200);
     const content = composeCaptureMemo({ ...capture, kind: "STAR", platform: "WEB", posts: [] }, body);
@@ -91,7 +119,7 @@ describe("capture rendering", () => {
     const original = formatCapturedPosts(withImages);
     expect(original).not.toContain(replyImage);
     const content = composeCaptureMemo(withImages, original);
-    expect(content).toContain(`${withImages.comment}\n\n![](<${replyImage}>)\n\n[我的原回复]`);
+    expect(content).toContain(`${withImages.comment}\n\n![](<${replyImage}>)\n\n[我的原帖]`);
     expect(content).toContain(`Original idea\n\n![](<${originalImage}>)`);
     expect(content.split(replyImage)).toHaveLength(2);
     expect(withImages).toEqual(before);

@@ -100,7 +100,7 @@ export function ClipWorkspace({ c, state, blocked }: { c: ClipperState; state: R
         {!draft && !c.extracting ? (
           <section className="clipper-empty">
             <h1>留下你的思考</h1>
-            <p>Star 剪藏当前网页；Pick up 留存你在 X 的回复或引用帖。</p>
+            <p>Star 剪藏当前网页；Pick up 留存你在 X 的发帖、回复或引用帖。</p>
             <p className="text-sm text-muted-foreground">
               {c.tab?.url ? "选择后才提取正文，本地草稿会自动恢复。" : "请回到要剪藏的网页，点击浏览器工具栏中的扩展图标。"}
             </p>
@@ -197,7 +197,7 @@ export function ClipWorkspace({ c, state, blocked }: { c: ClipperState; state: R
                           disabled={editingDisabled}
                           onChange={(event) => edit({ confirmed: event.target.checked })}
                         />
-                        页面未能确认登录身份，我确认上方评论由我发表。
+                        页面未能确认登录身份，我确认上方内容由我发表。
                       </label>
                     ) : null}
                     <div className="clipper-field-heading">
@@ -209,7 +209,7 @@ export function ClipWorkspace({ c, state, blocked }: { c: ClipperState; state: R
                       aria-label="Context & thinking"
                       value={draft.capture.context}
                       disabled={editingDisabled}
-                      placeholder="哪些背景、线索和思考促成了这条评论？"
+                      placeholder="哪些背景、线索和思考促成了这条发帖？"
                       onValueChange={(context) => edit({}, { context })}
                     />
                   </>
@@ -264,6 +264,8 @@ export function ClipWorkspace({ c, state, blocked }: { c: ClipperState; state: R
                     disabled={editingDisabled}
                     onValueChange={(original) => edit({ original })}
                   />
+                ) : isPickup && !draft.original.trim() ? (
+                  <p className="text-sm text-muted-foreground">已按独立发帖整理，保存时不包含上文章节。</p>
                 ) : (
                   <MarkdownPreview content={draft.original} connection={previewConnection} expanded />
                 )}
