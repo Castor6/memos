@@ -14,6 +14,8 @@ on:
 permissions:
   contents: read
   pull-requests: read
+  packages: read
+  actions: read
 
 concurrency:
   group: release-candidate
@@ -107,6 +109,12 @@ jobs:
     if: needs.plan.outputs.memos == 'true'
     outputs:
       version: ${{ needs.plan.outputs.memos_version }}
+      artifact_name: memos-${{ needs.plan.outputs.memos_version }}-${{ needs.source.outputs.commit }}-attempt-${{ github.run_attempt }}
+    permissions:
+      contents: read
+      packages: read
+      actions: read
+      statuses: write
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
@@ -116,6 +124,13 @@ jobs:
         with:
           ref: ${{ needs.source.outputs.commit }}
           fetch-depth: 0
+          persist-credentials: false
+      - name: Check out trusted publication tools
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: .publication-tools
+          sparse-checkout: scripts
           persist-credentials: false
       - uses: pnpm/action-setup@v4.2.0
         with:
@@ -195,22 +210,82 @@ jobs:
           if [ "$WEB_CLIPPER" = 'true' ]; then
             (cd build/candidate && sha256sum "memos-web-clipper-chromium-v$WEB_CLIPPER_VERSION.zip" >> SHA256SUMS)
           fi
-      - name: Test and publish immutable image, then advance stable
+      - name: Install registry transport
+        run: sudo apt-get update && sudo apt-get install -y skopeo
+      - name: Build and test one immutable image
         env:
+          GH_TOKEN: ${{ github.token }}
+          GHCR_IMAGE: ghcr.io/castor6/memos
           ACR_REGISTRY: ${{ vars.ACR_REGISTRY }}
           ACR_IMAGE: ${{ vars.ACR_IMAGE }}
           ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
           ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
-        run: python3 scripts/publish-image.py
+        run: python3 .publication-tools/scripts/publish-image.py prepare
       - uses: actions/upload-artifact@v6
+        id: candidate-artifact
         with:
-          name: memos-${{ needs.plan.outputs.memos_version }}-${{ needs.source.outputs.commit }}
+          name: memos-${{ needs.plan.outputs.memos_version }}-${{ needs.source.outputs.commit }}-attempt-${{ github.run_attempt }}
           path: build/candidate/
+          compression-level: 0
           retention-days: 30
           if-no-files-found: error
 
-  github-release:
+      - name: Record durable candidate receipt before any registry upload
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_ARTIFACT_ID: ${{ steps.candidate-artifact.outputs.artifact-id }}
+        run: python3 .publication-tools/scripts/publish-image.py receipt
+
+  registry:
     needs: [source, candidate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        channel: [acr, ghcr]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.source.outputs.commit }}
+          persist-credentials: false
+      - name: Check out trusted publication tools
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: .publication-tools
+          sparse-checkout: scripts
+          persist-credentials: false
+      - uses: actions/download-artifact@v6
+        with:
+          name: ${{ needs.candidate.outputs.artifact_name }}
+          path: build/candidate/
+      - name: Install registry transport
+        run: sudo apt-get update && sudo apt-get install -y skopeo
+      - name: Publish this channel independently
+        timeout-minutes: 15
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GHCR_IMAGE: ghcr.io/castor6/memos
+          ACR_IMAGE: ${{ vars.ACR_IMAGE }}
+          ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
+          ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
+          CHANNEL: ${{ matrix.channel }}
+        run: python3 .publication-tools/scripts/publish-image.py publish --channel "$CHANNEL"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: published-${{ matrix.channel }}
+          overwrite: true
+          path: build/result/
+          if-no-files-found: error
+          retention-days: 30
+
+  github-release:
+    needs: [source, candidate, registry]
+    if: always() && needs.candidate.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -220,15 +295,28 @@ jobs:
         with:
           ref: ${{ needs.source.outputs.commit }}
           persist-credentials: false
+      - name: Check out trusted publication tools
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: .publication-tools
+          sparse-checkout: scripts
+          persist-credentials: false
       - uses: actions/download-artifact@v6
         with:
-          name: memos-${{ needs.candidate.outputs.version }}-${{ needs.source.outputs.commit }}
+          name: ${{ needs.candidate.outputs.artifact_name }}
           path: build/candidate/
+      - uses: actions/download-artifact@v6
+        with:
+          pattern: published-*
+          path: build/published/
+      - name: Require at least one successful channel
+        run: python3 .publication-tools/scripts/publication-summary.py
       - name: Publish verified GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_COMMIT: ${{ needs.source.outputs.commit }}
-        run: python3 scripts/publish-github-release.py
+        run: python3 .publication-tools/scripts/publish-github-release.py
 
   clipper-candidate:
     needs: [source, plan]
@@ -269,6 +357,7 @@ jobs:
         with:
           name: web-clipper-${{ needs.plan.outputs.clipper_version }}-${{ needs.source.outputs.commit }}
           path: build/web-clipper/
+          overwrite: true
           retention-days: 30
           if-no-files-found: error
 
