@@ -427,7 +427,7 @@ export function useClipper(expectation: SaveExpectation | null, template: string
             operation: null,
           };
         } else {
-          if (!isXDetail || targetTab?.id === undefined) throw new Error("请打开你自己的 X 回复或引用帖详情页，再使用 Pick up。");
+          if (!isXDetail || targetTab?.id === undefined) throw new Error("请打开你自己的 X 发帖、回复或引用帖详情页，再使用 Pick up。");
           const [injected] = await bounded(
             browser.scripting.executeScript({ target: { tabId: targetTab.id }, func: captureXPage, args: [mode] }),
             "X 页面提取超时，请展开帖子后重试。",
@@ -437,7 +437,7 @@ export function useClipper(expectation: SaveExpectation | null, template: string
           if (!result?.capture) throw new Error(result?.error ?? "未能提取 X 帖子，请展开对话后重试。");
           if (result.capture.kind !== mode) throw new Error("提取结果与当前模式不一致，请重新提取。");
           if (mode === "PICK_UP" && result.isOwnPost === false)
-            throw new Error("当前帖子不属于已登录的 X 账号，请打开你自己的回复或引用帖。");
+            throw new Error("当前帖子不属于已登录的 X 账号，请打开你自己的发帖、回复或引用帖。");
           if (draftPageUrl(result.capture.sourceUrl) !== pageUrl) throw new Error("页面已切换，请重新打开扩展后提取。");
           next = {
             capture: {

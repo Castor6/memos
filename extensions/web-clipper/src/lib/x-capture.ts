@@ -258,11 +258,8 @@ export function captureXPage(kind: "STAR" | "CLIP" | "PICK_UP"): XCaptureResult 
         next = previous;
       }
       if (posts.length) warnings.push("已保存页面中展开的上文；X 可能未加载完整对话，请在保存前核对回应对象。");
-    } else {
-      warnings.push("未能确认当前页面的对话区域，已仅提取当前帖子和可识别的引用内容。");
     }
     for (const quote of quotes) if (!posts.some((post) => post.id === quote.id)) posts.push(quote);
-    if (!posts.length) warnings.push("当前页面未提供可确认的回应对象；请展开原帖或上文后重新提取。");
     posts.push(current);
   } else {
     posts.push(withQuotes(current, quotes));

@@ -26,11 +26,16 @@ export function composeCaptureMemo(capture: CaptureData, original: string, legac
     const provenance = ownPost ? ` · ${ownPost.author} · ${ownPost.publishedAt}` : "";
     const images = ownPost && !legacyLabels && inlineImages ? formatPostImages(ownPost.images) : "";
     const comment = `${capture.comment}${images ? `\n\n${images}` : ""}`;
-    sections.push(`## ${legacyLabels ? "我的评论" : "Pick up"}\n\n${comment}\n\n[我的原回复](${capture.sourceUrl})${provenance}`);
+    // Old pending requests must reproduce their original body for idempotent retries.
+    const legacyBody = legacyLabels || !inlineImages;
+    const sourceLabel = legacyBody ? "我的原回复" : "我的原帖";
+    sections.push(`## ${legacyLabels ? "我的评论" : "Pick up"}\n\n${comment}\n\n[${sourceLabel}](${capture.sourceUrl})${provenance}`);
     if (capture.context.trim()) sections.push(`## ${legacyLabels ? "补充背景" : "Context & thinking"}\n\n${capture.context.trim()}`);
-    sections.push(
-      `## ${legacyLabels ? "回应内容与上文" : "What they put down"}\n\n${displayedOriginal || "上文未加载；请通过原回复链接查看。"}`,
-    );
+    if (displayedOriginal || legacyBody) {
+      sections.push(
+        `## ${legacyLabels ? "回应内容与上文" : "What they put down"}\n\n${displayedOriginal || "上文未加载；请通过原回复链接查看。"}`,
+      );
+    }
   } else {
     if (capture.comment.trim()) sections.push(`## 我的思考\n\n${capture.comment.trim()}`);
     sections.push(`## 原内容\n\n${displayedOriginal}`);
