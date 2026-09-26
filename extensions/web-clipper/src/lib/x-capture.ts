@@ -32,13 +32,13 @@ export function captureXPage(kind: "STAR" | "CLIP" | "PICK_UP"): XCaptureResult 
   const warnings: string[] = [];
   const fail = (error: string): XCaptureResult => ({ capture: null, title: "", images: [], isOwnPost: null, warnings, error });
   const isXHost = (host: string) => /^(?:(?:www|mobile)\.)?(?:x\.com|twitter\.com)$/i.test(host);
-  const statusLink = (value: string | null) => {
+  const statusLink = (value: string | null, allowHistory = false) => {
     if (!value) return null;
     try {
       const url = new URL(value, location.href);
       if (!isXHost(url.hostname) || !/^https?:$/.test(url.protocol)) return null;
-      const match = url.pathname.match(/^\/([\w]+)\/status\/(\d+)(?:\/(?:photo|video)\/\d+)?\/?$/);
-      if (!match) return null;
+      const match = url.pathname.match(/^\/([\w]+)\/status\/(\d+)(?:\/(?:(?:photo|video)\/\d+|(history)))?\/?$/);
+      if (!match || (match[3] && !allowHistory)) return null;
       return { id: match[2]!, handle: match[1]!, url: `https://x.com/${match[1]}/status/${match[2]}` };
     } catch {
       return null;
@@ -129,9 +129,9 @@ export function captureXPage(kind: "STAR" | "CLIP" | "PICK_UP"): XCaptureResult 
   };
   const readPost = (article: Element): CapturedPost | null => {
     const time = ownElements(article, "time[datetime]", article).find((element) =>
-      statusLink(element.closest("a")?.getAttribute("href") ?? null),
+      statusLink(element.closest("a")?.getAttribute("href") ?? null, true),
     );
-    const link = statusLink(time?.closest("a")?.getAttribute("href") ?? null);
+    const link = statusLink(time?.closest("a")?.getAttribute("href") ?? null, true);
     if (!link) return null;
     const content = ownElements(article, '[data-testid="tweetText"]', article).map(bodyText).join("\n\n");
     const header = ownElements(article, '[data-testid="User-Name"]', article)[0];
@@ -167,7 +167,7 @@ export function captureXPage(kind: "STAR" | "CLIP" | "PICK_UP"): XCaptureResult 
         time?.closest("a")?.getAttribute("href"),
         ...Array.from(root.querySelectorAll("a[href]")).map((a) => a.getAttribute("href")),
       ];
-      const link = links.map((href) => statusLink(href ?? null)).find(Boolean);
+      const link = links.map((href) => statusLink(href ?? null, true)).find(Boolean);
       if (!link) {
         warnings.push("有引用卡片无法确认原帖链接，未将其混入你的评论；请展开引用原帖后核对。");
         continue;
