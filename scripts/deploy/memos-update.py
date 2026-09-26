@@ -55,7 +55,13 @@ class Updater:
         self.marker = self.state / "maintenance"
         self.pending = self.state / "pending.json"
         self.repo = config["image_repository"]
-        if not re.fullmatch(r"[a-z0-9.-]+/[a-z0-9_./-]+", self.repo):
+        retained = config.get("retained_image_repositories", [])
+        if not isinstance(retained, list) or len(retained) > 2:
+            raise ValueError("Expected at most two retained repositories")
+        self.repositories = [self.repo, *retained]
+        if len(set(self.repositories)) != len(self.repositories) or any(
+                not isinstance(repo, str) or not re.fullmatch(r"[a-z0-9.-]+/[a-z0-9_./-]+", repo)
+                for repo in self.repositories):
             raise ValueError("Invalid registry repository")
         for path in (self.app, self.state, self.backups):
             if str(path) in ("/", "/opt", "/etc", "/var", "/var/lib"):
@@ -109,16 +115,17 @@ class Updater:
         return json.loads(path.read_text()) if path.exists() else {}
 
     def candidate(self):
-        # Pull happens before maintenance or stopping the old service.
+        # Only the explicitly selected channel is contacted; no automatic failover.
+        repository = self.repo
         for attempt in range(3):
             try:
-                self.run("docker", "pull", self.repo + ":stable", timeout=300)
+                self.run("docker", "pull", repository + ":stable", timeout=300)
                 break
             except (subprocess.SubprocessError, OSError):
                 if attempt == 2:
                     raise
                 time.sleep(5)
-        info = json.loads(self.run("docker", "image", "inspect", self.repo + ":stable"))[0]
+        info = json.loads(self.run("docker", "image", "inspect", repository + ":stable"))[0]
         labels = info["Config"].get("Labels") or {}
         version = labels.get("org.opencontainers.image.version", "")
         commit = labels.get("org.opencontainers.image.revision", "")
@@ -127,10 +134,10 @@ class Updater:
             raise RuntimeError("Unexpected release source or commit")
         if info.get("Architecture") != "amd64" or info.get("Os") != "linux":
             raise RuntimeError("This deployment supports Linux amd64 only")
-        digests = [value for value in info.get("RepoDigests", []) if value.startswith(self.repo + "@sha256:")]
-        if len(digests) != 1 or not re.fullmatch(re.escape(self.repo) + r"@sha256:[0-9a-f]{64}", digests[0]):
+        digests = [value for value in info.get("RepoDigests", []) if value.startswith(repository + "@sha256:")]
+        if len(digests) != 1 or not re.fullmatch(re.escape(repository) + r"@sha256:[0-9a-f]{64}", digests[0]):
             raise RuntimeError("Expected one registry digest")
-        return {"image": digests[0], "version": version, "commit": commit}
+        return {"image": digests[0], "version": version, "commit": commit, "image_id": info["Id"]}
 
     def data_snapshot(self):
         database = self.app / "data" / "memos_prod.db"
@@ -257,7 +264,7 @@ class Updater:
                 continue
             digests = info.get("RepoDigests") or []
             # Only the configured repository and the two historical upstream repositories.
-            repos = (self.repo, "ghcr.io/usememos/memos", "neosmemo/memos")
+            repos = (*self.repositories, "ghcr.io/usememos/memos", "neosmemo/memos")
             source = (info.get("Config", {}).get("Labels") or {}).get("org.opencontainers.image.source")
             if source != "https://github.com/Castor6/memos" and not any(d.startswith(repo + "@sha256:") for d in digests for repo in repos):
                 continue
@@ -326,12 +333,13 @@ class Updater:
             raise RuntimeError("Unfinished deployment; inspect pending.json and recover before retrying")
         candidate = self.candidate()
         deployed = self.read_state("deployed.json")
-        if candidate["image"] == deployed.get("image"):
+        if (candidate["image"].split("@")[-1] == deployed.get("image", "").split("@")[-1]
+                and all(candidate[k] == deployed.get(k) for k in ("version", "commit"))):
             print("Already running the published digest")
             return
         if deployed and version_tuple(candidate["version"]) <= version_tuple(deployed["version"]):
             raise RuntimeError("Release channel would downgrade or replace an existing version")
-        if not retry and self.read_state("failed.json").get("image") == candidate["image"]:
+        if not retry and self.read_state("failed.json").get("image", "").split("@")[-1] == candidate["image"].split("@")[-1]:
             raise RuntimeError("This digest previously failed; inspect logs and explicitly retry")
         old = self.profile()
         if old.get("needsSetup"):

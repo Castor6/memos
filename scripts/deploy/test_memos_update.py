@@ -68,6 +68,28 @@ class UpdateTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.updater = FakeUpdater(Path(self.temp.name))
 
+    def test_channel_switch_same_digest_does_not_restart(self):
+        current = {**self.updater.release, "image": "old.example/team/memos@" + self.updater.release["image"].split("@")[1]}
+        module.write_json(self.updater.state / "deployed.json", current)
+        self.updater.update()
+        self.assertEqual(self.updater.events, ["pull"])
+
+    def test_failed_digest_cannot_be_retried_through_another_registry(self):
+        failed = {**self.updater.release, "image": "old.example/team/memos@" + self.updater.release["image"].split("@")[1]}
+        module.write_json(self.updater.state / "failed.json", failed)
+        with self.assertRaisesRegex(RuntimeError, "previously failed"):
+            self.updater.update()
+        self.assertNotIn("stop", self.updater.events)
+
+    def test_retained_repository_is_never_used_as_network_fallback(self):
+        self.updater.repositories.append("old.example/team/memos")
+        with patch.object(self.updater, "run", side_effect=subprocess.CalledProcessError(1, "docker")) as run, \
+                patch.object(module.time, "sleep"):
+            with self.assertRaises(subprocess.CalledProcessError):
+                module.Updater.candidate(self.updater)
+        self.assertEqual(run.call_count, 3)
+        self.assertTrue(all(call.args[2] == self.updater.repo + ":stable" for call in run.call_args_list))
+
     def test_pull_failure_never_stops_live_service(self):
         self.updater.failure = "pull"
         with self.assertRaises(RuntimeError):
