@@ -10,6 +10,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
+	"github.com/usememos/memos/internal/mcpaccess"
 	v1pb "github.com/usememos/memos/proto/gen/api/v1"
 	"github.com/usememos/memos/store"
 )
@@ -43,7 +44,7 @@ func (s *APIV1Service) prepareMemoRelations(ctx context.Context, memo *store.Mem
 		if err != nil {
 			return nil, status.Errorf(codes.InvalidArgument, "invalid related memo")
 		}
-		target, err := s.Store.GetMemo(ctx, &store.FindMemo{UID: &uid})
+		target, err := s.Store.GetMemo(ctx, &store.FindMemo{ExcludeMCPHidden: mcpaccess.IsRequest(ctx), UID: &uid})
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to find related memo")
 		}
@@ -70,13 +71,20 @@ func (s *APIV1Service) ListMemoRelations(ctx context.Context, request *v1pb.List
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid memo name: %v", err)
 	}
-	memo, err := s.Store.GetMemo(ctx, &store.FindMemo{UID: &memoUID})
+	memo, err := s.Store.GetMemo(ctx, &store.FindMemo{ExcludeMCPHidden: mcpaccess.IsRequest(ctx), UID: &memoUID})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get memo")
 	}
 
 	if memo == nil {
 		return nil, status.Errorf(codes.NotFound, "memo not found")
+	}
+	if mcpaccess.IsRequest(ctx) {
+		relations, err := s.loadMemoRelations(ctx, memo)
+		if err != nil {
+			return nil, err
+		}
+		return &v1pb.ListMemoRelationsResponse{Relations: relations}, nil
 	}
 	currentUser, err := s.fetchCurrentUser(ctx)
 	if err != nil {
@@ -89,7 +97,7 @@ func (s *APIV1Service) ListMemoRelations(ctx context.Context, request *v1pb.List
 		memoFilter = fmt.Sprintf(`creator_id == %d || visibility in ["PUBLIC", "PROTECTED"]`, currentUser.ID)
 	}
 	relationList := []*v1pb.MemoRelation{}
-	tempList, err := s.Store.ListMemoRelations(ctx, &store.FindMemoRelation{
+	tempList, err := s.Store.ListMemoRelations(ctx, &store.FindMemoRelation{ExcludeMCPHidden: mcpaccess.IsRequest(ctx),
 		MemoID:     &memo.ID,
 		MemoFilter: &memoFilter,
 	})
@@ -103,7 +111,7 @@ func (s *APIV1Service) ListMemoRelations(ctx context.Context, request *v1pb.List
 		}
 		relationList = append(relationList, relation)
 	}
-	tempList, err = s.Store.ListMemoRelations(ctx, &store.FindMemoRelation{
+	tempList, err = s.Store.ListMemoRelations(ctx, &store.FindMemoRelation{ExcludeMCPHidden: mcpaccess.IsRequest(ctx),
 		RelatedMemoID: &memo.ID,
 		MemoFilter:    &memoFilter,
 	})
@@ -125,7 +133,7 @@ func (s *APIV1Service) ListMemoRelations(ctx context.Context, request *v1pb.List
 }
 
 func (s *APIV1Service) convertMemoRelationFromStore(ctx context.Context, memoRelation *store.MemoRelation) (*v1pb.MemoRelation, error) {
-	memo, err := s.Store.GetMemo(ctx, &store.FindMemo{ID: &memoRelation.MemoID})
+	memo, err := s.Store.GetMemo(ctx, &store.FindMemo{ExcludeMCPHidden: mcpaccess.IsRequest(ctx), ID: &memoRelation.MemoID})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get memo: %v", err)
 	}
@@ -133,7 +141,7 @@ func (s *APIV1Service) convertMemoRelationFromStore(ctx context.Context, memoRel
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get memo content snippet")
 	}
-	relatedMemo, err := s.Store.GetMemo(ctx, &store.FindMemo{ID: &memoRelation.RelatedMemoID})
+	relatedMemo, err := s.Store.GetMemo(ctx, &store.FindMemo{ExcludeMCPHidden: mcpaccess.IsRequest(ctx), ID: &memoRelation.RelatedMemoID})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get related memo: %v", err)
 	}

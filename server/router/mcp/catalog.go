@@ -61,15 +61,17 @@ type requestBodySchemaOverride struct {
 // supplied by the path.
 var requestBodySchemaOverrides = map[string]requestBodySchemaOverride{
 	"MemoService_CreateMemo": {
-		required: []string{"content"},
+		required:          []string{"content"},
+		omittedProperties: []string{"mcpHidden"},
 	},
 	"MemoService_UpdateMemo": {
 		clearRequired:     true,
-		omittedProperties: []string{"name"},
+		omittedProperties: []string{"name", "mcpHidden"},
 		minProperties:     1,
 	},
 	"MemoService_CreateMemoComment": {
-		required: []string{"content"},
+		required:          []string{"content"},
+		omittedProperties: []string{"mcpHidden"},
 	},
 	"MemoService_SetMemoAttachments": {
 		required:          []string{"attachments"},
