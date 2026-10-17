@@ -76,13 +76,13 @@ WHEN NEW.uid = 'archive-todo' BEGIN SELECT RAISE(ABORT, 'injected state failure'
 			var jobs int
 			require.NoError(t, db.QueryRowContext(ctx, "SELECT COUNT(*) FROM attachment_cleanup").Scan(&jobs))
 			require.Equal(t, 1, jobs)
-			now := time.Now().Unix()
-			require.NoError(t, destination.Store.ProcessAttachmentCleanup(store.WithDeleteAttachmentStorageFailpoint(ctx), now, 100))
+			nowSeconds := time.Now().Unix()
+			require.NoError(t, destination.Store.ProcessAttachmentCleanup(store.WithDeleteAttachmentStorageFailpoint(ctx), nowSeconds, 100))
 			var attempts int
 			var nextAt int64
 			require.NoError(t, db.QueryRowContext(ctx, "SELECT attempts, next_at FROM attachment_cleanup").Scan(&attempts, &nextAt))
 			require.Equal(t, 1, attempts)
-			require.Greater(t, nextAt, now)
+			require.Greater(t, nextAt, nowSeconds)
 			require.NoError(t, destination.Store.ProcessAttachmentCleanup(ctx, nextAt, 100))
 			require.NoError(t, db.QueryRowContext(ctx, "SELECT COUNT(*) FROM attachment_cleanup").Scan(&jobs))
 			require.Zero(t, jobs)

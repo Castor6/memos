@@ -56,15 +56,15 @@ func TestDeleteAttachmentWithCleanupIsAtomicAndRetryable(t *testing.T) {
 	require.NoError(t, ts.DeleteAttachmentWithCleanup(selected, request))
 	require.Equal(t, 1, cleanupJobCount(t, ts), "repeating deletion must not duplicate its pending job")
 
-	now := time.Now().Unix()
-	require.NoError(t, ts.ProcessAttachmentCleanup(store.WithDeleteAttachmentStorageFailpoint(ctx), now, 100))
+	nowSeconds := time.Now().Unix()
+	require.NoError(t, ts.ProcessAttachmentCleanup(store.WithDeleteAttachmentStorageFailpoint(ctx), nowSeconds, 100))
 	require.Equal(t, 1, cleanupJobCount(t, ts))
 	require.FileExists(t, path)
 	var attempts int
 	var nextAt int64
 	require.NoError(t, ts.GetDriver().GetDB().QueryRow("SELECT attempts, next_at FROM attachment_cleanup").Scan(&attempts, &nextAt))
 	require.Equal(t, 1, attempts)
-	require.Greater(t, nextAt, now)
+	require.Greater(t, nextAt, nowSeconds)
 	require.NoError(t, ts.ProcessAttachmentCleanup(ctx, nextAt, 100))
 	require.Zero(t, cleanupJobCount(t, ts))
 	require.NoFileExists(t, path)

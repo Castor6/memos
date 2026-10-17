@@ -38,7 +38,7 @@ func (s *APIV1Service) sanitizeMCPMemoWithPath(ctx context.Context, memo *store.
 		if len(path) >= 64 || *remaining <= 0 {
 			return &store.Memo{Content: "[Content unavailable through MCP]"}, true, nil
 		}
-		*remaining = *remaining - 1
+		*remaining--
 		path[memo.ID] = true
 		defer delete(path, memo.ID)
 	}
