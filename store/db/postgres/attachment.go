@@ -45,6 +45,10 @@ func (d *DB) ListAttachments(ctx context.Context, find *store.FindAttachment) ([
 		args = append(args, *v)
 	}
 
+	if find.ExcludeMCPHidden {
+		where = append(where, "NOT EXISTS (SELECT 1 FROM memo AS private_memo LEFT JOIN memo_relation AS private_relation ON private_relation.memo_id = private_memo.id AND private_relation.type = 'COMMENT' LEFT JOIN memo AS private_parent ON private_parent.id = private_relation.related_memo_id WHERE private_memo.id = attachment.memo_id AND (private_memo.mcp_hidden = TRUE OR private_parent.mcp_hidden = TRUE))")
+	}
+
 	if v := find.ID; v != nil {
 		where, args = append(where, "attachment.id = "+placeholder(len(args)+1)), append(args, *v)
 	}

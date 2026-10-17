@@ -295,6 +295,9 @@ message Memo {
   // Optional. Immutable web capture snapshot, returned only to the creator.
   MemoCapture capture = 23 [(google.api.field_behavior) = OPTIONAL];
 
+  // Hide this memo from the built-in MCP endpoint. Other API and sharing access is unchanged.
+  bool mcp_hidden = 24 [(google.api.field_behavior) = OPTIONAL];
+
   // Computed properties of a memo.
   message Property {
     bool has_link = 1;

@@ -50,6 +50,7 @@ type Memo struct {
 	Content    string
 	Visibility Visibility
 	Pinned     bool
+	MCPHidden  bool
 	Payload    *storepb.MemoPayload
 
 	// Composed fields
@@ -70,10 +71,11 @@ type FindMemo struct {
 	CreatorID *int32
 
 	// Domain specific fields
-	VisibilityList  []Visibility
-	ExcludeContent  bool
-	ExcludeComments bool
-	Filters         []string
+	VisibilityList   []Visibility
+	ExcludeContent   bool
+	ExcludeComments  bool
+	ExcludeMCPHidden bool
+	Filters          []string
 
 	// Pagination
 	Limit  *int
@@ -103,6 +105,7 @@ type UpdateMemo struct {
 	Content    *string
 	Visibility *Visibility
 	Pinned     *bool
+	MCPHidden  *bool
 	Payload    *storepb.MemoPayload
 }
 

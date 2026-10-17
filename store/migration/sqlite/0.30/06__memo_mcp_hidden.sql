@@ -1,0 +1,1 @@
+ALTER TABLE memo ADD COLUMN mcp_hidden INTEGER NOT NULL DEFAULT 0 CHECK (mcp_hidden IN (0, 1));

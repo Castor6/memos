@@ -266,7 +266,9 @@ type Memo struct {
 	// Persisted link previews, available without fetching the source page again.
 	LinkMetadata []*LinkMetadata `protobuf:"bytes,22,rep,name=link_metadata,json=linkMetadata,proto3" json:"link_metadata,omitempty"`
 	// Optional. Immutable web capture snapshot, returned only to the creator.
-	Capture       *MemoCapture `protobuf:"bytes,23,opt,name=capture,proto3" json:"capture,omitempty"`
+	Capture *MemoCapture `protobuf:"bytes,23,opt,name=capture,proto3" json:"capture,omitempty"`
+	// Hide this memo from the built-in MCP endpoint. Other API and sharing access is unchanged.
+	McpHidden     bool `protobuf:"varint,24,opt,name=mcp_hidden,json=mcpHidden,proto3" json:"mcp_hidden,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -446,6 +448,13 @@ func (x *Memo) GetCapture() *MemoCapture {
 		return x.Capture
 	}
 	return nil
+}
+
+func (x *Memo) GetMcpHidden() bool {
+	if x != nil {
+		return x.McpHidden
+	}
+	return false
 }
 
 type Location struct {
@@ -2726,7 +2735,7 @@ const file_api_v1_memo_service_proto_rawDesc = "" +
 	"\rreaction_type\x18\x04 \x01(\tB\x03\xe0A\x02R\freactionType\x12@\n" +
 	"\vcreate_time\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"createTime:X\xeaAU\n" +
-	"\x15memos.api.v1/Reaction\x12!memos/{memo}/reactions/{reaction}\x1a\x04name*\treactions2\breaction\"\xa1\n" +
+	"\x15memos.api.v1/Reaction\x12!memos/{memo}/reactions/{reaction}\x1a\x04name*\treactions2\breaction\"\xc5\n" +
 	"\n" +
 	"\x04Memo\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12.\n" +
@@ -2756,7 +2765,9 @@ const file_api_v1_memo_service_proto_rawDesc = "" +
 	"\ais_todo\x18\x14 \x01(\bB\x03\xe0A\x01R\x06isTodo\x12(\n" +
 	"\rexplicit_tags\x18\x15 \x01(\bB\x03\xe0A\x01R\fexplicitTags\x12D\n" +
 	"\rlink_metadata\x18\x16 \x03(\v2\x1a.memos.api.v1.LinkMetadataB\x03\xe0A\x03R\flinkMetadata\x128\n" +
-	"\acapture\x18\x17 \x01(\v2\x19.memos.api.v1.MemoCaptureB\x03\xe0A\x01R\acapture\x1a\xac\x01\n" +
+	"\acapture\x18\x17 \x01(\v2\x19.memos.api.v1.MemoCaptureB\x03\xe0A\x01R\acapture\x12\"\n" +
+	"\n" +
+	"mcp_hidden\x18\x18 \x01(\bB\x03\xe0A\x01R\tmcpHidden\x1a\xac\x01\n" +
 	"\bProperty\x12\x19\n" +
 	"\bhas_link\x18\x01 \x01(\bR\ahasLink\x12\"\n" +
 	"\rhas_task_list\x18\x02 \x01(\bR\vhasTaskList\x12\x19\n" +

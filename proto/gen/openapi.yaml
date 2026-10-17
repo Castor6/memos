@@ -3652,6 +3652,9 @@ components:
                     allOf:
                         - $ref: '#/components/schemas/MemoCapture'
                     description: Optional. Immutable web capture snapshot, returned only to the creator.
+                mcpHidden:
+                    type: boolean
+                    description: Hide this memo from the built-in MCP endpoint. Other API and sharing access is unchanged.
         MemoCapture:
             type: object
             properties:

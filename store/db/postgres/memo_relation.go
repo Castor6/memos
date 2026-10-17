@@ -40,6 +40,9 @@ func (d *DB) UpsertMemoRelation(ctx context.Context, create *store.MemoRelation)
 
 func (d *DB) ListMemoRelations(ctx context.Context, find *store.FindMemoRelation) ([]*store.MemoRelation, error) {
 	where, args := []string{"1 = 1"}, []any{}
+	if find.ExcludeMCPHidden {
+		where = append(where, "NOT EXISTS (SELECT 1 FROM memo AS private_memo LEFT JOIN memo_relation AS private_relation ON private_relation.memo_id = private_memo.id AND private_relation.type = 'COMMENT' LEFT JOIN memo AS private_parent ON private_parent.id = private_relation.related_memo_id WHERE private_memo.id IN (memo_relation.memo_id, memo_relation.related_memo_id) AND (private_memo.mcp_hidden = TRUE OR private_parent.mcp_hidden = TRUE))")
+	}
 	if find.MemoID != nil {
 		where, args = append(where, "memo_id = "+placeholder(len(args)+1)), append(args, *find.MemoID)
 	}
