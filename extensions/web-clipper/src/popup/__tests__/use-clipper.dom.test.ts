@@ -159,6 +159,44 @@ describe("useClipper manual capture and durable drafts", () => {
     expect(saves()[0]).not.toHaveProperty("credentials");
   });
 
+  it.each(["WEB", "X"])("places new %s Star provenance above the source and retains it after reopening", async (platform) => {
+    if (platform === "X") browserMock.tabs.query.mockResolvedValue([{ id: 4, url: xUrl }]);
+    const first = renderHook(useReadyClipper);
+    await waitReady(first.result);
+    await act(async () => first.result.current.start("STAR"));
+    const link = platform === "WEB" ? `[${page.title}](${page.url})` : `[来源](${xUrl})`;
+    expect(first.result.current.draft?.original).not.toContain(link);
+    await act(async () => first.result.current.update({ original: "Long source. ".repeat(150) }));
+    expect(first.result.current.content).toContain(`## 原内容\n\n${link}\n\n<details>`);
+    expect(first.result.current.content.split(link)).toHaveLength(2);
+    first.unmount();
+    const reopened = renderHook(useReadyClipper);
+    await waitReady(reopened.result);
+    expect(reopened.result.current.content).toContain(`## 原内容\n\n${link}\n\n<details>`);
+    await act(async () => reopened.result.current.save());
+    expect(saves()[0]?.content).toBe(reopened.result.current.content);
+  });
+
+  it.each([false, true])("preserves old Star pending content with a frozen body: %s", async (frozen) => {
+    const first = renderHook(useReadyClipper);
+    await waitReady(first.result);
+    await act(async () => first.result.current.start("STAR"));
+    const stored = await browserMock.storage.local.get(null);
+    const key = Object.keys(stored).find((key) => key.endsWith(":STAR"))!;
+    const old = { ...(stored[key] as Record<string, unknown>) };
+    delete old.sourceLink;
+    old.original = `${"Old source. ".repeat(150)}\n\n[Hello World](${page.url})`;
+    const content = `## 原内容\n\n<details>\n<summary>展开原内容</summary>\n\n${old.original}\n\n</details>`;
+    old.operation = { requestId: "old-star-operation", startedAt: Date.now(), ...(frozen ? { content } : {}) };
+    first.unmount();
+    seedStorage({ [key]: old });
+    const reopened = renderHook(useReadyClipper);
+    await waitReady(reopened.result);
+    expect(reopened.result.current.content).toBe(content);
+    await act(async () => reopened.result.current.save());
+    expect(saves()[0]).toMatchObject({ content, saveRequestId: "old-star-operation", saveIsRetry: true });
+  });
+
   it("restores a page draft after closing, with no new extraction", async () => {
     const first = renderHook(useReadyClipper);
     await waitReady(first.result);
@@ -327,7 +365,8 @@ describe("useClipper manual capture and durable drafts", () => {
     expect(browserMock.scripting.executeScript).toHaveBeenCalledWith(expect.objectContaining({ args: ["STAR"] }));
     expect(result.current.draft?.capture).toMatchObject({ kind: "STAR", platform: "X", comment: "" });
     expect(result.current.draft?.original).toContain("好");
-    expect(result.current.draft?.original).toContain(`[来源](${xUrl})`);
+    expect(result.current.draft?.sourceLink).toBe(`[来源](${xUrl})`);
+    expect(result.current.content).toContain(`## 原内容\n\n[来源](${xUrl})\n\n###`);
     expect(result.current.draft?.confirmed).toBe(true);
     await act(async () => result.current.update({}, { comment: "This matters to me" }));
     await act(async () => result.current.start("STAR", true));

@@ -5,7 +5,7 @@ import { composeCaptureMemo, formatCapturedPosts, utf8Bytes } from "@/lib/captur
 import type { CaptureData, CaptureKind, ClipSaveStatus } from "@/lib/clip-records";
 import type { ConnectionSource } from "@/lib/connection-config";
 import { captureSourceKey as draftPageUrl, type EditorSource, findEditorSource } from "@/lib/editor-page";
-import { composeMemoContent } from "@/lib/format";
+import { composeStarContent } from "@/lib/format";
 import { estimatedArchivedBytes, markdownImageUrls } from "@/lib/markdown-images";
 import type { Visibility } from "@/lib/memos-client";
 import type { SaveResult } from "@/lib/messages";
@@ -21,6 +21,7 @@ export type Draft = {
   capture: CaptureData;
   title: string;
   original: string;
+  sourceLink?: string;
   images: string[];
   imageLayout?: "inline";
   tags: string[];
@@ -95,6 +96,7 @@ function restoreDraft(value: unknown, mode: CaptureKind, pageUrl: string): Draft
     capture,
     title: raw.title,
     original: raw.original,
+    ...(typeof raw.sourceLink === "string" ? { sourceLink: raw.sourceLink } : {}),
     images: raw.images,
     ...(raw.imageLayout === "inline" ? { imageLayout: "inline" } : {}),
     tags: (raw.tags as string[] | undefined) ?? defaultTags(mode),
@@ -399,7 +401,7 @@ export function useClipper(expectation: SaveExpectation | null, template: string
           if (!/^https?:\/\//i.test(captured.url)) throw new Error("当前页面不是可保存的网页，请打开普通网页后再使用 Star。");
           if (draftPageUrl(captured.url) !== pageUrl)
             throw new Error("原网页已切换，请回到原页面后重新提取，或在新页面点击扩展图标。当前草稿已保留。");
-          const original = composeMemoContent({
+          const original = composeStarContent({
             bodyMarkdown: captured.selectionMarkdown || captured.articleMarkdown,
             title: captured.title,
             url: captured.url,
@@ -417,7 +419,7 @@ export function useClipper(expectation: SaveExpectation | null, template: string
               posts: [],
             },
             title: captured.title,
-            original,
+            ...original,
             images: captured.images,
             imageLayout: "inline",
             tags: existing?.tags ?? defaultTags(mode),
@@ -446,10 +448,8 @@ export function useClipper(expectation: SaveExpectation | null, template: string
               context: existing?.capture.context ?? "",
             },
             title: result.title,
-            original:
-              mode === "STAR"
-                ? `${formatCapturedPosts(result.capture)}\n\n[来源](${result.capture.sourceUrl})`
-                : formatCapturedPosts(result.capture),
+            original: formatCapturedPosts(result.capture),
+            ...(mode === "STAR" ? { sourceLink: `[来源](${result.capture.sourceUrl})` } : {}),
             images: result.images,
             imageLayout: "inline",
             tags: existing?.tags ?? defaultTags(mode),
@@ -479,7 +479,9 @@ export function useClipper(expectation: SaveExpectation | null, template: string
     [expectation, accountKey, scope, pageUrl, tab, template, source, applyDraft, persist],
   );
 
-  const content = draft ? (draft.operation?.content ?? composeCaptureMemo(draft.capture, draft.original)) : "";
+  const content = draft
+    ? (draft.operation?.content ?? composeCaptureMemo(draft.capture, draft.original, false, true, draft.sourceLink))
+    : "";
   const contentBytes = draft?.operation && !draft.operation.inlineImages ? utf8Bytes(content) : estimatedArchivedBytes(content);
   const overLimit = !!capabilities && capabilities.contentMaxBytes > 0 && contentBytes > capabilities.contentMaxBytes;
 
@@ -491,7 +493,7 @@ export function useClipper(expectation: SaveExpectation | null, template: string
     if (!capabilities?.supported) return { ok: false, errorKind: "capture-unsupported", message: "请先确认服务器支持同步记录。" };
     if (current.capture.kind === "PICK_UP" && !current.confirmed)
       return { ok: false, errorKind: "invalid-content", message: "请先确认这条评论属于你。" };
-    const memo = current.operation?.content ?? composeCaptureMemo(current.capture, current.original);
+    const memo = current.operation?.content ?? composeCaptureMemo(current.capture, current.original, false, true, current.sourceLink);
     const saveBytes = current.operation && !current.operation.inlineImages ? utf8Bytes(memo) : estimatedArchivedBytes(memo);
     if (capabilities.contentMaxBytes > 0 && saveBytes > capabilities.contentMaxBytes)
       return { ok: false, errorKind: "content-too-large", contentMaxBytes: capabilities.contentMaxBytes };

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import { composeMemoContent, htmlToMarkdown, toQuotedMarkdown } from "@/lib/format";
+import { composeMemoContent, composeStarContent, htmlToMarkdown, toQuotedMarkdown } from "@/lib/format";
 
 describe("htmlToMarkdown", () => {
   it("converts basic HTML to markdown", () => {
@@ -99,5 +99,26 @@ describe("composeMemoContent", () => {
       template: "{{content}}\n\n[{{title}}]({{url}}) {{tags}}",
     });
     expect(out).toBe("Body\n\n[T](https://e.com)");
+  });
+});
+
+describe("Star source provenance", () => {
+  const input = {
+    bodyMarkdown: "Body\n\n[User link](https://example.com)",
+    title: "Source",
+    url: "https://example.com",
+    description: "Summary",
+  };
+
+  it("separates only the default automatic source while keeping user links in the body", () => {
+    expect(composeStarContent(input)).toEqual({
+      original: `${input.bodyMarkdown}\n\nSummary`,
+      sourceLink: "[Source](https://example.com)",
+    });
+  });
+
+  it("keeps custom template links and layout untouched", () => {
+    const custom = { ...input, template: "{{content}}\n\n[Custom]({{url}})\n{{url}}" };
+    expect(composeStarContent(custom)).toEqual({ original: composeMemoContent(custom) });
   });
 });
