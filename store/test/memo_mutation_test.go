@@ -148,21 +148,21 @@ func TestAttachmentCleanupSurvivesRestartAndRetriesIdempotently(t *testing.T) {
 	_, path := createMutationAttachment(t, ts, memo, 1)
 	ids := []int32{}
 	require.NoError(t, ts.ApplyMemoMutation(ctx, &store.MemoMutation{Update: &store.UpdateMemo{ID: memo.ID}, AttachmentIDs: &ids, ActorID: user.ID}))
-	now := time.Now().Unix()
-	require.NoError(t, ts.ProcessAttachmentCleanup(store.WithDeleteAttachmentStorageFailpoint(ctx), now, 100))
+	nowSeconds := time.Now().Unix()
+	require.NoError(t, ts.ProcessAttachmentCleanup(store.WithDeleteAttachmentStorageFailpoint(ctx), nowSeconds, 100))
 	require.Equal(t, 1, cleanupJobCount(t, ts))
 	require.FileExists(t, path)
 	var attempts int
 	var nextAt int64
 	require.NoError(t, ts.GetDriver().GetDB().QueryRow("SELECT attempts, next_at FROM attachment_cleanup").Scan(&attempts, &nextAt))
 	require.Equal(t, 1, attempts)
-	require.Greater(t, nextAt, now)
+	require.Greater(t, nextAt, nowSeconds)
 	require.NoError(t, ts.Close())
 	driver, err = db.NewDBDriver(profile)
 	require.NoError(t, err)
 	ts = store.New(driver, profile)
 	t.Cleanup(func() { require.NoError(t, ts.Close()) })
-	require.NoError(t, ts.ProcessAttachmentCleanup(ctx, now, 100))
+	require.NoError(t, ts.ProcessAttachmentCleanup(ctx, nowSeconds, 100))
 	require.FileExists(t, path)
 	// A process can stop after removing the file and before acknowledging the job.
 	require.NoError(t, os.Remove(path))
