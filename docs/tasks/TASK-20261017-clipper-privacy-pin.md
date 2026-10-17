@@ -68,3 +68,9 @@
 2026-10-17 最终 UI 验收（功能基线 `b540c227`）：Codex 内置浏览器实际检查 1440×900、430×739、430×932；flomo 与深色主题的徽标和侧线可见，430px 无常驻侧栏及横向溢出，手机菜单切换私密可用。新 Star 样例的来源链接位于折叠外。控制台未发现 error/warn。视口、主题与测试前本地草稿已恢复。截图留在本机 `tmp/local-dev/evidence/`，不入库；本次窄屏验证不代表 iPhone/Safari、软键盘、触摸或 PWA 真机验收。
 
 使用 Changesets CLI 记录应用 minor 与扩展 patch，未手改版本或发布日志。正式发布、部署及合并由仓库流程单独推进。
+
+## 2026-10-18：恢复 GitHub Actions
+
+用户授权调查并恢复 Actions，继续完成 PR #67 的 CI。仓库 REST 权限为 `enabled=true`、各工作流为 `active`，但 dispatch 返回 HTTP 422；仅重新启用这两层设置仍无法运行。登录后的 Actions 页面明确提示 GitHub 为减少 fork 中无效计算而暂停工作流，并提供维护者重新启用按钮。这是 fork 运行开关，不能仅凭前述 API 状态判定可运行，也没有证据表明是本次代码或额度问题。
+
+在仓库 Actions 页面点击重新启用后，页面返回 `Actions Enabled.`。保留现有工作流、权限范围与发布门禁；未更改认证、令牌、Docker 或发布配置。CI 结果以 [PR #67 的检查](https://github.com/Castor6/memos/pull/67/checks) 为准，恢复并不等于发布或部署。
