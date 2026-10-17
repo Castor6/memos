@@ -73,7 +73,7 @@ func buildMemoQuery(ctx context.Context, find *store.FindMemo) (string, []any, e
 	}
 
 	if find.ExcludeMCPHidden {
-		where = append(where, "memo.mcp_hidden = FALSE AND (parent_memo.id IS NULL OR parent_memo.mcp_hidden = FALSE)")
+		where = append(where, "memo.id NOT IN (SELECT id FROM mcp_hidden_memos)")
 	}
 
 	engine, err := filter.DefaultEngine()
@@ -167,6 +167,9 @@ func buildMemoQuery(ctx context.Context, find *store.FindMemo) (string, []any, e
 		"LEFT JOIN `memo` AS `parent_memo` ON `memo_relation`.`related_memo_id` = `parent_memo`.`id` " +
 		"WHERE " + strings.Join(where, " AND ") + " " +
 		"ORDER BY " + strings.Join(orderBy, ", ")
+	if find.ExcludeMCPHidden {
+		query = store.MCPHiddenMemoCTE + query
+	}
 	if find.Limit != nil {
 		query = fmt.Sprintf("%s LIMIT %d", query, *find.Limit)
 		if find.Offset != nil {

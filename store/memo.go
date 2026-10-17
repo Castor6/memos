@@ -32,6 +32,16 @@ func (v Visibility) String() string {
 	}
 }
 
+// MCPHiddenMemoCTE selects protected memos and their comments at every depth.
+// UNION deduplicates rows so malformed comment cycles cannot recurse indefinitely.
+const MCPHiddenMemoCTE = `WITH RECURSIVE mcp_hidden_memos(id) AS (
+  SELECT id FROM memo WHERE mcp_hidden = TRUE
+  UNION
+  SELECT relation.memo_id FROM memo_relation AS relation
+  INNER JOIN mcp_hidden_memos AS parent ON parent.id = relation.related_memo_id
+  WHERE relation.type = 'COMMENT'
+) `
+
 type Memo struct {
 	// ID is the system generated unique identifier for the memo.
 	ID int32

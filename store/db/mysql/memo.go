@@ -80,7 +80,7 @@ func (d *DB) ListMemos(ctx context.Context, find *store.FindMemo) ([]*store.Memo
 	}
 
 	if find.ExcludeMCPHidden {
-		where = append(where, "memo.mcp_hidden = FALSE AND (parent_memo.id IS NULL OR parent_memo.mcp_hidden = FALSE)")
+		where = append(where, "memo.id NOT IN (SELECT id FROM mcp_hidden_memos)")
 	}
 
 	engine, err := filter.DefaultEngine()
@@ -175,6 +175,9 @@ func (d *DB) ListMemos(ctx context.Context, find *store.FindMemo) ([]*store.Memo
 		"WHERE " + strings.Join(where, " AND ") + " " +
 		"HAVING " + strings.Join(having, " AND ") + " " +
 		"ORDER BY " + strings.Join(orderBy, ", ")
+	if find.ExcludeMCPHidden {
+		query = store.MCPHiddenMemoCTE + query
+	}
 	if find.Limit != nil {
 		query = fmt.Sprintf("%s LIMIT %d", query, *find.Limit)
 		if find.Offset != nil {

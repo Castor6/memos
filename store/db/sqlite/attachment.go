@@ -47,7 +47,7 @@ func buildAttachmentQuery(ctx context.Context, find *store.FindAttachment) (stri
 	}
 
 	if find.ExcludeMCPHidden {
-		where = append(where, "NOT EXISTS (SELECT 1 FROM memo AS private_memo LEFT JOIN memo_relation AS private_relation ON private_relation.memo_id = private_memo.id AND private_relation.type = 'COMMENT' LEFT JOIN memo AS private_parent ON private_parent.id = private_relation.related_memo_id WHERE private_memo.id = attachment.memo_id AND (private_memo.mcp_hidden = TRUE OR private_parent.mcp_hidden = TRUE))")
+		where = append(where, "(attachment.memo_id IS NULL OR attachment.memo_id NOT IN (SELECT id FROM mcp_hidden_memos))")
 	}
 
 	if v := find.ID; v != nil {
@@ -119,6 +119,9 @@ func buildAttachmentQuery(ctx context.Context, find *store.FindAttachment) (stri
 		"LEFT JOIN `memo` ON `attachment`.`memo_id` = `memo`.`id`" + " " +
 		"WHERE " + strings.Join(where, " AND ") + " " +
 		"ORDER BY `attachment`.`updated_ts` DESC"
+	if find.ExcludeMCPHidden {
+		query = store.MCPHiddenMemoCTE + query
+	}
 	if find.Limit != nil {
 		query = fmt.Sprintf("%s LIMIT %d", query, *find.Limit)
 		if find.Offset != nil {
