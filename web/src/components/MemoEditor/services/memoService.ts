@@ -42,9 +42,10 @@ function buildUpdateMask(
     mask.add("visibility");
     patch.visibility = state.metadata.visibility;
   }
-  if ((state.metadata.mcpHidden ?? false) !== prevMemo.mcpHidden) {
+  const mcpHidden = state.metadata.mcpHidden ?? false;
+  if (mcpHidden !== (state.metadata.initialMcpHidden ?? false) && mcpHidden !== prevMemo.mcpHidden) {
     mask.add("mcp_hidden");
-    patch.mcpHidden = state.metadata.mcpHidden ?? false;
+    patch.mcpHidden = mcpHidden;
   }
   if (!isEqual(allAttachments, prevMemo.attachments)) {
     mask.add("attachments");
@@ -185,6 +186,7 @@ ${fileMarkdown(getAttachmentUrl(attachment), FILE_TITLE + attachment.type, attac
         tags: memo.tags,
         isTodo: memo.isTodo,
         mcpHidden: memo.mcpHidden,
+        initialMcpHidden: memo.mcpHidden,
         visibility: memo.visibility,
         attachments: memo.attachments,
         relations: memo.relations,

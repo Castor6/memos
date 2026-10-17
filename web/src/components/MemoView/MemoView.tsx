@@ -122,16 +122,14 @@ const MemoView: React.FC<MemoViewProps> = (props: MemoViewProps) => {
 
   const article = (
     <article
-      className={cn(
-        MEMO_CARD_BASE_CLASSES,
-        showPinned && memoData.pinned && "border-l-[3px] border-l-primary",
-        showCommentPreview ? "mb-0 rounded-b-none" : "mb-2",
-        className,
-      )}
+      className={cn(MEMO_CARD_BASE_CLASSES, showCommentPreview ? "mb-0 rounded-b-none" : "mb-2", className)}
       ref={cardRef}
       tabIndex={readonly ? -1 : 0}
       {...contextMenu.handlers}
     >
+      {showPinned && memoData.pinned && (
+        <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-0 w-[3px] rounded-l-lg bg-primary" />
+      )}
       <MemoHeader
         showCreator={showCreator}
         showVisibility={showVisibility}

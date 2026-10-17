@@ -11,6 +11,8 @@ export interface EditorState {
     tags?: string[];
     isTodo?: boolean;
     mcpHidden?: boolean;
+    /** Privacy value when editing began; only explicit changes may overwrite it. */
+    initialMcpHidden?: boolean;
     visibility: Visibility;
     attachments: Attachment[];
     relations: MemoRelation[];
