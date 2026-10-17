@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createInitialState } from "@/components/MemoEditor/state";
 import { cacheService } from "@/components/MemoEditor/services/cacheService";
 
 describe("memo editor cache", () => {
@@ -14,6 +15,14 @@ describe("memo editor cache", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it("restores MCP privacy with the draft", () => {
+    const key = cacheService.key("users/steven", "private-draft");
+    cacheService.saveNow(key, "Private draft", { ...createInitialState().metadata, mcpHidden: true });
+    expect(cacheService.loadMetadata(key)?.mcpHidden).toBe(true);
+    cacheService.saveNow(key, "Shared draft", { ...createInitialState().metadata, mcpHidden: false });
+    expect(cacheService.loadMetadata(key)?.mcpHidden).toBe(false);
   });
 
   it("stores draft content", () => {

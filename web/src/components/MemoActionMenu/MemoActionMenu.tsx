@@ -12,6 +12,7 @@ import {
   ListChecksIcon,
   ListRestartIcon,
   MoreVerticalIcon,
+  ShieldOffIcon,
   TrashIcon,
 } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -61,6 +62,7 @@ const MemoActionMenu = (props: MemoActionMenuProps) => {
   // Action handlers
   const {
     handleTogglePinMemoBtnClick,
+    handleToggleMcpHidden,
     handleEditMemoClick,
     handleToggleMemoStatusClick,
     handleCopyLink,
@@ -168,6 +170,13 @@ const MemoActionMenu = (props: MemoActionMenuProps) => {
         {/* Write actions (non-readonly) */}
         {!readonly && (
           <>
+            <DropdownMenuItem onClick={handleToggleMcpHidden}>
+              <ShieldOffIcon className="size-4" />
+              <div className="flex flex-col">
+                <span>{t(memo.mcpHidden ? "memo.mcp-privacy.disable" : "memo.mcp-privacy.enable")}</span>
+                <span className="max-w-64 text-xs text-muted-foreground">{t("memo.mcp-privacy.description")}</span>
+              </div>
+            </DropdownMenuItem>
             {/* Archive/Restore (non-comment) */}
             {!isComment && (
               <DropdownMenuItem onClick={handleToggleMemoStatusClick}>

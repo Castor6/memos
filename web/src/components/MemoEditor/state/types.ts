@@ -10,6 +10,7 @@ export interface EditorState {
   metadata: {
     tags?: string[];
     isTodo?: boolean;
+    mcpHidden?: boolean;
     visibility: Visibility;
     attachments: Attachment[];
     relations: MemoRelation[];

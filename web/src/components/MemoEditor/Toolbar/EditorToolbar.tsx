@@ -1,7 +1,8 @@
-import { Maximize2Icon, Minimize2Icon, MoreHorizontalIcon, RedoIcon, UndoIcon } from "lucide-react";
+import { Maximize2Icon, Minimize2Icon, MoreHorizontalIcon, RedoIcon, ShieldOffIcon, UndoIcon } from "lucide-react";
 import { type FC, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { Location, Visibility } from "@/types/proto/api/v1/memo_service_pb";
 import { useTranslate } from "@/utils/i18n";
@@ -26,7 +27,7 @@ export const EditorToolbar: FC<EditorToolbarProps> = ({
   const t = useTranslate();
   const rootRef = useRef<HTMLDivElement>(null);
   const width = useElementWidth(rootRef);
-  const narrow = width > 0 && width < 560;
+  const narrow = width > 0 && width < 660;
   const compact = width > 0 && width < 390;
   const active = useEditorActiveState(controllerRef);
   const isFocusMode = useEditorSelector((s) => s.ui.isFocusMode);
@@ -38,6 +39,7 @@ export const EditorToolbar: FC<EditorToolbarProps> = ({
   const isSaving = useEditorSelector((s) => s.ui.isLoading.saving);
   const isUploading = useEditorSelector((s) => s.ui.isLoading.uploading);
   const location = useEditorSelector((s) => s.metadata.location);
+  const mcpHidden = useEditorSelector((s) => s.metadata.mcpHidden ?? false);
   const visibility = useEditorSelector((s) => s.metadata.visibility);
 
   const handleLocationChange = (next?: Location) => {
@@ -88,8 +90,25 @@ export const EditorToolbar: FC<EditorToolbarProps> = ({
         </CommandMenu>
       </div>
 
-      <div className={cn("shrink-0 flex items-center gap-1", narrow ? "w-full" : "justify-end")}>
+      <div className={cn("shrink-0 flex flex-wrap items-center gap-1", narrow ? "w-full" : "justify-end")}>
         <VisibilitySelector value={visibility} onChange={handleVisibilityChange} />
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                variant={mcpHidden ? "secondary" : "ghost"}
+                size="sm"
+                aria-pressed={mcpHidden}
+                disabled={isSaving}
+                onClick={() => dispatch(actions.setMetadata({ mcpHidden: !mcpHidden }))}
+              />
+            }
+          >
+            <ShieldOffIcon className="size-4" />
+            {t("memo.mcp-privacy.label")}
+          </TooltipTrigger>
+          <TooltipContent>{t("memo.mcp-privacy.description")}</TooltipContent>
+        </Tooltip>
         {narrow && <span className="flex-1" />}
         {onCancel && (
           <Button variant="ghost" size="sm" onClick={onCancel} disabled={isSaving}>

@@ -122,7 +122,12 @@ const MemoView: React.FC<MemoViewProps> = (props: MemoViewProps) => {
 
   const article = (
     <article
-      className={cn(MEMO_CARD_BASE_CLASSES, showCommentPreview ? "mb-0 rounded-b-none" : "mb-2", className)}
+      className={cn(
+        MEMO_CARD_BASE_CLASSES,
+        showPinned && memoData.pinned && "border-l-[3px] border-l-primary",
+        showCommentPreview ? "mb-0 rounded-b-none" : "mb-2",
+        className,
+      )}
       ref={cardRef}
       tabIndex={readonly ? -1 : 0}
       {...contextMenu.handlers}
