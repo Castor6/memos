@@ -149,3 +149,65 @@ func TestMCPPrivacyCrossSpaceReference(t *testing.T) {
 	require.Nil(t, captured.Payload.Capture)
 
 }
+
+func TestMCPPrivacyNestedComment(t *testing.T) {
+	s := newIntegrationService(t)
+	ctx := context.Background()
+	u, e := s.Store.CreateUser(ctx, &store.User{Username: "reviewnested", Role: store.RoleAdmin})
+	require.NoError(t, e)
+	app := userCtx(ctx, u.ID)
+	mcp := mcpaccess.WithRequest(app)
+	root, e := s.CreateMemo(app, &v1pb.CreateMemoRequest{Memo: &v1pb.Memo{Content: "root", McpHidden: true}})
+	require.NoError(t, e)
+	child, e := s.CreateMemoComment(app, &v1pb.CreateMemoCommentRequest{Name: root.Name, Comment: &v1pb.Memo{Content: "child"}})
+	require.NoError(t, e)
+	grand, e := s.CreateMemoComment(app, &v1pb.CreateMemoCommentRequest{Name: child.Name, Comment: &v1pb.Memo{Content: "grand secret"}})
+	require.NoError(t, e)
+	_, e = s.UpdateMemo(mcp, &v1pb.UpdateMemoRequest{Memo: &v1pb.Memo{Name: grand.Name, Content: "MCP overwrote protected descendant"}, UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"content"}}})
+	require.Equal(t, codes.NotFound, status.Code(e))
+}
+func TestMCPPrivacyTransitiveReference(t *testing.T) {
+	s := newIntegrationService(t)
+	ctx := context.Background()
+	u, e := s.Store.CreateUser(ctx, &store.User{Username: "reviewchain", Role: store.RoleAdmin})
+	require.NoError(t, e)
+	app := userCtx(ctx, u.ID)
+	mcp := mcpaccess.WithRequest(app)
+	a, e := s.CreateMemo(app, &v1pb.CreateMemoRequest{Memo: &v1pb.Memo{Content: "cached secret"}})
+	require.NoError(t, e)
+	b, e := s.CreateMemo(app, &v1pb.CreateMemoRequest{Memo: &v1pb.Memo{Content: "![" + a.Snippet + "](</" + a.Name + "> \"memos:reference\")"}})
+	require.NoError(t, e)
+	require.Contains(t, b.Snippet, "cached secret")
+	c, e := s.CreateMemo(app, &v1pb.CreateMemoRequest{Memo: &v1pb.Memo{Content: "![" + b.Snippet + "](</" + b.Name + "> \"memos:reference\")"}})
+	require.NoError(t, e)
+	_, e = s.UpdateMemo(app, &v1pb.UpdateMemoRequest{Memo: &v1pb.Memo{Name: a.Name, McpHidden: true}, UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"mcp_hidden"}}})
+	require.NoError(t, e)
+	got, e := s.GetMemo(mcp, &v1pb.GetMemoRequest{Name: c.Name})
+	require.NoError(t, e)
+	require.NotContains(t, got.Content, "cached secret")
+}
+
+func TestMCPPrivacyDeleteProtectsIncomingRelations(t *testing.T) {
+	svc := newIntegrationService(t)
+	ctx := context.Background()
+	user, err := svc.Store.CreateUser(ctx, &store.User{Username: "incoming", Role: store.RoleAdmin})
+	require.NoError(t, err)
+	app := userCtx(ctx, user.ID)
+	mcp := mcpaccess.WithRequest(app)
+	visible, err := svc.CreateMemo(app, &v1pb.CreateMemoRequest{Memo: &v1pb.Memo{Content: "visible"}})
+	require.NoError(t, err)
+	hidden, err := svc.CreateMemo(app, &v1pb.CreateMemoRequest{Memo: &v1pb.Memo{
+		Content:   "private reference owner",
+		McpHidden: true,
+		Relations: []*v1pb.MemoRelation{{
+			Type:        v1pb.MemoRelation_REFERENCE,
+			RelatedMemo: &v1pb.MemoRelation_Memo{Name: visible.Name},
+		}},
+	}})
+	require.NoError(t, err)
+	_, err = svc.DeleteMemo(mcp, &v1pb.DeleteMemoRequest{Name: visible.Name})
+	require.Equal(t, codes.FailedPrecondition, status.Code(err))
+	relations, err := svc.ListMemoRelations(app, &v1pb.ListMemoRelationsRequest{Name: hidden.Name})
+	require.NoError(t, err)
+	require.Len(t, relations.Relations, 1)
+}

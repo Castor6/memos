@@ -22,8 +22,26 @@ var mcpResourceReference = regexp.MustCompile(`/(memos|file/attachments)/([A-Za-
 // sanitizeMCPMemo removes entire Markdown blocks containing protected resource
 // references, including cached labels. Ordinary copied prose is not traced.
 func (s *APIV1Service) sanitizeMCPMemo(ctx context.Context, memo *store.Memo) (*store.Memo, bool, error) {
+	remaining := 256
+	return s.sanitizeMCPMemoWithPath(ctx, memo, make(map[int32]bool), &remaining)
+}
+
+func (s *APIV1Service) sanitizeMCPMemoWithPath(ctx context.Context, memo *store.Memo, path map[int32]bool, remaining *int) (*store.Memo, bool, error) {
 	if !mcpaccess.IsRequest(ctx) {
 		return memo, false, nil
+	}
+	// Cycles cannot add new protected targets, and the bounded depth avoids an
+	// unbounded traversal when users build long chains of cached reference cards.
+	if memo.ID != 0 {
+		if path[memo.ID] {
+			return memo, false, nil
+		}
+		if len(path) >= 64 || *remaining <= 0 {
+			return &store.Memo{Content: "[Content unavailable through MCP]"}, true, nil
+		}
+		*remaining = *remaining - 1
+		path[memo.ID] = true
+		defer delete(path, memo.ID)
 	}
 	blocks := strings.Split(memo.Content, "\n\n")
 	changed := false
@@ -43,6 +61,12 @@ func (s *APIV1Service) sanitizeMCPMemo(ctx context.Context, memo *store.Memo) (*
 				hidden, err = s.memoHiddenFromMCP(ctx, target)
 				if err != nil {
 					return nil, false, err
+				}
+				if !hidden && target != nil {
+					_, hidden, err = s.sanitizeMCPMemoWithPath(ctx, target, path, remaining)
+					if err != nil {
+						return nil, false, err
+					}
 				}
 			} else {
 				attachment, err := s.Store.GetAttachment(store.WithoutSpace(ctx), &store.FindAttachment{UID: &uid})
@@ -73,7 +97,7 @@ func (s *APIV1Service) sanitizeMCPMemo(ctx context.Context, memo *store.Memo) (*
 		if err != nil {
 			return nil, false, err
 		}
-		_, captureChanged, err := s.sanitizeMCPMemo(ctx, &store.Memo{Content: string(snapshot)})
+		_, captureChanged, err := s.sanitizeMCPMemoWithPath(ctx, &store.Memo{Content: string(snapshot)}, path, remaining)
 		if err != nil {
 			return nil, false, err
 		}
@@ -182,14 +206,13 @@ func (s *APIV1Service) listMCPFilteredMemos(ctx context.Context, find *store.Fin
 	}
 }
 
-// checkMCPDeleteComments protects independently hidden descendants from cascading deletions.
-func (s *APIV1Service) checkMCPDeleteComments(ctx context.Context, memo *store.Memo) error {
+// checkMCPDeleteImpact prevents cascades from modifying protected comments or relations.
+func (s *APIV1Service) checkMCPDeleteImpact(ctx context.Context, memo *store.Memo) error {
 	if !mcpaccess.IsRequest(ctx) {
 		return nil
 	}
 	pending := []int32{memo.ID}
 	seen := make(map[int32]bool)
-	commentType := store.MemoRelationComment
 	for len(pending) > 0 {
 		id := pending[0]
 		pending = pending[1:]
@@ -197,19 +220,33 @@ func (s *APIV1Service) checkMCPDeleteComments(ctx context.Context, memo *store.M
 			continue
 		}
 		seen[id] = true
-		comments, err := s.Store.ListMemoRelations(store.WithoutSpace(ctx), &store.FindMemoRelation{RelatedMemoID: &id, Type: &commentType})
+		outgoing, err := s.Store.ListMemoRelations(store.WithoutSpace(ctx), &store.FindMemoRelation{MemoID: &id})
 		if err != nil {
-			return status.Errorf(codes.Internal, "failed to check comments")
+			return status.Errorf(codes.Internal, "failed to check memo relations")
 		}
-		for _, comment := range comments {
-			child, err := s.Store.GetMemo(store.WithoutSpace(ctx), &store.FindMemo{ID: &comment.MemoID})
+		incoming, err := s.Store.ListMemoRelations(store.WithoutSpace(ctx), &store.FindMemoRelation{RelatedMemoID: &id})
+		if err != nil {
+			return status.Errorf(codes.Internal, "failed to check memo relations")
+		}
+		for _, relation := range append(outgoing, incoming...) {
+			otherID := relation.RelatedMemoID
+			if otherID == id {
+				otherID = relation.MemoID
+			}
+			other, err := s.Store.GetMemo(store.WithoutSpace(ctx), &store.FindMemo{ID: &otherID})
 			if err != nil {
-				return status.Errorf(codes.Internal, "failed to check comment")
+				return status.Errorf(codes.Internal, "failed to check related memo")
 			}
-			if child != nil && child.MCPHidden {
-				return status.Errorf(codes.FailedPrecondition, "delete this memo in the app because it has protected comments")
+			hidden, err := s.memoHiddenFromMCP(ctx, other)
+			if err != nil {
+				return status.Errorf(codes.Internal, "failed to check related memo")
 			}
-			pending = append(pending, comment.MemoID)
+			if hidden {
+				return status.Errorf(codes.FailedPrecondition, "delete this memo in the app because it has protected comments or relations")
+			}
+			if relation.Type == store.MemoRelationComment && relation.RelatedMemoID == id {
+				pending = append(pending, relation.MemoID)
+			}
 		}
 	}
 	return nil

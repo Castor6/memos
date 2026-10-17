@@ -648,7 +648,7 @@ func (s *APIV1Service) DeleteMemo(ctx context.Context, request *v1pb.DeleteMemoR
 		return nil, status.Errorf(codes.PermissionDenied, "permission denied")
 	}
 
-	if err := s.checkMCPDeleteComments(ctx, memo); err != nil {
+	if err := s.checkMCPDeleteImpact(ctx, memo); err != nil {
 		return nil, err
 	}
 
