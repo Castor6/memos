@@ -459,6 +459,8 @@ func TestLinkMetadataQueueMigrationPreservesPermanentSnapshots(t *testing.T) {
 	require.NoError(t, err)
 	_, err = s.GetDriver().GetDB().ExecContext(ctx, "DROP TABLE link_metadata_backfill")
 	require.NoError(t, err)
+	_, err = s.GetDriver().GetDB().ExecContext(ctx, "ALTER TABLE memo DROP COLUMN mcp_hidden")
+	require.NoError(t, err)
 	_, err = s.UpsertInstanceSetting(ctx, &storepb.InstanceSetting{Key: storepb.InstanceSettingKey_BASIC, Value: &storepb.InstanceSetting_BasicSetting{BasicSetting: &storepb.InstanceBasicSetting{SchemaVersion: "0.30.5"}}})
 	require.NoError(t, err)
 	require.NoError(t, s.Migrate(ctx))

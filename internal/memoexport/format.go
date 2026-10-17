@@ -57,6 +57,7 @@ type PersonalMemo struct {
 	Space        string `json:"space"`
 	IsTodo       bool   `json:"isTodo"`
 	ExplicitTags bool   `json:"explicitTags"`
+	MCPHidden    bool   `json:"mcpHidden,omitempty"`
 }
 
 // Generator names the software that wrote the archive.
