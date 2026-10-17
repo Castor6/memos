@@ -42,6 +42,7 @@ CREATE TABLE memo (
   pinned INTEGER NOT NULL CHECK (pinned IN (0, 1)) DEFAULT 0,
   space TEXT NOT NULL DEFAULT '',
   is_todo INTEGER NOT NULL DEFAULT 0 CHECK (is_todo IN (0, 1)),
+  mcp_hidden INTEGER NOT NULL DEFAULT 0 CHECK (mcp_hidden IN (0, 1)),
   payload TEXT NOT NULL DEFAULT '{}'
 );
 

@@ -14,6 +14,8 @@ import (
 	"github.com/labstack/echo/v5"
 	sdkmcp "github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/pkg/errors"
+
+	"github.com/usememos/memos/internal/mcpaccess"
 )
 
 type apiAdapter struct {
@@ -25,7 +27,7 @@ func newAPIAdapter(echoServer *echo.Echo) *apiAdapter {
 }
 
 func (a *apiAdapter) execute(ctx context.Context, operation *openAPIOperation, arguments map[string]any, authorization string) (*sdkmcp.CallToolResult, error) {
-	req, err := buildAPIRequest(ctx, operation, arguments, authorization)
+	req, err := buildAPIRequest(mcpaccess.WithRequest(ctx), operation, arguments, authorization)
 	if err != nil {
 		return newToolErrorResult(err.Error()), nil
 	}

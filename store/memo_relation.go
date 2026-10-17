@@ -20,10 +20,11 @@ type MemoRelation struct {
 }
 
 type FindMemoRelation struct {
-	MemoID        *int32
-	RelatedMemoID *int32
-	Type          *MemoRelationType
-	MemoFilter    *string
+	MemoID           *int32
+	RelatedMemoID    *int32
+	Type             *MemoRelationType
+	MemoFilter       *string
+	ExcludeMCPHidden bool
 	// MemoIDList matches relations where memo_id OR related_memo_id is in the list.
 	MemoIDList []int32
 	// SourceMemoIDList matches relations where memo_id is in the list.

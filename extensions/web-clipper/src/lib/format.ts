@@ -1,6 +1,6 @@
 import TurndownService from "turndown";
 import { gfm } from "turndown-plugin-gfm";
-import { DEFAULT_TEMPLATE, renderTemplate } from "./template";
+import { DEFAULT_CONTENT_TEMPLATE, DEFAULT_TEMPLATE, renderTemplate, SOURCE_LINK_TEMPLATE } from "./template";
 
 const turndown = new TurndownService({
   headingStyle: "atx",
@@ -55,4 +55,15 @@ export function composeMemoContent({ bodyMarkdown, title, url, description, temp
     description: (description ?? "").trim().slice(0, DESCRIPTION_MAX_CHARS),
   };
   return renderTemplate(template?.trim() ? template : DEFAULT_TEMPLATE, vars);
+}
+
+/** Keep automatically generated provenance outside the Star source fold without rewriting custom templates. */
+export function composeStarContent(input: ComposeInput): { original: string; sourceLink?: string } {
+  if (input.template?.trim() && input.template.trim() !== DEFAULT_TEMPLATE) {
+    return { original: composeMemoContent(input) };
+  }
+  return {
+    original: composeMemoContent({ ...input, template: DEFAULT_CONTENT_TEMPLATE }),
+    sourceLink: composeMemoContent({ ...input, template: SOURCE_LINK_TEMPLATE }),
+  };
 }

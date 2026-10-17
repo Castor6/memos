@@ -39,7 +39,7 @@ func archiveFixture(t *testing.T) (*TestService, context.Context, *v1pb.ExportMe
 	require.NoError(t, err)
 	_, err = ts.Service.CreateMemo(ctx, &v1pb.CreateMemoRequest{MemoId: "archive-reference", Memo: &v1pb.Memo{Content: "reference", Visibility: v1pb.Visibility_PRIVATE, Relations: []*v1pb.MemoRelation{{Type: v1pb.MemoRelation_REFERENCE, RelatedMemo: &v1pb.MemoRelation_Memo{Name: note.Name}}}}})
 	require.NoError(t, err)
-	todo, err := ts.Service.CreateMemo(store.WithSpace(ctx, "company"), &v1pb.CreateMemoRequest{MemoId: "archive-todo", Memo: &v1pb.Memo{Content: "- [x] 归档待办", IsTodo: true, ExplicitTags: true, Tags: []string{"待办标签"}, Visibility: v1pb.Visibility_PRIVATE, CreateTime: stamp, UpdateTime: stamp}})
+	todo, err := ts.Service.CreateMemo(store.WithSpace(ctx, "company"), &v1pb.CreateMemoRequest{MemoId: "archive-todo", Memo: &v1pb.Memo{Content: "- [x] 归档待办", IsTodo: true, McpHidden: true, ExplicitTags: true, Tags: []string{"待办标签"}, Visibility: v1pb.Visibility_PRIVATE, CreateTime: stamp, UpdateTime: stamp}})
 	require.NoError(t, err)
 	todo.State = v1pb.State_ARCHIVED
 	todo.Pinned = true
@@ -88,6 +88,7 @@ func TestMemoArchiveRoundTripAndRepeat(t *testing.T) {
 	todo, err := destination.Service.GetMemo(store.WithSpace(ctx, "company"), &v1pb.GetMemoRequest{Name: "memos/archive-todo"})
 	require.NoError(t, err)
 	require.True(t, todo.IsTodo)
+	require.True(t, todo.McpHidden)
 	require.True(t, todo.Pinned)
 	require.Equal(t, v1pb.State_ARCHIVED, todo.State)
 	reference, err := destination.Service.GetMemo(ctx, &v1pb.GetMemoRequest{Name: "memos/archive-reference"})

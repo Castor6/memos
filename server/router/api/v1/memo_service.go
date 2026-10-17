@@ -14,6 +14,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/usememos/memos/internal/httpgetter"
+	"github.com/usememos/memos/internal/mcpaccess"
 	v1pb "github.com/usememos/memos/proto/gen/api/v1"
 	storepb "github.com/usememos/memos/proto/gen/store"
 	"github.com/usememos/memos/server/runner/memopayload"
@@ -77,6 +78,9 @@ func (s *APIV1Service) CreateMemo(ctx context.Context, request *v1pb.CreateMemoR
 		return nil, status.Errorf(codes.Unauthenticated, "user not authenticated")
 	}
 
+	if mcpaccess.IsRequest(ctx) && request.GetMemo().GetMcpHidden() {
+		return nil, status.Errorf(codes.PermissionDenied, "MCP cannot change privacy")
+	}
 	if request.Memo == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "memo is required")
 	}
@@ -105,6 +109,7 @@ func (s *APIV1Service) CreateMemo(ctx context.Context, request *v1pb.CreateMemoR
 		UID:        memoUID,
 		Space:      space,
 		IsTodo:     request.Memo.IsTodo,
+		MCPHidden:  request.Memo.McpHidden,
 		Payload:    &storepb.MemoPayload{ExplicitTags: request.Memo.ExplicitTags, Tags: request.Memo.Tags, Capture: convertMemoCaptureToStore(request.Memo.Capture)},
 		CreatorID:  user.ID,
 		Content:    request.Memo.Content,
@@ -127,6 +132,15 @@ func (s *APIV1Service) CreateMemo(ctx context.Context, request *v1pb.CreateMemoR
 	}
 	if len(create.Content) > contentLengthLimit {
 		return nil, status.Errorf(codes.InvalidArgument, "content too long (max %d characters)", contentLengthLimit)
+	}
+	if mcpaccess.IsRequest(ctx) {
+		_, changed, err := s.sanitizeMCPMemo(ctx, create)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to check references")
+		}
+		if changed {
+			return nil, status.Errorf(codes.PermissionDenied, "protected resource reference")
+		}
 	}
 	if err := memopayload.RebuildMemoPayload(ctx, create, s.MarkdownService); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to rebuild memo payload: %v", err)
@@ -162,7 +176,7 @@ func (s *APIV1Service) CreateMemo(ctx context.Context, request *v1pb.CreateMemoR
 			return nil, errors.Wrap(err, "failed to set memo attachments")
 		}
 
-		a, err := s.Store.ListAttachments(ctx, &store.FindAttachment{
+		a, err := s.Store.ListAttachments(ctx, &store.FindAttachment{ExcludeMCPHidden: mcpaccess.IsRequest(ctx),
 			MemoID: &memo.ID,
 		})
 		if err != nil {
@@ -207,7 +221,7 @@ func (s *APIV1Service) CreateMemo(ctx context.Context, request *v1pb.CreateMemoR
 }
 
 func (s *APIV1Service) ListMemos(ctx context.Context, request *v1pb.ListMemosRequest) (*v1pb.ListMemosResponse, error) {
-	memoFind := &store.FindMemo{
+	memoFind := &store.FindMemo{ExcludeMCPHidden: mcpaccess.IsRequest(ctx),
 		// Exclude comments by default.
 		ExcludeComments: true,
 		IsTodo:          &request.IsTodo,
@@ -282,20 +296,26 @@ func (s *APIV1Service) ListMemos(ctx context.Context, request *v1pb.ListMemosReq
 	limitPlusOne := limit + 1
 	memoFind.Limit = &limitPlusOne
 	memoFind.Offset = &offset
-	memos, err := s.Store.ListMemos(ctx, memoFind)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to list memos: %v", err)
-	}
-
-	memoMessages := []*v1pb.Memo{}
+	var memos []*store.Memo
 	nextPageToken := ""
-	if len(memos) == limitPlusOne {
-		memos = memos[:limit]
-		nextPageToken, err = getPageToken(limit, offset+limit)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to get next page token, error: %v", err)
+	// Filters can inspect content-derived tags, properties and capture snapshots.
+	if mcpaccess.IsRequest(ctx) && request.Filter != "" {
+		var nextOffset int
+		memos, nextOffset, err = s.listMCPFilteredMemos(ctx, memoFind, limit, offset)
+		if err == nil && nextOffset >= 0 {
+			nextPageToken, err = getPageToken(limit, nextOffset)
+		}
+	} else {
+		memos, err = s.Store.ListMemos(ctx, memoFind)
+		if err == nil && len(memos) == limitPlusOne {
+			memos = memos[:limit]
+			nextPageToken, err = getPageToken(limit, offset+limit)
 		}
 	}
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to list memos")
+	}
+	memoMessages := []*v1pb.Memo{}
 
 	if len(memos) == 0 {
 		response := &v1pb.ListMemosResponse{
@@ -326,7 +346,7 @@ func (s *APIV1Service) ListMemos(ctx context.Context, request *v1pb.ListMemosReq
 	}
 
 	// ATTACHMENTS
-	attachments, err := s.Store.ListAttachments(ctx, &store.FindAttachment{MemoIDList: memoIDs})
+	attachments, err := s.Store.ListAttachments(ctx, &store.FindAttachment{ExcludeMCPHidden: mcpaccess.IsRequest(ctx), MemoIDList: memoIDs})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to list attachments")
 	}
@@ -384,7 +404,7 @@ func (s *APIV1Service) GetMemo(ctx context.Context, request *v1pb.GetMemoRequest
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid memo name: %v", err)
 	}
-	memo, err := s.Store.GetMemo(ctx, &store.FindMemo{
+	memo, err := s.Store.GetMemo(ctx, &store.FindMemo{ExcludeMCPHidden: mcpaccess.IsRequest(ctx),
 		UID: &memoUID,
 	})
 	if err != nil {
@@ -398,7 +418,7 @@ func (s *APIV1Service) GetMemo(ctx context.Context, request *v1pb.GetMemoRequest
 		return nil, err
 	}
 	if memo.ParentUID != nil {
-		parentMemo, err := s.Store.GetMemo(ctx, &store.FindMemo{UID: memo.ParentUID})
+		parentMemo, err := s.Store.GetMemo(ctx, &store.FindMemo{ExcludeMCPHidden: mcpaccess.IsRequest(ctx), UID: memo.ParentUID})
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to get parent memo")
 		}
@@ -417,7 +437,7 @@ func (s *APIV1Service) GetMemo(ctx context.Context, request *v1pb.GetMemoRequest
 		return nil, status.Errorf(codes.Internal, "failed to list reactions")
 	}
 
-	attachments, err := s.Store.ListAttachments(ctx, &store.FindAttachment{
+	attachments, err := s.Store.ListAttachments(ctx, &store.FindAttachment{ExcludeMCPHidden: mcpaccess.IsRequest(ctx),
 		MemoID: &memo.ID,
 	})
 	if err != nil {
@@ -440,6 +460,9 @@ func (s *APIV1Service) GetMemo(ctx context.Context, request *v1pb.GetMemoRequest
 
 // UpdateMemo updates an existing memo.
 func (s *APIV1Service) UpdateMemo(ctx context.Context, request *v1pb.UpdateMemoRequest) (*v1pb.Memo, error) {
+	if mcpaccess.IsRequest(ctx) && request.GetMemo().GetMcpHidden() {
+		return nil, status.Errorf(codes.PermissionDenied, "MCP cannot change privacy")
+	}
 	if request.Memo == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "memo is required")
 	}
@@ -451,12 +474,15 @@ func (s *APIV1Service) UpdateMemo(ctx context.Context, request *v1pb.UpdateMemoR
 		return nil, status.Errorf(codes.InvalidArgument, "update mask is required")
 	}
 	for _, path := range request.UpdateMask.Paths {
+		if mcpaccess.IsRequest(ctx) && path == "mcp_hidden" {
+			return nil, status.Errorf(codes.PermissionDenied, "MCP cannot change privacy")
+		}
 		if path == "capture" || strings.HasPrefix(path, "capture.") {
 			return nil, status.Errorf(codes.InvalidArgument, "capture snapshots cannot be changed")
 		}
 	}
 
-	memo, err := s.Store.GetMemo(ctx, &store.FindMemo{UID: &memoUID})
+	memo, err := s.Store.GetMemo(ctx, &store.FindMemo{ExcludeMCPHidden: mcpaccess.IsRequest(ctx), UID: &memoUID})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get memo: %v", err)
 	}
@@ -476,6 +502,9 @@ func (s *APIV1Service) UpdateMemo(ctx context.Context, request *v1pb.UpdateMemoR
 		return nil, status.Errorf(codes.PermissionDenied, "permission denied")
 	}
 
+	if err := s.checkMCPMemoReplacement(ctx, memo, request.UpdateMask.Paths); err != nil {
+		return nil, err
+	}
 	update := &store.UpdateMemo{
 		ID: memo.ID,
 	}
@@ -492,6 +521,17 @@ func (s *APIV1Service) UpdateMemo(ctx context.Context, request *v1pb.UpdateMemoR
 			}
 			if len(request.Memo.Content) > contentLengthLimit {
 				return nil, status.Errorf(codes.InvalidArgument, "content too long (max %d characters)", contentLengthLimit)
+			}
+			if mcpaccess.IsRequest(ctx) {
+				candidate := *memo
+				candidate.Content = request.Memo.Content
+				_, changed, err := s.sanitizeMCPMemo(ctx, &candidate)
+				if err != nil {
+					return nil, status.Errorf(codes.Internal, "failed to check references")
+				}
+				if changed {
+					return nil, status.Errorf(codes.PermissionDenied, "protected resource reference")
+				}
 			}
 			memo.Content = request.Memo.Content
 			if err := memopayload.RebuildMemoPayload(ctx, memo, s.MarkdownService); err != nil {
@@ -511,7 +551,7 @@ func (s *APIV1Service) UpdateMemo(ctx context.Context, request *v1pb.UpdateMemoR
 		} else if path == "visibility" {
 			visibility := convertVisibilityToStore(request.Memo.Visibility)
 			if memo.ParentUID != nil {
-				parentMemo, err := s.Store.GetMemo(ctx, &store.FindMemo{UID: memo.ParentUID})
+				parentMemo, err := s.Store.GetMemo(ctx, &store.FindMemo{ExcludeMCPHidden: mcpaccess.IsRequest(ctx), UID: memo.ParentUID})
 				if err != nil {
 					return nil, status.Errorf(codes.Internal, "failed to get parent memo")
 				}
@@ -521,6 +561,8 @@ func (s *APIV1Service) UpdateMemo(ctx context.Context, request *v1pb.UpdateMemoR
 				visibility = parentMemo.Visibility
 			}
 			update.Visibility = &visibility
+		} else if path == "mcp_hidden" {
+			update.MCPHidden = &request.Memo.McpHidden
 		} else if path == "pinned" {
 			update.Pinned = &request.Memo.Pinned
 		} else if path == "state" {
@@ -584,7 +626,7 @@ func (s *APIV1Service) DeleteMemo(ctx context.Context, request *v1pb.DeleteMemoR
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid memo name: %v", err)
 	}
-	memo, err := s.Store.GetMemo(ctx, &store.FindMemo{
+	memo, err := s.Store.GetMemo(ctx, &store.FindMemo{ExcludeMCPHidden: mcpaccess.IsRequest(ctx),
 		UID: &memoUID,
 	})
 	if err != nil {
@@ -606,6 +648,10 @@ func (s *APIV1Service) DeleteMemo(ctx context.Context, request *v1pb.DeleteMemoR
 		return nil, status.Errorf(codes.PermissionDenied, "permission denied")
 	}
 
+	if err := s.checkMCPDeleteImpact(ctx, memo); err != nil {
+		return nil, err
+	}
+
 	reactions, err := s.Store.ListReactions(ctx, &store.FindReaction{
 		ContentID: &request.Name,
 	})
@@ -613,7 +659,7 @@ func (s *APIV1Service) DeleteMemo(ctx context.Context, request *v1pb.DeleteMemoR
 		return nil, status.Errorf(codes.Internal, "failed to list reactions")
 	}
 
-	attachments, err := s.Store.ListAttachments(ctx, &store.FindAttachment{
+	attachments, err := s.Store.ListAttachments(ctx, &store.FindAttachment{ExcludeMCPHidden: mcpaccess.IsRequest(ctx),
 		MemoID: &memo.ID,
 	})
 	if err != nil {
@@ -630,7 +676,7 @@ func (s *APIV1Service) DeleteMemo(ctx context.Context, request *v1pb.DeleteMemoR
 
 	// Delete memo comments first (store.DeleteMemo handles their relations and attachments)
 	commentType := store.MemoRelationComment
-	relations, err := s.Store.ListMemoRelations(ctx, &store.FindMemoRelation{RelatedMemoID: &memo.ID, Type: &commentType})
+	relations, err := s.Store.ListMemoRelations(ctx, &store.FindMemoRelation{ExcludeMCPHidden: mcpaccess.IsRequest(ctx), RelatedMemoID: &memo.ID, Type: &commentType})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to list memo comments")
 	}

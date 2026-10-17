@@ -40,6 +40,9 @@ func (d *DB) UpsertMemoRelation(ctx context.Context, create *store.MemoRelation)
 
 func (d *DB) ListMemoRelations(ctx context.Context, find *store.FindMemoRelation) ([]*store.MemoRelation, error) {
 	where, args := []string{"1 = 1"}, []any{}
+	if find.ExcludeMCPHidden {
+		where = append(where, "memo_id NOT IN (SELECT id FROM mcp_hidden_memos) AND related_memo_id NOT IN (SELECT id FROM mcp_hidden_memos)")
+	}
 	if find.MemoID != nil {
 		where, args = append(where, "memo_id = "+placeholder(len(args)+1)), append(args, *find.MemoID)
 	}
@@ -117,6 +120,9 @@ func (d *DB) ListMemoRelations(ctx context.Context, find *store.FindMemoRelation
 		FROM memo_relation
 		WHERE ` + strings.Join(where, " AND ") + `
 		ORDER BY memo_id DESC`
+	if find.ExcludeMCPHidden {
+		query = store.MCPHiddenMemoCTE + query
+	}
 	if find.Limit != nil {
 		query = fmt.Sprintf("%s LIMIT %d", query, *find.Limit)
 		if find.Offset != nil {

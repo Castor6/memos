@@ -67,9 +67,9 @@ func EnqueueMemoLinks(ctx context.Context, tx *sql.Tx, dialect, content string) 
 }
 
 func enqueueLinkMetadata(ctx context.Context, db linkMetadataExecutor, dialect, url string, memoLink bool) error {
-	expires := time.Now().Add(linkMetadataPreviewWindow).Unix()
+	expiresSeconds := time.Now().Add(linkMetadataPreviewWindow).Unix()
 	if memoLink {
-		expires = 0
+		expiresSeconds = 0
 	}
 	query := "INSERT INTO link_metadata_job (url_hash, url, expires_ts) SELECT ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM link_metadata WHERE url_hash = ?)"
 	if dialect == "mysql" {
@@ -85,14 +85,14 @@ func enqueueLinkMetadata(ctx context.Context, db linkMetadataExecutor, dialect, 
 			query += "NOTHING"
 		}
 	}
-	_, err := db.ExecContext(ctx, linkMetadataSQL(dialect, query), linkKey(url), url, expires, linkKey(url))
+	_, err := db.ExecContext(ctx, linkMetadataSQL(dialect, query), linkKey(url), url, expiresSeconds, linkKey(url))
 	return errors.Wrap(err, "enqueue link preview")
 }
 
 func (s *Store) pruneTemporaryLinkMetadata(ctx context.Context, url string) error {
-	now := time.Now().Unix()
+	nowSeconds := time.Now().Unix()
 	condition := "expires_ts > 0 AND expires_ts <= ? AND lease_until <= ?"
-	args := []any{now, now}
+	args := []any{nowSeconds, nowSeconds}
 	if url != "" {
 		condition += " AND url_hash = ?"
 		args = append(args, linkKey(url))
@@ -100,7 +100,7 @@ func (s *Store) pruneTemporaryLinkMetadata(ctx context.Context, url string) erro
 		// Select a bounded indexed batch, then recheck expiry and the lease when
 		// deleting so concurrent memo registration or API claims are preserved.
 		query := "SELECT url_hash FROM link_metadata_job WHERE " + condition + " ORDER BY expires_ts, next_attempt_ts, url_hash LIMIT ?"
-		rows, err := s.driver.GetDB().QueryContext(ctx, linkMetadataSQL(s.profile.Driver, query), now, now, linkMetadataPruneBatchSize)
+		rows, err := s.driver.GetDB().QueryContext(ctx, linkMetadataSQL(s.profile.Driver, query), nowSeconds, nowSeconds, linkMetadataPruneBatchSize)
 		if err != nil {
 			return errors.Wrap(err, "list expired temporary link previews")
 		}
@@ -192,8 +192,8 @@ func (s *Store) FetchLinkMetadata(ctx context.Context, url string, fetch func(co
 		if err != nil {
 			return nil, errors.Wrap(err, "read link preview job")
 		}
-		now := time.Now().Unix()
-		if job.LeaseUntil > now {
+		nowSeconds := time.Now().Unix()
+		if job.LeaseUntil > nowSeconds {
 			timer := time.NewTimer(50 * time.Millisecond)
 			select {
 			case <-ctx.Done():
@@ -203,12 +203,12 @@ func (s *Store) FetchLinkMetadata(ctx context.Context, url string, fetch func(co
 			}
 			continue
 		}
-		if job.NextAttempt > now {
+		if job.NextAttempt > nowSeconds {
 			return nil, ErrLinkMetadataDeferred
 		}
 		job.LeaseToken = rand.Text()
 		query = "UPDATE link_metadata_job SET attempts = CASE WHEN attempts < 31 THEN attempts + 1 ELSE 31 END, lease_token = ?, lease_until = ?, next_attempt_ts = ? WHERE url_hash = ? AND next_attempt_ts <= ? AND lease_until <= ?"
-		result, err := s.driver.GetDB().ExecContext(ctx, linkMetadataSQL(s.profile.Driver, query), job.LeaseToken, now+int64(linkMetadataLease/time.Second), now+int64(linkMetadataLease/time.Second), linkKey(url), now, now)
+		result, err := s.driver.GetDB().ExecContext(ctx, linkMetadataSQL(s.profile.Driver, query), job.LeaseToken, nowSeconds+int64(linkMetadataLease/time.Second), nowSeconds+int64(linkMetadataLease/time.Second), linkKey(url), nowSeconds, nowSeconds)
 		if err != nil {
 			return nil, errors.Wrap(err, "claim link preview")
 		}

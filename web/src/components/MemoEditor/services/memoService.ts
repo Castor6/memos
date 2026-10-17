@@ -42,6 +42,11 @@ function buildUpdateMask(
     mask.add("visibility");
     patch.visibility = state.metadata.visibility;
   }
+  const mcpHidden = state.metadata.mcpHidden ?? false;
+  if (mcpHidden !== (state.metadata.initialMcpHidden ?? false) && mcpHidden !== prevMemo.mcpHidden) {
+    mask.add("mcp_hidden");
+    patch.mcpHidden = mcpHidden;
+  }
   if (!isEqual(allAttachments, prevMemo.attachments)) {
     mask.add("attachments");
     patch.attachments = toAttachmentReferences(allAttachments);
@@ -128,6 +133,7 @@ export const memoService = {
       explicitTags: true,
       space: getActiveSpace(),
       isTodo: state.metadata.isTodo ?? false,
+      mcpHidden: state.metadata.mcpHidden ?? false,
       visibility: state.metadata.visibility,
       attachments: toAttachmentReferences(allAttachments),
       relations: state.metadata.relations,
@@ -179,6 +185,8 @@ ${fileMarkdown(getAttachmentUrl(attachment), FILE_TITLE + attachment.type, attac
       metadata: {
         tags: memo.tags,
         isTodo: memo.isTodo,
+        mcpHidden: memo.mcpHidden,
+        initialMcpHidden: memo.mcpHidden,
         visibility: memo.visibility,
         attachments: memo.attachments,
         relations: memo.relations,

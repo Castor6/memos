@@ -412,6 +412,7 @@ func (s *APIV1Service) importArchiveMemo(ctx context.Context, user *store.User, 
 	memo := &v1pb.Memo{Content: content, Tags: record.Tags, ExplicitTags: true, Visibility: v1pb.Visibility_PRIVATE, CreateTime: timestamppb.New(time.Unix(created, 0)), UpdateTime: timestamppb.New(time.Unix(updated, 0)), Attachments: attachments}
 	if record.Castor != nil {
 		memo.IsTodo = record.Castor.IsTodo
+		memo.McpHidden = record.Castor.MCPHidden
 		memo.ExplicitTags = record.Castor.ExplicitTags
 	}
 	if record.Location != nil {

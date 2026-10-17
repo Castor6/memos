@@ -6,12 +6,15 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/labstack/echo/v5"
 	sdkmcp "github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/require"
+
+	"github.com/usememos/memos/internal/mcpaccess"
 )
 
 func TestNormalizeStructuredContentKeepsObjects(t *testing.T) {
@@ -339,4 +342,20 @@ func TestExecuteOperationConvertsAPIErrorsToToolErrors(t *testing.T) {
 	require.True(t, ok)
 	require.Contains(t, text.Text, "404")
 	require.Contains(t, text.Text, "missing memo")
+}
+
+func TestAdapterMarksOnlyInternalMCPRequests(t *testing.T) {
+	server := echo.New()
+	server.GET("/api/v1/probe", func(c *echo.Context) error {
+		return c.JSON(http.StatusOK, map[string]any{"mcp": mcpaccess.IsRequest(c.Request().Context())})
+	})
+	operation := &openAPIOperation{Method: http.MethodGet, Path: "/api/v1/probe"}
+	result, err := newAPIAdapter(server).execute(context.Background(), operation, nil, "")
+	require.NoError(t, err)
+	require.Equal(t, true, result.StructuredContent.(map[string]any)["mcp"])
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/probe", nil)
+	req.Header.Set("X-MCP-Request", "true")
+	recorder := httptest.NewRecorder()
+	server.ServeHTTP(recorder, req)
+	require.JSONEq(t, `{"mcp":false}`, recorder.Body.String())
 }

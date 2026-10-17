@@ -42,20 +42,21 @@ type Attachment struct {
 }
 
 type FindAttachment struct {
-	Space          *string
-	GetBlob        bool
-	ID             *int32
-	UID            *string
-	CreatorID      *int32
-	Filename       *string
-	FilenameSearch *string
-	MemoID         *int32
-	MemoIDList     []int32
-	HasRelatedMemo bool
-	StorageType    *storepb.AttachmentStorageType
-	Filters        []string
-	Limit          *int
-	Offset         *int
+	Space            *string
+	GetBlob          bool
+	ID               *int32
+	UID              *string
+	CreatorID        *int32
+	Filename         *string
+	FilenameSearch   *string
+	MemoID           *int32
+	MemoIDList       []int32
+	HasRelatedMemo   bool
+	ExcludeMCPHidden bool
+	StorageType      *storepb.AttachmentStorageType
+	Filters          []string
+	Limit            *int
+	Offset           *int
 }
 
 type UpdateAttachment struct {

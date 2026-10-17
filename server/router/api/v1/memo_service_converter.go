@@ -11,6 +11,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/usememos/memos/internal/linkmetadata"
+	"github.com/usememos/memos/internal/mcpaccess"
 	v1pb "github.com/usememos/memos/proto/gen/api/v1"
 	storepb "github.com/usememos/memos/proto/gen/store"
 	"github.com/usememos/memos/store"
@@ -30,6 +31,11 @@ func (s *APIV1Service) convertMemoFromStore(ctx context.Context, memo *store.Mem
 }
 
 func (s *APIV1Service) convertMemoFromStoreWithCreators(ctx context.Context, memo *store.Memo, reactions []*store.Reaction, attachments []*store.Attachment, relations []*v1pb.MemoRelation, creatorMap map[int32]*store.User) (*v1pb.Memo, error) {
+	var err error
+	memo, _, err = s.sanitizeMCPMemo(ctx, memo)
+	if err != nil {
+		return nil, err
+	}
 	name := fmt.Sprintf("%s%s", MemoNamePrefix, memo.UID)
 	creator := creatorMap[memo.CreatorID]
 	if creator == nil {
@@ -44,6 +50,7 @@ func (s *APIV1Service) convertMemoFromStoreWithCreators(ctx context.Context, mem
 		Content:    memo.Content,
 		Visibility: convertVisibilityFromStore(memo.Visibility),
 		Pinned:     memo.Pinned,
+		McpHidden:  memo.MCPHidden,
 		Space:      memo.Space,
 		IsTodo:     memo.IsTodo,
 	}
@@ -216,14 +223,14 @@ func (s *APIV1Service) batchConvertMemoRelations(ctx context.Context, memos []*s
 		memoIDSet[m.ID] = true
 	}
 
-	outgoingRelations, err := s.Store.ListMemoRelations(ctx, &store.FindMemoRelation{
+	outgoingRelations, err := s.Store.ListMemoRelations(ctx, &store.FindMemoRelation{ExcludeMCPHidden: mcpaccess.IsRequest(ctx),
 		SourceMemoIDList: memoIDs,
 		MemoFilter:       &memoFilter,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to batch list outgoing memo relations")
 	}
-	incomingRelations, err := s.Store.ListMemoRelations(ctx, &store.FindMemoRelation{
+	incomingRelations, err := s.Store.ListMemoRelations(ctx, &store.FindMemoRelation{ExcludeMCPHidden: mcpaccess.IsRequest(ctx),
 		RelatedMemoIDList: memoIDs,
 		MemoFilter:        &memoFilter,
 	})
@@ -243,6 +250,10 @@ func (s *APIV1Service) batchConvertMemoRelations(ctx context.Context, memos []*s
 	memoIDToUID := make(map[int32]string, len(memos))
 	memoIDToSnippet := make(map[int32]string, len(memos))
 	for _, m := range memos {
+		m, _, err = s.sanitizeMCPMemo(ctx, m)
+		if err != nil {
+			return nil, err
+		}
 		memoIDToUID[m.ID] = m.UID
 		if includeSnippets {
 			snippet, err := s.getMemoContentSnippet(m.Content)
@@ -260,12 +271,16 @@ func (s *APIV1Service) batchConvertMemoRelations(ctx context.Context, memos []*s
 		for id := range neededIDs {
 			extraIDs = append(extraIDs, id)
 		}
-		extraFind := &store.FindMemo{IDList: extraIDs, ExcludeContent: !includeSnippets}
+		extraFind := &store.FindMemo{ExcludeMCPHidden: mcpaccess.IsRequest(ctx), IDList: extraIDs, ExcludeContent: !includeSnippets}
 		extraMemos, err := s.Store.ListMemos(ctx, extraFind)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to batch fetch related memos")
 		}
 		for _, m := range extraMemos {
+			m, _, err = s.sanitizeMCPMemo(ctx, m)
+			if err != nil {
+				return nil, err
+			}
 			memoIDToUID[m.ID] = m.UID
 			if includeSnippets {
 				snippet, err := s.getMemoContentSnippet(m.Content)

@@ -14,8 +14,8 @@ import (
 )
 
 func (d *DB) CreateMemo(ctx context.Context, create *store.Memo) (*store.Memo, error) {
-	fields := []string{"`uid`", "`creator_id`", "`content`", "`visibility`", "`payload`", "`space`", "`is_todo`"}
-	placeholder := []string{"?", "?", "?", "?", "?", "?", "?"}
+	fields := []string{"`uid`", "`creator_id`", "`content`", "`visibility`", "`payload`", "`space`", "`is_todo`", "`mcp_hidden`"}
+	placeholder := []string{"?", "?", "?", "?", "?", "?", "?", "?"}
 	payload := "{}"
 	if create.Payload != nil {
 		payloadBytes, err := protojson.Marshal(create.Payload)
@@ -24,7 +24,7 @@ func (d *DB) CreateMemo(ctx context.Context, create *store.Memo) (*store.Memo, e
 		}
 		payload = string(payloadBytes)
 	}
-	args := []any{create.UID, create.CreatorID, create.Content, create.Visibility, payload, create.Space, create.IsTodo}
+	args := []any{create.UID, create.CreatorID, create.Content, create.Visibility, payload, create.Space, create.IsTodo, create.MCPHidden}
 
 	// Add custom timestamps if provided
 	if create.CreatedTs != 0 {
@@ -70,6 +70,10 @@ func buildMemoQuery(ctx context.Context, find *store.FindMemo) (string, []any, e
 	}
 	if v := find.IsTodo; v != nil {
 		where, args = append(where, "`memo`.`is_todo` = ?"), append(args, *v)
+	}
+
+	if find.ExcludeMCPHidden {
+		where = append(where, "memo.id NOT IN (SELECT id FROM mcp_hidden_memos)")
 	}
 
 	engine, err := filter.DefaultEngine()
@@ -150,6 +154,7 @@ func buildMemoQuery(ctx context.Context, find *store.FindMemo) (string, []any, e
 		"`memo`.`payload` AS `payload`",
 		"`memo`.`space` AS `space`",
 		"`memo`.`is_todo` AS `is_todo`",
+		"`memo`.`mcp_hidden` AS `mcp_hidden`",
 		"CASE WHEN `parent_memo`.`uid` IS NOT NULL THEN `parent_memo`.`uid` ELSE NULL END AS `parent_uid`",
 	}
 	if !find.ExcludeContent {
@@ -162,6 +167,9 @@ func buildMemoQuery(ctx context.Context, find *store.FindMemo) (string, []any, e
 		"LEFT JOIN `memo` AS `parent_memo` ON `memo_relation`.`related_memo_id` = `parent_memo`.`id` " +
 		"WHERE " + strings.Join(where, " AND ") + " " +
 		"ORDER BY " + strings.Join(orderBy, ", ")
+	if find.ExcludeMCPHidden {
+		query = store.MCPHiddenMemoCTE + query
+	}
 	if find.Limit != nil {
 		query = fmt.Sprintf("%s LIMIT %d", query, *find.Limit)
 		if find.Offset != nil {
@@ -199,6 +207,7 @@ func (d *DB) ListMemos(ctx context.Context, find *store.FindMemo) ([]*store.Memo
 			&payloadBytes,
 			&memo.Space,
 			&memo.IsTodo,
+			&memo.MCPHidden,
 			&memo.ParentUID,
 		}
 		if !find.ExcludeContent {
@@ -244,6 +253,9 @@ func (d *DB) UpdateMemo(ctx context.Context, update *store.UpdateMemo) error {
 	}
 	if v := update.Pinned; v != nil {
 		set, args = append(set, "`pinned` = ?"), append(args, *v)
+	}
+	if v := update.MCPHidden; v != nil {
+		set, args = append(set, "`mcp_hidden` = ?"), append(args, *v)
 	}
 	if v := update.Payload; v != nil {
 		payloadBytes, err := protojson.Marshal(v)

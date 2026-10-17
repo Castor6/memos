@@ -11,6 +11,7 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/usememos/memos/internal/mcpaccess"
 	v1pb "github.com/usememos/memos/proto/gen/api/v1"
 	storepb "github.com/usememos/memos/proto/gen/store"
 	"github.com/usememos/memos/store"
@@ -22,7 +23,7 @@ func (s *APIV1Service) CreateMemoComment(ctx context.Context, request *v1pb.Crea
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid memo name: %v", err)
 	}
-	relatedMemo, err := s.Store.GetMemo(ctx, &store.FindMemo{UID: &memoUID})
+	relatedMemo, err := s.Store.GetMemo(ctx, &store.FindMemo{ExcludeMCPHidden: mcpaccess.IsRequest(ctx), UID: &memoUID})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get memo")
 	}
@@ -67,7 +68,7 @@ func (s *APIV1Service) CreateMemoComment(ctx context.Context, request *v1pb.Crea
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid memo name: %v", err)
 	}
-	memo, err := s.Store.GetMemo(ctx, &store.FindMemo{UID: &memoUID})
+	memo, err := s.Store.GetMemo(ctx, &store.FindMemo{ExcludeMCPHidden: mcpaccess.IsRequest(ctx), UID: &memoUID})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get memo")
 	}
@@ -144,7 +145,7 @@ func (s *APIV1Service) ListMemoComments(ctx context.Context, request *v1pb.ListM
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid memo name: %v", err)
 	}
-	memo, err := s.Store.GetMemo(ctx, &store.FindMemo{UID: &memoUID})
+	memo, err := s.Store.GetMemo(ctx, &store.FindMemo{ExcludeMCPHidden: mcpaccess.IsRequest(ctx), UID: &memoUID})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get memo")
 	}
@@ -178,7 +179,7 @@ func (s *APIV1Service) ListMemoComments(ctx context.Context, request *v1pb.ListM
 		limit = normalizePageSize(request.PageSize)
 	}
 	limitPlusOne := limit + 1
-	memoRelations, err := s.Store.ListMemoRelations(ctx, &store.FindMemoRelation{
+	memoRelations, err := s.Store.ListMemoRelations(ctx, &store.FindMemoRelation{ExcludeMCPHidden: mcpaccess.IsRequest(ctx),
 		RelatedMemoID: &memo.ID,
 		Type:          &memoRelationComment,
 		MemoFilter:    &memoFilter,
@@ -210,7 +211,7 @@ func (s *APIV1Service) ListMemoComments(ctx context.Context, request *v1pb.ListM
 	for _, m := range memoRelations {
 		memoRelationIDs = append(memoRelationIDs, m.MemoID)
 	}
-	memos, err := s.Store.ListMemos(ctx, &store.FindMemo{IDList: memoRelationIDs})
+	memos, err := s.Store.ListMemos(ctx, &store.FindMemo{ExcludeMCPHidden: mcpaccess.IsRequest(ctx), IDList: memoRelationIDs})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to list memos")
 	}
@@ -235,7 +236,7 @@ func (s *APIV1Service) ListMemoComments(ctx context.Context, request *v1pb.ListM
 		memoReactionsMap[reaction.ContentID] = append(memoReactionsMap[reaction.ContentID], reaction)
 	}
 
-	attachments, err := s.Store.ListAttachments(ctx, &store.FindAttachment{MemoIDList: memoIDsForAttachments})
+	attachments, err := s.Store.ListAttachments(ctx, &store.FindAttachment{ExcludeMCPHidden: mcpaccess.IsRequest(ctx), MemoIDList: memoIDsForAttachments})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to list attachments")
 	}

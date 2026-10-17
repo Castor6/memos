@@ -20,11 +20,11 @@ export function splitTemplateTokens(text: string): string[] {
  * description second, provenance last. Tags in the capture workspace are independent;
  * literal #tags in templates remain body text. Empty-variable lines drop cleanly.
  */
-export const DEFAULT_TEMPLATE = `{{content}}
+export const DEFAULT_CONTENT_TEMPLATE = `{{content}}
 
-{{description}}
-
-[{{title}}]({{url}})`;
+{{description}}`;
+export const SOURCE_LINK_TEMPLATE = "[{{title}}]({{url}})";
+export const DEFAULT_TEMPLATE = `${DEFAULT_CONTENT_TEMPLATE}\n\n${SOURCE_LINK_TEMPLATE}`;
 
 export function renderTemplate(template: string, vars: Record<string, string | undefined>): string {
   const rendered = template

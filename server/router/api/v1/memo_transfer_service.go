@@ -107,7 +107,7 @@ func (s *APIV1Service) ExportMemoArchive(ctx context.Context, _ *v1pb.ExportMemo
 			UID: memo.UID, Creator: user.Username, CreateTime: memoexport.FormatTime(memo.CreatedTs),
 			UpdateTime: memoexport.FormatTime(memo.UpdatedTs), State: string(memo.RowStatus), Visibility: string(memo.Visibility),
 			Pinned: memo.Pinned, Tags: memo.Payload.GetTags(),
-			Castor: &memoexport.PersonalMemo{Version: 1, Space: memo.Space, IsTodo: memo.IsTodo, ExplicitTags: memo.Payload.GetExplicitTags()},
+			Castor: &memoexport.PersonalMemo{Version: 1, Space: memo.Space, IsTodo: memo.IsTodo, ExplicitTags: memo.Payload.GetExplicitTags(), MCPHidden: memo.MCPHidden},
 		}
 		if loc := memo.Payload.GetLocation(); loc != nil {
 			record.Location = &memoexport.Location{Placeholder: loc.Placeholder, Latitude: loc.Latitude, Longitude: loc.Longitude}

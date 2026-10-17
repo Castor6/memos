@@ -8,6 +8,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
+	"github.com/usememos/memos/internal/mcpaccess"
 	v1pb "github.com/usememos/memos/proto/gen/api/v1"
 	"github.com/usememos/memos/store"
 )
@@ -24,7 +25,7 @@ func (s *APIV1Service) SetMemoAttachments(ctx context.Context, request *v1pb.Set
 }
 
 func (s *APIV1Service) prepareMemoAttachmentIDs(ctx context.Context, user *store.User, memo *store.Memo, requestAttachments []*v1pb.Attachment) ([]int32, error) {
-	currentAttachments, err := s.Store.ListAttachments(ctx, &store.FindAttachment{MemoID: &memo.ID})
+	currentAttachments, err := s.Store.ListAttachments(ctx, &store.FindAttachment{ExcludeMCPHidden: mcpaccess.IsRequest(ctx), MemoID: &memo.ID})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to list attachments")
 	}
@@ -71,7 +72,7 @@ func (s *APIV1Service) normalizeMemoAttachmentRequest(
 		if err != nil {
 			return nil, status.Errorf(codes.InvalidArgument, "invalid attachment name: %v", err)
 		}
-		attachment, err := s.Store.GetAttachment(ctx, &store.FindAttachment{UID: &attachmentUID})
+		attachment, err := s.Store.GetAttachment(ctx, &store.FindAttachment{ExcludeMCPHidden: mcpaccess.IsRequest(ctx), UID: &attachmentUID})
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to get attachment: %v", err)
 		}
@@ -162,7 +163,7 @@ func (s *APIV1Service) ListMemoAttachments(ctx context.Context, request *v1pb.Li
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid memo name: %v", err)
 	}
-	memo, err := s.Store.GetMemo(ctx, &store.FindMemo{UID: &memoUID})
+	memo, err := s.Store.GetMemo(ctx, &store.FindMemo{ExcludeMCPHidden: mcpaccess.IsRequest(ctx), UID: &memoUID})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get memo: %v", err)
 	}
@@ -184,7 +185,7 @@ func (s *APIV1Service) ListMemoAttachments(ctx context.Context, request *v1pb.Li
 		}
 	}
 
-	attachments, err := s.Store.ListAttachments(ctx, &store.FindAttachment{
+	attachments, err := s.Store.ListAttachments(ctx, &store.FindAttachment{ExcludeMCPHidden: mcpaccess.IsRequest(ctx),
 		MemoID: &memo.ID,
 	})
 	if err != nil {

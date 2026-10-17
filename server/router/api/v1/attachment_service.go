@@ -19,6 +19,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/usememos/memos/internal/filter"
+	"github.com/usememos/memos/internal/mcpaccess"
 	v1pb "github.com/usememos/memos/proto/gen/api/v1"
 	storepb "github.com/usememos/memos/proto/gen/store"
 	"github.com/usememos/memos/store"
@@ -124,7 +125,7 @@ func (s *APIV1Service) prepareAttachment(ctx context.Context, request *v1pb.Crea
 		if err != nil {
 			return nil, status.Errorf(codes.InvalidArgument, "invalid memo name: %v", err)
 		}
-		memo, err := s.Store.GetMemo(ctx, &store.FindMemo{UID: &memoUID})
+		memo, err := s.Store.GetMemo(ctx, &store.FindMemo{ExcludeMCPHidden: mcpaccess.IsRequest(ctx), UID: &memoUID})
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to find memo: %v", err)
 		}
@@ -273,7 +274,7 @@ func (s *APIV1Service) ListAttachments(ctx context.Context, request *v1pb.ListAt
 		}
 	}
 
-	findAttachment := &store.FindAttachment{
+	findAttachment := &store.FindAttachment{ExcludeMCPHidden: mcpaccess.IsRequest(ctx),
 		CreatorID: &user.ID,
 		Limit:     &pageSize,
 		Offset:    &offset,
@@ -311,7 +312,7 @@ func (s *APIV1Service) GetAttachment(ctx context.Context, request *v1pb.GetAttac
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid attachment id: %v", err)
 	}
-	attachment, err := s.Store.GetAttachment(ctx, &store.FindAttachment{UID: &attachmentUID})
+	attachment, err := s.Store.GetAttachment(ctx, &store.FindAttachment{ExcludeMCPHidden: mcpaccess.IsRequest(ctx), UID: &attachmentUID})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get attachment: %v", err)
 	}
@@ -342,7 +343,7 @@ func (s *APIV1Service) UpdateAttachment(ctx context.Context, request *v1pb.Updat
 	if user == nil {
 		return nil, status.Errorf(codes.Unauthenticated, "user not authenticated")
 	}
-	attachment, err := s.Store.GetAttachment(ctx, &store.FindAttachment{UID: &attachmentUID})
+	attachment, err := s.Store.GetAttachment(ctx, &store.FindAttachment{ExcludeMCPHidden: mcpaccess.IsRequest(ctx), UID: &attachmentUID})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get attachment: %v", err)
 	}
@@ -388,7 +389,7 @@ func (s *APIV1Service) DeleteAttachment(ctx context.Context, request *v1pb.Delet
 	if user == nil {
 		return nil, status.Errorf(codes.Unauthenticated, "user not authenticated")
 	}
-	attachment, err := s.Store.GetAttachment(ctx, &store.FindAttachment{
+	attachment, err := s.Store.GetAttachment(ctx, &store.FindAttachment{ExcludeMCPHidden: mcpaccess.IsRequest(ctx),
 		UID:       &attachmentUID,
 		CreatorID: &user.ID,
 	})
@@ -437,7 +438,7 @@ func (s *APIV1Service) BatchDeleteAttachments(ctx context.Context, request *v1pb
 		if err != nil {
 			return nil, status.Errorf(codes.InvalidArgument, "invalid attachment id: %v", err)
 		}
-		attachment, err := s.Store.GetAttachment(ctx, &store.FindAttachment{UID: &attachmentUID})
+		attachment, err := s.Store.GetAttachment(ctx, &store.FindAttachment{ExcludeMCPHidden: mcpaccess.IsRequest(ctx), UID: &attachmentUID})
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to get attachment: %v", err)
 		}
@@ -501,7 +502,7 @@ func (s *APIV1Service) checkAttachmentAccess(ctx context.Context, attachment *st
 	}
 
 	// For linked attachments, check memo visibility.
-	memo, err := s.Store.GetMemo(ctx, &store.FindMemo{ID: attachment.MemoID})
+	memo, err := s.Store.GetMemo(ctx, &store.FindMemo{ExcludeMCPHidden: mcpaccess.IsRequest(ctx), ID: attachment.MemoID})
 	if err != nil {
 		return status.Errorf(codes.Internal, "failed to get memo: %v", err)
 	}

@@ -127,6 +127,9 @@ const MemoView: React.FC<MemoViewProps> = (props: MemoViewProps) => {
       tabIndex={readonly ? -1 : 0}
       {...contextMenu.handlers}
     >
+      {showPinned && memoData.pinned && (
+        <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-0 w-[3px] rounded-l-lg bg-primary" />
+      )}
       <MemoHeader
         showCreator={showCreator}
         showVisibility={showVisibility}

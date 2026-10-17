@@ -145,6 +145,9 @@ func (s *Store) updateMemoTx(ctx context.Context, tx *sql.Tx, update *UpdateMemo
 	if update.Pinned != nil {
 		add("pinned", "?", *update.Pinned)
 	}
+	if update.MCPHidden != nil {
+		add("mcp_hidden", "?", *update.MCPHidden)
+	}
 	if update.Payload != nil {
 		payload, err := protojson.Marshal(update.Payload)
 		if err != nil {

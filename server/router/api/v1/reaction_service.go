@@ -8,6 +8,7 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
+	"github.com/usememos/memos/internal/mcpaccess"
 	v1pb "github.com/usememos/memos/proto/gen/api/v1"
 	"github.com/usememos/memos/store"
 )
@@ -18,7 +19,7 @@ func (s *APIV1Service) ListMemoReactions(ctx context.Context, request *v1pb.List
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid memo name: %v", err)
 	}
-	memo, err := s.Store.GetMemo(ctx, &store.FindMemo{UID: &memoUID})
+	memo, err := s.Store.GetMemo(ctx, &store.FindMemo{ExcludeMCPHidden: mcpaccess.IsRequest(ctx), UID: &memoUID})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get memo: %v", err)
 	}
@@ -71,7 +72,7 @@ func (s *APIV1Service) UpsertMemoReaction(ctx context.Context, request *v1pb.Ups
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid memo name: %v", err)
 	}
-	memo, err := s.Store.GetMemo(ctx, &store.FindMemo{UID: &memoUID})
+	memo, err := s.Store.GetMemo(ctx, &store.FindMemo{ExcludeMCPHidden: mcpaccess.IsRequest(ctx), UID: &memoUID})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get memo: %v", err)
 	}
@@ -101,7 +102,7 @@ func (s *APIV1Service) UpsertMemoReaction(ctx context.Context, request *v1pb.Ups
 	// Broadcast live refresh event (reaction belongs to a memo).
 	var parentMemo *store.Memo
 	if memo.ParentUID != nil {
-		parentMemo, _ = s.Store.GetMemo(ctx, &store.FindMemo{UID: memo.ParentUID})
+		parentMemo, _ = s.Store.GetMemo(ctx, &store.FindMemo{ExcludeMCPHidden: mcpaccess.IsRequest(ctx), UID: memo.ParentUID})
 	}
 	s.SSEHub.Broadcast(buildMemoReactionSSEEvent(SSEEventReactionUpserted, request.Reaction.ContentId, memo, parentMemo))
 
@@ -138,6 +139,19 @@ func (s *APIV1Service) DeleteMemoReaction(ctx context.Context, request *v1pb.Del
 		return nil, status.Errorf(codes.PermissionDenied, "permission denied")
 	}
 
+	if mcpaccess.IsRequest(ctx) {
+		uid, err := ExtractMemoUIDFromName(reaction.ContentID)
+		if err != nil {
+			return nil, status.Errorf(codes.NotFound, "memo not found")
+		}
+		memo, err := s.Store.GetMemo(ctx, &store.FindMemo{UID: &uid, ExcludeMCPHidden: true})
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to get memo")
+		}
+		if memo == nil {
+			return nil, status.Errorf(codes.NotFound, "memo not found")
+		}
+	}
 	if err := s.Store.DeleteReaction(ctx, &store.DeleteReaction{
 		ID: reactionID,
 	}); err != nil {
@@ -148,7 +162,7 @@ func (s *APIV1Service) DeleteMemoReaction(ctx context.Context, request *v1pb.Del
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid memo name: %v", err)
 	}
-	memo, err := s.Store.GetMemo(ctx, &store.FindMemo{UID: &memoUID})
+	memo, err := s.Store.GetMemo(ctx, &store.FindMemo{ExcludeMCPHidden: mcpaccess.IsRequest(ctx), UID: &memoUID})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get memo")
 	}
@@ -156,7 +170,7 @@ func (s *APIV1Service) DeleteMemoReaction(ctx context.Context, request *v1pb.Del
 	// Broadcast live refresh event (reaction belongs to a memo).
 	var parentMemo *store.Memo
 	if memo != nil && memo.ParentUID != nil {
-		parentMemo, _ = s.Store.GetMemo(ctx, &store.FindMemo{UID: memo.ParentUID})
+		parentMemo, _ = s.Store.GetMemo(ctx, &store.FindMemo{ExcludeMCPHidden: mcpaccess.IsRequest(ctx), UID: memo.ParentUID})
 	}
 	s.SSEHub.Broadcast(buildMemoReactionSSEEvent(SSEEventReactionDeleted, reaction.ContentID, memo, parentMemo))
 

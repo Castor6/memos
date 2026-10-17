@@ -41,6 +41,7 @@ function writeEntry(key: string, content: string, metadata?: EditorState["metada
                 attachments: metadata.attachments,
                 relations: metadata.relations,
                 isTodo: metadata.isTodo,
+                mcpHidden: metadata.mcpHidden,
               }),
             ),
           })
@@ -91,7 +92,7 @@ export const cacheService = {
       const entry = JSON.parse(localStorage.getItem(key) || "null");
       if (entry?.kind !== STRUCTURED_CACHE_ENTRY_KIND || typeof entry.memo !== "string") return;
       const memo = fromJsonString(MemoSchema, entry.memo);
-      return { tags: memo.tags, attachments: memo.attachments, relations: memo.relations };
+      return { tags: memo.tags, attachments: memo.attachments, relations: memo.relations, mcpHidden: memo.mcpHidden };
     } catch {
       return;
     }

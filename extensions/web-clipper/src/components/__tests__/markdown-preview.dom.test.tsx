@@ -88,11 +88,17 @@ describe("MarkdownPreview", () => {
     const content = composeCaptureMemo(
       { kind: "STAR", platform: "WEB", sourceId: "", sourceUrl: "https://example.com", comment: "Thought", context: "", posts: [] },
       `## Original heading\n\n${"Long passage. ".repeat(150)}`,
+      false,
+      true,
+      "[Original page](https://example.com)",
     );
     const { container } = render(<MarkdownPreview content={content} />);
     const details = container.querySelector("details");
     expect(details).toBeInTheDocument();
     expect(details).not.toHaveAttribute("open");
+    const sourceLink = screen.getByRole("link", { name: "Original page" });
+    expect(sourceLink.closest("details")).toBeNull();
+    expect(sourceLink.compareDocumentPosition(details!)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expect(details?.querySelector("summary")).toHaveTextContent("展开原内容");
     expect(details?.querySelector("h2")).toHaveTextContent("Original heading");
     expect(details).toHaveTextContent("Long passage.");

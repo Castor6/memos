@@ -1,8 +1,8 @@
-import { BookmarkIcon } from "lucide-react";
+import { BookmarkIcon, ShieldOffIcon } from "lucide-react";
 import { useCallback, useState } from "react";
 import { Link } from "react-router-dom";
 import RelativeTime from "@/components/RelativeTime";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useNewMemo } from "@/contexts/NewMemoContext";
 import useNavigateTo from "@/hooks/useNavigateTo";
 import i18n from "@/i18n";
@@ -16,7 +16,6 @@ import MemoActionMenu from "../../MemoActionMenu";
 import { ReactionSelector } from "../../MemoReactionListView";
 import UserAvatar from "../../UserAvatar";
 import VisibilityIcon from "../../VisibilityIcon";
-import { useMemoActions } from "../hooks";
 import { useMemoViewContext, useMemoViewDerived } from "../MemoViewContext";
 import type { MemoHeaderProps } from "../types";
 
@@ -33,8 +32,6 @@ const MemoHeader: React.FC<MemoHeaderProps> = ({ showCreator, showVisibility, sh
   const handleGotoMemoDetailPage = useCallback(() => {
     navigateTo(`/${memo.name}`, { state: { from: parentPage } });
   }, [memo.name, parentPage, navigateTo]);
-
-  const { unpinMemo } = useMemoActions(memo);
 
   const timeValue = isArchived ? (
     memoDisplayTime?.toLocaleString(i18n.language)
@@ -58,7 +55,24 @@ const MemoHeader: React.FC<MemoHeaderProps> = ({ showCreator, showVisibility, sh
 
   return (
     <div className="w-full flex flex-row justify-between items-center gap-2">
-      <div className="w-auto max-w-[calc(100%-8rem)] grow flex flex-row justify-start items-center">
+      <div className="min-w-0 grow flex flex-row flex-wrap justify-start items-center gap-x-2 gap-y-1">
+        {showPinned && memo.pinned && (
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">
+            <BookmarkIcon className="size-3" />
+            {t("memo.pinned-badge")}
+          </span>
+        )}
+        {memo.mcpHidden && !readonly && (
+          <Tooltip>
+            <TooltipTrigger
+              render={<span className="inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground" tabIndex={0} />}
+            >
+              <ShieldOffIcon className="size-3" />
+              {t("memo.mcp-privacy.label")}
+            </TooltipTrigger>
+            <TooltipContent>{t("memo.mcp-privacy.description")}</TooltipContent>
+          </Tooltip>
+        )}
         {showCreator && creator ? (
           <CreatorDisplay creator={creator} displayTime={displayTime} timeTooltip={timeTooltip} onGotoDetail={handleGotoMemoDetailPage} />
         ) : (
@@ -93,19 +107,6 @@ const MemoHeader: React.FC<MemoHeaderProps> = ({ showCreator, showVisibility, sh
           </Tooltip>
         )}
 
-        {showPinned && memo.pinned && (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger render={<span className="cursor-pointer" />}>
-                <BookmarkIcon className="w-4 h-auto text-primary" onClick={unpinMemo} />
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>{t("common.unpin")}</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        )}
-
         {memo.isTodo && (
           <span className="text-sm text-muted-foreground" aria-label="待办完成进度">
             ☑ {tasks.filter((task) => task.checked).length}/{tasks.length}
@@ -131,13 +132,13 @@ interface CreatorDisplayProps {
 }
 
 const CreatorDisplay: React.FC<CreatorDisplayProps> = ({ creator, displayTime, timeTooltip, onGotoDetail }) => (
-  <div className="w-full flex flex-row justify-start items-center">
+  <div className="min-w-0 flex-1 flex flex-row justify-start items-center">
     <Link className="w-auto hover:opacity-80 rounded-md transition-colors" to={`/u/${encodeURIComponent(creator.username)}`} viewTransition>
       <UserAvatar className="mr-2 shrink-0" avatarUrl={creator.avatarUrl} />
     </Link>
-    <div className="w-full flex flex-col justify-center items-start">
+    <div className="min-w-0 flex-1 flex flex-col justify-center items-start">
       <Link
-        className="block leading-tight hover:opacity-80 rounded-md transition-colors truncate text-muted-foreground"
+        className="max-w-full block leading-tight hover:opacity-80 rounded-md transition-colors truncate text-muted-foreground"
         to={`/u/${encodeURIComponent(creator.username)}`}
         viewTransition
       >

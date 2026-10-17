@@ -74,6 +74,14 @@ export const useMemoActionHandlers = ({ memo, onEdit, setDeleteDialogOpen }: Use
     }
   }, [memo.name, memo.pinned, updateMemo]);
 
+  const handleToggleMcpHidden = useCallback(async () => {
+    try {
+      await updateMemo({ update: { name: memo.name, mcpHidden: !memo.mcpHidden }, updateMask: ["mcp_hidden"] });
+    } catch (error: unknown) {
+      handleError(error, toast.error, { context: "Update memo MCP privacy", fallbackMessage: t("memo.mcp-privacy.update-failed") });
+    }
+  }, [memo.name, memo.mcpHidden, t, updateMemo]);
+
   const handleEditMemoClick = useCallback(() => {
     onEdit?.();
   }, [onEdit]);
@@ -151,6 +159,7 @@ export const useMemoActionHandlers = ({ memo, onEdit, setDeleteDialogOpen }: Use
 
   return {
     handleTogglePinMemoBtnClick,
+    handleToggleMcpHidden,
     handleEditMemoClick,
     handleToggleMemoStatusClick,
     handleCopyLink,

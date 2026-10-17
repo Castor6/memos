@@ -45,6 +45,10 @@ func (d *DB) ListAttachments(ctx context.Context, find *store.FindAttachment) ([
 		args = append(args, *v)
 	}
 
+	if find.ExcludeMCPHidden {
+		where = append(where, "(attachment.memo_id IS NULL OR attachment.memo_id NOT IN (SELECT id FROM mcp_hidden_memos))")
+	}
+
 	if v := find.ID; v != nil {
 		where, args = append(where, "attachment.id = "+placeholder(len(args)+1)), append(args, *v)
 	}
@@ -116,6 +120,9 @@ func (d *DB) ListAttachments(ctx context.Context, find *store.FindAttachment) ([
 		WHERE %s
 		ORDER BY attachment.updated_ts DESC
 	`, strings.Join(fields, ", "), strings.Join(where, " AND "))
+	if find.ExcludeMCPHidden {
+		query = store.MCPHiddenMemoCTE + query
+	}
 	if find.Limit != nil {
 		query = fmt.Sprintf("%s LIMIT %d", query, *find.Limit)
 		if find.Offset != nil {

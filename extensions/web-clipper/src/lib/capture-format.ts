@@ -17,7 +17,13 @@ export function formatCapturedPosts(capture: CaptureData): string {
     .join("\n\n---\n\n");
 }
 
-export function composeCaptureMemo(capture: CaptureData, original: string, legacyLabels = false, inlineImages = true): string {
+export function composeCaptureMemo(
+  capture: CaptureData,
+  original: string,
+  legacyLabels = false,
+  inlineImages = true,
+  sourceLink = "",
+): string {
   const sections: string[] = [];
   const body = original.trim();
   const displayedOriginal = body.length > 1600 ? `<details>\n<summary>展开原内容</summary>\n\n${body}\n\n</details>` : body;
@@ -38,7 +44,7 @@ export function composeCaptureMemo(capture: CaptureData, original: string, legac
     }
   } else {
     if (capture.comment.trim()) sections.push(`## 我的思考\n\n${capture.comment.trim()}`);
-    sections.push(`## 原内容\n\n${displayedOriginal}`);
+    sections.push(`## 原内容\n\n${[sourceLink, displayedOriginal].filter(Boolean).join("\n\n")}`);
   }
   return sections.join("\n\n");
 }
