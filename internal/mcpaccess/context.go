@@ -11,4 +11,7 @@ func WithRequest(ctx context.Context) context.Context {
 }
 
 // IsRequest reports whether the request came through the MCP adapter.
-func IsRequest(ctx context.Context) bool { value, _ := ctx.Value(contextKey{}).(bool); return value }
+func IsRequest(ctx context.Context) bool {
+	value, ok := ctx.Value(contextKey{}).(bool)
+	return ok && value
+}

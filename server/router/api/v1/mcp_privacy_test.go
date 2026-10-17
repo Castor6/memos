@@ -147,7 +147,6 @@ func TestMCPPrivacyCrossSpaceReference(t *testing.T) {
 	require.True(t, changed)
 	require.Equal(t, "safe current body", captured.Content)
 	require.Nil(t, captured.Payload.Capture)
-
 }
 
 func TestMCPPrivacyNestedComment(t *testing.T) {

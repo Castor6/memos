@@ -12,7 +12,6 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/usememos/memos/internal/mcpaccess"
-	storepb "github.com/usememos/memos/proto/gen/store"
 	"github.com/usememos/memos/server/runner/memopayload"
 	"github.com/usememos/memos/store"
 )
@@ -109,7 +108,7 @@ func (s *APIV1Service) sanitizeMCPMemoWithPath(ctx context.Context, memo *store.
 	sanitized := *memo
 	sanitized.Content = strings.Join(blocks, "\n\n")
 	if memo.Payload != nil {
-		sanitized.Payload = proto.Clone(memo.Payload).(*storepb.MemoPayload)
+		sanitized.Payload = proto.CloneOf(memo.Payload)
 		sanitized.Payload.Capture = nil
 	}
 	if err := memopayload.RebuildMemoPayload(ctx, &sanitized, s.MarkdownService); err != nil {
