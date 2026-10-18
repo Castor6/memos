@@ -43,14 +43,16 @@ const MemoActionMenu = (props: MemoActionMenuProps) => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const { exporting, download } = useMemoPdfExport(memo);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [closingContextMenuPosition, setClosingContextMenuPosition] = useState<MemoActionMenuProps["contextMenuPosition"]>(null);
+  const anchorPosition = contextMenuPosition ?? closingContextMenuPosition;
   const contextAnchor = useMemo(
     () =>
-      contextMenuPosition
+      anchorPosition
         ? {
-            getBoundingClientRect: () => DOMRect.fromRect({ x: contextMenuPosition.x, y: contextMenuPosition.y, width: 0, height: 0 }),
+            getBoundingClientRect: () => DOMRect.fromRect({ x: anchorPosition.x, y: anchorPosition.y, width: 0, height: 0 }),
           }
         : undefined,
-    [contextMenuPosition],
+    [anchorPosition],
   );
 
   // Derived state
@@ -82,7 +84,13 @@ const MemoActionMenu = (props: MemoActionMenuProps) => {
       open={Boolean(contextMenuPosition) || menuOpen}
       onOpenChange={(open) => {
         setMenuOpen(open);
+        // Keep the pointer anchor while the closed popup finishes its exit animation.
+        if (open) setClosingContextMenuPosition(null);
+        else if (contextMenuPosition) setClosingContextMenuPosition(contextMenuPosition);
         if (!open) onContextMenuClose?.();
+      }}
+      onOpenChangeComplete={(open) => {
+        if (!open) setClosingContextMenuPosition(null);
       }}
     >
       <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="size-4" aria-label="笔记操作" />}>
