@@ -1,5 +1,5 @@
 import { create } from "@bufbuild/protobuf";
-import { createEvent, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, createEvent, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import MemoActionMenu from "@/components/MemoActionMenu/MemoActionMenu";
 import { useMemoContextMenu } from "@/components/MemoView/hooks/useMemoContextMenu";
@@ -29,6 +29,49 @@ function Card({ readonly = false, archived = false }: { readonly?: boolean; arch
 }
 
 describe("memo card context menu", () => {
+  it.each(["outside click", "Escape"])("keeps the pointer anchor through the exit animation after %s", async (dismissal) => {
+    vi.spyOn(document.documentElement, "clientWidth", "get").mockReturnValue(1024);
+    vi.spyOn(document.documentElement, "clientHeight", "get").mockReturnValue(768);
+    render(<Card />);
+    fireEvent.contextMenu(screen.getByText("正文"), { clientX: 300, clientY: 180 });
+    const popup = await screen.findByRole("menu");
+    await waitFor(() => expect(popup).not.toHaveAttribute("data-starting-style"));
+    const positioner = popup.parentElement!;
+    const position = positioner.style.transform;
+    const alignment = popup.getAttribute("data-align");
+    expect(alignment).toBe("start");
+    let finishAnimation!: () => void;
+    const finished = new Promise<void>((resolve) => {
+      finishAnimation = resolve;
+    });
+    const getAnimations = vi.fn(() => [{ finished }]);
+    Object.defineProperty(popup, "getAnimations", { value: getAnimations, configurable: true });
+
+    if (dismissal === "Escape") {
+      fireEvent.keyDown(popup, { key: "Escape" });
+    } else {
+      fireEvent.mouseDown(document.body);
+      fireEvent.mouseUp(document.body);
+      fireEvent.click(document.body);
+    }
+    await waitFor(() => expect(getAnimations).toHaveBeenCalled());
+    expect(popup).toBeInTheDocument();
+    expect(popup).toHaveAttribute("data-ending-style");
+    expect(popup).toHaveAttribute("data-align", alignment);
+    expect(positioner.style.transform).toBe(position);
+
+    await act(async () => finishAnimation());
+    await waitFor(() => expect(popup).not.toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "笔记操作" }));
+    const buttonPopup = await screen.findByRole("menu");
+    await waitFor(() => expect(buttonPopup.parentElement!.style.transform).not.toBe(position));
+    fireEvent.keyDown(buttonPopup, { key: "Escape" });
+    await waitFor(() => expect(buttonPopup).not.toBeInTheDocument());
+    fireEvent.contextMenu(screen.getByText("正文"), { clientX: 480, clientY: 240 });
+    const reopenedPopup = await screen.findByRole("menu");
+    await waitFor(() => expect(reopenedPopup.parentElement!.style.transform).not.toBe(position));
+  });
+
   it("opens the existing actions by right-click and executes edit", async () => {
     render(<Card />);
     const event = createEvent.contextMenu(screen.getByText("正文"), { clientX: 300, clientY: 180 });
