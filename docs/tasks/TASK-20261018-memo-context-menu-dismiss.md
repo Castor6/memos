@@ -2,7 +2,7 @@
 
 - 记录日期：2026-10-18
 - 模块与关键词：MemoActionMenu、右键菜单、退出动画、虚拟锚点
-- 维护归属：本次排查会话，分支 `fix/memo-context-menu-dismiss`
+- 维护归属：本次排查会话；原修复分支 `fix/memo-context-menu-dismiss`，后续表情入口修复分支 `fix/memo-reaction-trigger-flicker`
 - 关联任务：[笔记右键入口](TASK-20260920-memos-todo-alignment.md)
 
 ## 背景与目标
@@ -45,3 +45,13 @@
 
 - 窄屏检查不代表 iPhone/Safari 真机、触摸长按或 PWA 验收；本次修改未涉及这些入口。
 - 本次仅做本地修复与 PR 交付，没有执行生产部署。
+
+## 2026-10-18 补充：表情入口闪烁
+
+- 原菜单定位修复已随 PR #69 合入，Version Packages PR #70 将应用升级为 0.10.1。本轮基于主分支 `4689ee80`，用户提供新录屏，要求右键菜单操作时笔记右上角的表情图标不要闪烁。
+- 录屏抽帧与本地检查确认：桌面端表情入口受 `sm:hidden sm:group-hover:block` 控制，随卡片悬停反复显隐。未修复时，点击卡片外关闭菜单后入口为 `display: none`、尺寸为 0；回到卡片变为 `display: block`、16×16。
+- 改为表情入口常驻显示，保持原位置和尺寸，移除只用于强制显示入口的父组件状态。表情面板仍由 `ReactionSelector` 自己管理；登录和归档显示条件保留，菜单定位和退出动画不变。
+- `./scripts/dev.sh check frontend` 通过：462 个源码文件类型/Biome 检查，97 个测试文件共 464 项测试（含原菜单退出定位回归），生产构建及空白检查。仍有既有 chunk 大小和插件耗时提示。
+- Codex 内置浏览器、本地可丢弃数据：1440×900 下右键打开、外部左键关闭、Esc 关闭、三点按钮重开、表情面板打开关闭均通过；无论卡片是否悬停，入口保持 `display: block` 和 16×16 尺寸。430×739 与 430×932 下入口和菜单正常，无常驻左侧导航、无页面横向溢出，表情面板正常打开；结束已恢复视口覆盖。
+- 本轮浏览器控制台无错误或警告。截图与抽帧保存在本机 `/tmp/memos-reaction-flicker/`，不提交录屏或截图；窄屏检查不代表 iPhone/Safari 真机和触摸验收。
+- 使用 Changesets CLI 创建 `.changeset/fine-candles-arrive.md`，为 `memos-personal` 添加中文 patch 说明；扩展无变更，不手改发布版本及日志。`fnm exec --using 24 corepack pnpm check:release origin/main` 通过。
