@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.10.1
+
+### Patch Changes
+
+- bd2ceb1: 修复笔记右键菜单关闭时跳到卡片右上角闪现的问题，保持原位置完成退出动画。
+
 ## 0.10.0
 
 ### Minor Changes
