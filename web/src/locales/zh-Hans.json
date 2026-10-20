@@ -231,6 +231,8 @@
     "content-syntax": "内容语法"
   },
   "memo": {
+    "word-count-label": "字数",
+    "word-count": "{{count}} 字",
     "pinned-badge": "已置顶",
     "mcp-privacy": {
       "label": "私密",

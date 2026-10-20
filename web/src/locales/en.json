@@ -278,6 +278,8 @@
     "content-syntax": "Content syntax"
   },
   "memo": {
+    "word-count-label": "Word count",
+    "word-count": "{{count}} words",
     "pinned-badge": "Pinned",
     "mcp-privacy": {
       "label": "Private",

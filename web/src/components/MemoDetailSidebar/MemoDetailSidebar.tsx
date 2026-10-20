@@ -27,6 +27,7 @@ import { useTranslate } from "@/utils/i18n";
 import { extractHeadings } from "@/utils/markdown-manipulation";
 import { convertVisibilityToString } from "@/utils/memo";
 import { isSuperUser } from "@/utils/user";
+import { countMemoWords } from "@/utils/word-count";
 import MemoOutline from "./MemoOutline";
 import MemoSharePanel from "./MemoSharePanel";
 
@@ -140,6 +141,7 @@ const MemoDetailSidebar = ({ memo, className, onShareImageOpen }: Props) => {
   const hasUpdated = !isEqual(memo.createTime, memo.updateTime);
 
   const { data: creator } = useUser(memo.creator, { enabled: !!memo.creator });
+  const wordCount = useMemo(() => countMemoWords(memo.content), [memo.content]);
   const headings = useMemo(() => extractHeadings(memo.content), [memo.content]);
   const { referencing, referenced } = useMemo(() => getRelationBuckets(memo.relations, memo.name), [memo.relations, memo.name]);
   const relationMemoNames = useMemo(
@@ -225,6 +227,9 @@ const MemoDetailSidebar = ({ memo, className, onShareImageOpen }: Props) => {
             </span>
           </span>
         )}
+
+        <PropertyLabel>{t("memo.word-count-label")}</PropertyLabel>
+        <span className={cn(PROPERTY_VALUE_CLASSES, "tabular-nums")}>{t("memo.word-count", { count: wordCount })}</span>
 
         <PropertyLabel>{t("common.created-at")}</PropertyLabel>
         <span className={cn(PROPERTY_VALUE_CLASSES, "tabular-nums")} title={createTime?.toLocaleString(i18n.language)}>

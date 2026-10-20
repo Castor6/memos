@@ -222,6 +222,8 @@
     "content-syntax": "內容語法"
   },
   "memo": {
+    "word-count-label": "字數",
+    "word-count": "{{count}} 字",
     "archived-at": "封存於",
     "click-to-hide-sensitive-content": "點擊隱藏 NSFW 內容",
     "click-to-show-sensitive-content": "點擊顯示 NSFW 內容",
