@@ -278,6 +278,8 @@
     "content-syntax": "Content syntax"
   },
   "memo": {
+    "word-count-label": "Word count",
+    "word-count": "{{count}} words",
     "pinned-badge": "Pinned",
     "mcp-privacy": {
       "label": "Private",
@@ -305,6 +307,13 @@
     "direction-desc": "Descending",
     "display-time": "Display Time",
     "filters": {
+      "remove": "Remove filter {{name}}",
+      "incomplete": "To-do",
+      "tag-mode": "Tag matching",
+      "union": "Any",
+      "intersection": "All",
+      "clear": "Clear",
+      "clear-all": "Clear filters",
       "has-code": "hasCode",
       "has-link": "hasLink",
       "has-task-list": "hasTaskList",

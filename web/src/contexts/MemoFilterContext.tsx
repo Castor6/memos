@@ -1,5 +1,5 @@
 import { uniqBy } from "lodash-es";
-import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, type ReactNode, useCallback, useContext, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 export type FilterFactor =
@@ -10,7 +10,11 @@ export type FilterFactor =
   | "pinned"
   | "property.hasLink"
   | "property.hasTaskList"
-  | "property.hasCode";
+  | "property.hasCode"
+  | "property.hasIncompleteTasks"
+  | "mcpHidden";
+
+export type TagMatchMode = "any" | "all";
 
 export interface MemoFilter {
   factor: FilterFactor;
@@ -40,6 +44,8 @@ export const stringifyFilters = (filters: MemoFilter[]): string => {
 
 interface MemoFilterContextValue {
   filters: MemoFilter[];
+  tagMatchMode: TagMatchMode;
+  setTagMatchMode: (mode: TagMatchMode) => void;
   shortcut: string | undefined;
   hasActiveFilters: boolean;
   getFiltersByFactor: (factor: FilterFactor) => MemoFilter[];
@@ -56,72 +62,68 @@ const MemoFilterContext = createContext<MemoFilterContextValue | null>(null);
 
 export function MemoFilterProvider({ children }: { children: ReactNode }) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const lastSyncedUrlRef = useRef("");
-  const lastSyncedStoreRef = useRef("");
-
-  // Initialize from URL
-  const [filters, setFiltersState] = useState<MemoFilter[]>(() => {
-    return parseFilterQuery(searchParams.get("filter"));
-  });
+  // Keep the URL authoritative, including external navigation and browser history.
+  // The ref also accumulates multiple updates made in one event (e.g. search words).
+  const pendingParams = useRef(searchParams);
+  pendingParams.current = searchParams;
+  const filters = useMemo(() => parseFilterQuery(searchParams.get("filter")), [searchParams]);
+  const tagMatchMode: TagMatchMode = searchParams.get("tagMode") === "all" ? "all" : "any";
   const [shortcut, setShortcutState] = useState<string | undefined>(undefined);
 
-  // Sync URL to state when URL changes externally
-  useEffect(() => {
-    const filterParam = searchParams.get("filter") || "";
-    if (filterParam !== lastSyncedUrlRef.current) {
-      lastSyncedUrlRef.current = filterParam;
-      const newFilters = parseFilterQuery(filterParam);
-      setFiltersState(newFilters);
-      lastSyncedStoreRef.current = stringifyFilters(newFilters);
-    }
-  }, [searchParams]);
+  const updateParams = useCallback(
+    (update: (params: URLSearchParams) => void) => {
+      const params = new URLSearchParams(pendingParams.current);
+      update(params);
+      pendingParams.current = params;
+      setSearchParams(params, { replace: true });
+    },
+    [setSearchParams],
+  );
 
-  // Sync state to URL when state changes
-  useEffect(() => {
-    const storeString = stringifyFilters(filters);
-    if (storeString !== lastSyncedStoreRef.current && storeString !== lastSyncedUrlRef.current) {
-      lastSyncedStoreRef.current = storeString;
-      const newParams = new URLSearchParams(searchParams);
-      if (filters.length > 0) {
-        newParams.set("filter", storeString);
-      } else {
-        newParams.delete("filter");
-      }
-      setSearchParams(newParams, { replace: true });
-      lastSyncedUrlRef.current = filters.length > 0 ? storeString : "";
-    }
-  }, [filters, searchParams, setSearchParams]);
+  const updateFilters = useCallback(
+    (update: (previous: MemoFilter[]) => MemoFilter[]) => {
+      updateParams((params) => {
+        const next = uniqBy(update(parseFilterQuery(params.get("filter"))), getMemoFilterKey);
+        if (next.length > 0) params.set("filter", stringifyFilters(next));
+        else params.delete("filter");
+        if (!next.some((filter) => filter.factor === "tagSearch")) params.delete("tagMode");
+      });
+    },
+    [updateParams],
+  );
+
+  const setTagMatchMode = useCallback(
+    (mode: TagMatchMode) => {
+      updateParams((params) => {
+        if (mode === "all") params.set("tagMode", mode);
+        else params.delete("tagMode");
+      });
+    },
+    [updateParams],
+  );
 
   const getFiltersByFactor = useCallback((factor: FilterFactor) => filters.filter((f) => f.factor === factor), [filters]);
-
-  const setFilters = useCallback((newFilters: MemoFilter[]) => {
-    setFiltersState(newFilters);
-  }, []);
-
-  const addFilter = useCallback((filter: MemoFilter) => {
-    setFiltersState((prev) => uniqBy([...prev, filter], getMemoFilterKey));
-  }, []);
-
-  const removeFilter = useCallback((predicate: (f: MemoFilter) => boolean) => {
-    setFiltersState((prev) => prev.filter((f) => !predicate(f)));
-  }, []);
-
-  const removeFiltersByFactor = useCallback((factor: FilterFactor) => {
-    setFiltersState((prev) => prev.filter((f) => f.factor !== factor));
-  }, []);
+  const setFilters = useCallback((next: MemoFilter[]) => updateFilters(() => next), [updateFilters]);
+  const addFilter = useCallback((filter: MemoFilter) => updateFilters((previous) => [...previous, filter]), [updateFilters]);
+  const removeFilter = useCallback(
+    (predicate: (f: MemoFilter) => boolean) => updateFilters((previous) => previous.filter((f) => !predicate(f))),
+    [updateFilters],
+  );
+  const removeFiltersByFactor = useCallback((factor: FilterFactor) => removeFilter((f) => f.factor === factor), [removeFilter]);
 
   const clearAllFilters = useCallback(() => {
-    setFiltersState([]);
+    setFilters([]);
     setShortcutState(undefined);
-  }, []);
+  }, [setFilters]);
 
-  const setShortcut = useCallback((newShortcut?: string) => {
-    setShortcutState(newShortcut);
-    // Clear content search filter when selecting a shortcut (issue #5462)
-    if (newShortcut !== undefined) {
-      setFiltersState((prev) => prev.filter((f) => f.factor !== "contentSearch"));
-    }
-  }, []);
+  const setShortcut = useCallback(
+    (newShortcut?: string) => {
+      setShortcutState(newShortcut);
+      // Clear content search filter when selecting a shortcut (issue #5462).
+      if (newShortcut !== undefined) removeFiltersByFactor("contentSearch");
+    },
+    [removeFiltersByFactor],
+  );
 
   const hasFilter = useCallback((filter: MemoFilter) => filters.some((f) => getMemoFilterKey(f) === getMemoFilterKey(filter)), [filters]);
 
@@ -131,6 +133,8 @@ export function MemoFilterProvider({ children }: { children: ReactNode }) {
     <MemoFilterContext.Provider
       value={{
         filters,
+        tagMatchMode,
+        setTagMatchMode,
         shortcut,
         hasActiveFilters,
         getFiltersByFactor,

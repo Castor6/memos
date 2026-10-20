@@ -1,7 +1,7 @@
 import type { Element } from "hast";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { type MemoFilter, stringifyFilters, useMemoFilterContext } from "@/contexts/MemoFilterContext";
+import { type MemoFilter, parseFilterQuery, stringifyFilters, useMemoFilterContext } from "@/contexts/MemoFilterContext";
 import useNavigateTo from "@/hooks/useNavigateTo";
 import { tagStyles } from "@/lib/markdownStyles";
 import { findTagMetadata, getTagStyle } from "@/lib/tag";
@@ -16,7 +16,7 @@ interface TagProps extends React.HTMLAttributes<HTMLSpanElement> {
 }
 
 export const Tag: React.FC<TagProps> = ({ "data-tag": dataTag, children, className, style, node: _node, ...props }) => {
-  const { parentPage } = useMemoViewContext();
+  const { parentPage, memo } = useMemoViewContext();
   const location = useLocation();
   const navigateTo = useNavigateTo();
   const { getFiltersByFactor, removeFilter, addFilter } = useMemoFilterContext();
@@ -36,10 +36,16 @@ export const Tag: React.FC<TagProps> = ({ "data-tag": dataTag, children, classNa
 
     // If the tag is clicked in a memo detail page, we should navigate to the memo list page.
     if (location.pathname.startsWith("/m")) {
-      const pathname = parentPage || Routes.HOME;
-      const searchParams = new URLSearchParams();
-
-      searchParams.set("filter", stringifyFilters([{ factor: "tagSearch", value: tag }]));
+      const [pathname, search = ""] = (parentPage === Routes.HOME && memo.isTodo ? "/todos" : parentPage || Routes.HOME).split("?");
+      const searchParams = new URLSearchParams(search);
+      const previous = parseFilterQuery(searchParams.get("filter"));
+      const selected = previous.some((filter) => filter.factor === "tagSearch" && filter.value === tag);
+      const next: MemoFilter[] = selected
+        ? previous.filter((filter) => filter.factor !== "tagSearch" || filter.value !== tag)
+        : [...previous, { factor: "tagSearch", value: tag }];
+      if (next.length) searchParams.set("filter", stringifyFilters(next));
+      else searchParams.delete("filter");
+      if (!next.some((filter) => filter.factor === "tagSearch")) searchParams.delete("tagMode");
       navigateTo(`${pathname}?${searchParams.toString()}`);
       return;
     }
@@ -48,8 +54,6 @@ export const Tag: React.FC<TagProps> = ({ "data-tag": dataTag, children, classNa
     if (isActive) {
       removeFilter((f: MemoFilter) => f.factor === "tagSearch" && f.value === tag);
     } else {
-      // Remove all existing tag filters first, then add the new one
-      removeFilter((f: MemoFilter) => f.factor === "tagSearch");
       addFilter({
         factor: "tagSearch",
         value: tag,

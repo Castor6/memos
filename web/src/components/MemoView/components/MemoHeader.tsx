@@ -1,5 +1,5 @@
 import { BookmarkIcon, ShieldOffIcon } from "lucide-react";
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { Link } from "react-router-dom";
 import RelativeTime from "@/components/RelativeTime";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -11,6 +11,7 @@ import type { User } from "@/types/proto/api/v1/user_service_pb";
 import { useTranslate } from "@/utils/i18n";
 import { extractTasksFromAst } from "@/utils/markdown-manipulation";
 import { convertVisibilityToString } from "@/utils/memo";
+import { countMemoWords } from "@/utils/word-count";
 import MemoActionMenu from "../../MemoActionMenu";
 import { ReactionSelector } from "../../MemoReactionListView";
 import UserAvatar from "../../UserAvatar";
@@ -22,6 +23,7 @@ const MemoHeader: React.FC<MemoHeaderProps> = ({ showCreator, showVisibility, sh
   const t = useTranslate();
 
   const { memo, creator, currentUser, parentPage, isArchived, readonly, openEditor } = useMemoViewContext();
+  const wordCount = useMemo(() => countMemoWords(memo.content), [memo.content]);
   const tasks = memo.isTodo ? extractTasksFromAst(memo.content) : [];
   const { createTime, updateTime, displayTime: memoDisplayTime, isDisplayingUpdatedTime, relativeTimeFormat } = useMemoViewDerived();
   const { newMemoName } = useNewMemo();
@@ -76,6 +78,7 @@ const MemoHeader: React.FC<MemoHeaderProps> = ({ showCreator, showVisibility, sh
         ) : (
           <TimeDisplay displayTime={displayTime} timeTooltip={timeTooltip} onGotoDetail={handleGotoMemoDetailPage} />
         )}
+        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{t("memo.word-count", { count: wordCount })}</span>
         {memo.name === newMemoName && (
           <span className="ml-2 shrink-0 rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-medium leading-none text-primary">
             {t("memo.new-badge")}

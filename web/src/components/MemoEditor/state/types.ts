@@ -9,6 +9,8 @@ export interface EditorState {
   content: string;
   metadata: {
     tags?: string[];
+    /** Filter-derived draft tags; never sent to the memo API. */
+    draftAutoTags?: string[];
     isTodo?: boolean;
     mcpHidden?: boolean;
     /** Privacy value when editing began; only explicit changes may overwrite it. */

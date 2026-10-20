@@ -210,3 +210,35 @@ func TestMCPPrivacyDeleteProtectsIncomingRelations(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, relations.Relations, 1)
 }
+
+func TestMCPPrivacyFilterPreservesScopes(t *testing.T) {
+	svc := newIntegrationService(t)
+	ctx := context.Background()
+	owner, err := svc.Store.CreateUser(ctx, &store.User{Username: "filter-owner", Role: store.RoleAdmin})
+	require.NoError(t, err)
+	other, err := svc.Store.CreateUser(ctx, &store.User{Username: "filter-other", Role: store.RoleUser})
+	require.NoError(t, err)
+	app := userCtx(ctx, owner.ID)
+	for _, isTodo := range []bool{false, true} {
+		hidden, err := svc.CreateMemo(app, &v1pb.CreateMemoRequest{Memo: &v1pb.Memo{Content: "#work\n- [ ] pending", McpHidden: true, IsTodo: isTodo, Visibility: v1pb.Visibility_PRIVATE}})
+		require.NoError(t, err)
+		_, err = svc.CreateMemo(app, &v1pb.CreateMemoRequest{Memo: &v1pb.Memo{Content: "#work\n- [x] completed", McpHidden: true, IsTodo: isTodo}})
+		require.NoError(t, err)
+		_, err = svc.CreateMemo(app, &v1pb.CreateMemoRequest{Memo: &v1pb.Memo{Content: "#work\n- [ ] visible", IsTodo: isTodo}})
+		require.NoError(t, err)
+		for _, content := range []string{"#work\nNo checklist", "#work\n```\n- [ ] code example\n```"} {
+			_, err = svc.CreateMemo(app, &v1pb.CreateMemoRequest{Memo: &v1pb.Memo{Content: content, McpHidden: true, IsTodo: isTodo}})
+			require.NoError(t, err)
+		}
+		request := &v1pb.ListMemosRequest{Filter: `mcp_hidden && has_incomplete_tasks && tag in ["work", "project"]`, IsTodo: isTodo}
+		list, err := svc.ListMemos(app, request)
+		require.NoError(t, err)
+		require.Len(t, list.Memos, 1)
+		require.Equal(t, hidden.Name, list.Memos[0].Name)
+		for _, restricted := range []context.Context{mcpaccess.WithRequest(app), userCtx(ctx, other.ID), store.WithSpace(app, "other")} {
+			list, err = svc.ListMemos(restricted, request)
+			require.NoError(t, err)
+			require.Empty(t, list.Memos)
+		}
+	}
+}

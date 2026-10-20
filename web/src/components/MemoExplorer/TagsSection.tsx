@@ -2,6 +2,7 @@ import { HashIcon, MoreVerticalIcon, TagsIcon } from "lucide-react";
 import { useState } from "react";
 import TagSettingsMenu, { TagSettingsDialog } from "@/components/TagSettingsMenu";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/contexts/AuthContext";
 import { type MemoFilter, useMemoFilterContext } from "@/contexts/MemoFilterContext";
@@ -20,7 +21,7 @@ interface Props {
 const TagsSection = (props: Props) => {
   const t = useTranslate();
   const { currentUser, userTagsSetting } = useAuth();
-  const { getFiltersByFactor, addFilter, removeFilter } = useMemoFilterContext();
+  const { getFiltersByFactor, addFilter, removeFilter, tagMatchMode, setTagMatchMode } = useMemoFilterContext();
   const [treeMode, setTreeMode] = useLocalStorage<boolean>("tag-view-as-tree", false);
   const [treeAutoExpand, setTreeAutoExpand] = useLocalStorage<boolean>("tag-tree-auto-expand", false);
 
@@ -36,8 +37,6 @@ const TagsSection = (props: Props) => {
     if (isActive) {
       removeFilter((f: MemoFilter) => f.factor === "tagSearch" && f.value === tag);
     } else {
-      // Remove all existing tag filters first, then add the new one
-      removeFilter((f: MemoFilter) => f.factor === "tagSearch");
       addFilter({
         factor: "tagSearch",
         value: tag,
@@ -48,7 +47,22 @@ const TagsSection = (props: Props) => {
   return (
     <div className="w-full flex flex-col justify-start items-start mt-3 px-1 h-auto shrink-0 flex-nowrap">
       <div className="flex flex-row justify-between items-center w-full gap-1 mb-1 text-sm leading-6 text-muted-foreground select-none">
-        <span>{t("common.tags")}</span>
+        <span className="mr-auto">{t("common.tags")}</span>
+        <Select value={tagMatchMode} onValueChange={(value) => setTagMatchMode(value === "all" ? "all" : "any")}>
+          <SelectTrigger size="sm" aria-label={t("memo.filters.tag-mode")}>
+            <SelectValue>{t(tagMatchMode === "all" ? "memo.filters.intersection" : "memo.filters.union")}</SelectValue>
+          </SelectTrigger>
+          <SelectContent align="end" data-tag-filter-select>
+            <SelectGroup>
+              <SelectItem value="any" indicator={false}>
+                {t("memo.filters.union")}
+              </SelectItem>
+              <SelectItem value="all" indicator={false}>
+                {t("memo.filters.intersection")}
+              </SelectItem>
+            </SelectGroup>
+          </SelectContent>
+        </Select>
         {(tags.length > 0 || currentUser) && (
           <Popover open={optionsOpen} onOpenChange={setOptionsOpen}>
             <PopoverTrigger aria-label="标签菜单">
@@ -91,11 +105,13 @@ const TagsSection = (props: Props) => {
               const isActive = getFiltersByFactor("tagSearch").some((filter: MemoFilter) => filter.value === tag);
               return (
                 <TagSettingsMenu key={tag} tag={tag}>
-                  <div
+                  <button
+                    type="button"
+                    aria-pressed={isActive}
                     className={cn(
                       "shrink-0 w-auto max-w-full text-sm rounded-md leading-6 flex flex-row justify-start items-center select-none cursor-pointer transition-colors",
                       "hover:opacity-80",
-                      isActive ? "text-primary" : "text-muted-foreground",
+                      isActive ? "text-primary bg-accent/60" : "text-muted-foreground",
                     )}
                     onClick={() => handleTagClick(tag)}
                     data-sidebar-tag={tag}
@@ -106,7 +122,7 @@ const TagsSection = (props: Props) => {
                       <span className={cn("truncate", isActive ? "font-medium" : "")}>{tag}</span>
                       {amount > 1 && <span className="opacity-60 shrink-0">({amount})</span>}
                     </div>
-                  </div>
+                  </button>
                 </TagSettingsMenu>
               );
             })}

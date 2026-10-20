@@ -20,6 +20,7 @@ export default function EditorTags({
   onFocusContent?: () => void;
 }) {
   const { actions, dispatch } = useEditorContext();
+  const draftAutoTags = useEditorSelector((state) => state.metadata.draftAutoTags ?? EMPTY_TAGS);
   const tags = useEditorSelector((state) => state.metadata.tags ?? EMPTY_TAGS);
   const { userTagsSetting } = useAuth();
   const { filters } = useMemoFilterContext();
@@ -33,23 +34,33 @@ export default function EditorTags({
   const listRef = useRef<HTMLDivElement>(null);
   const selectedFilter = filters.filter((filter) => filter.factor === "tagSearch").map((filter) => filter.value);
   const filterKey = selectedFilter.join("\u0000");
-  const autoTags = useRef(new Set<string>());
   const previousFilter = useRef<string | undefined>(undefined);
   useEffect(() => {
     if (ready && !editing && previousFilter.current !== filterKey) {
-      const retained = tags.filter((tag) => !autoTags.current.has(tag) || selectedFilter.includes(tag));
-      autoTags.current = new Set([
-        ...[...autoTags.current].filter((tag) => selectedFilter.includes(tag)),
-        ...selectedFilter.filter((tag) => !retained.includes(tag)),
-      ]);
-      dispatch(actions.setMetadata({ tags: Array.from(new Set([...retained, ...selectedFilter])) }));
+      const retained = tags.filter((tag) => !draftAutoTags.includes(tag) || selectedFilter.includes(tag));
+      dispatch(
+        actions.setMetadata({
+          tags: Array.from(new Set([...retained, ...selectedFilter])),
+          draftAutoTags: Array.from(
+            new Set([
+              ...draftAutoTags.filter((tag) => selectedFilter.includes(tag)),
+              ...selectedFilter.filter((tag) => !retained.includes(tag)),
+            ]),
+          ),
+        }),
+      );
       previousFilter.current = filterKey;
     }
-  }, [ready, editing, filterKey, tags, selectedFilter, dispatch, actions]);
+  }, [ready, editing, draftAutoTags, filterKey, tags, selectedFilter, dispatch, actions]);
   const add = (tag: string) => {
     const value = tag.trim();
-    autoTags.current.delete(value);
-    if (value && !tags.includes(value)) dispatch(actions.setMetadata({ tags: [...tags, value] }));
+    if (value)
+      dispatch(
+        actions.setMetadata({
+          tags: Array.from(new Set([...tags, value])),
+          draftAutoTags: draftAutoTags.filter((tag) => tag !== value),
+        }),
+      );
     setSearch("");
     setOpen(false);
   };
@@ -82,7 +93,14 @@ export default function EditorTags({
           data-tag={tag}
           style={tagStyle(tag)}
           aria-label={`移除标签 ${tag}`}
-          onClick={() => dispatch(actions.setMetadata({ tags: tags.filter((value) => value !== tag) }))}
+          onClick={() =>
+            dispatch(
+              actions.setMetadata({
+                tags: tags.filter((value) => value !== tag),
+                draftAutoTags: draftAutoTags.filter((value) => value !== tag),
+              }),
+            )
+          }
         >
           {emoji(tag)} {tag} <span aria-hidden>×</span>
         </button>

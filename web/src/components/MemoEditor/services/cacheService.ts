@@ -34,6 +34,7 @@ function writeEntry(key: string, content: string, metadata?: EditorState["metada
             kind: STRUCTURED_CACHE_ENTRY_KIND,
             version: STRUCTURED_CACHE_ENTRY_VERSION,
             content,
+            draftAutoTags: metadata.draftAutoTags,
             memo: toJsonString(
               MemoSchema,
               create(MemoSchema, {
@@ -92,7 +93,10 @@ export const cacheService = {
       const entry = JSON.parse(localStorage.getItem(key) || "null");
       if (entry?.kind !== STRUCTURED_CACHE_ENTRY_KIND || typeof entry.memo !== "string") return;
       const memo = fromJsonString(MemoSchema, entry.memo);
-      return { tags: memo.tags, attachments: memo.attachments, relations: memo.relations, mcpHidden: memo.mcpHidden };
+      const draftAutoTags = Array.isArray(entry.draftAutoTags)
+        ? entry.draftAutoTags.filter((tag: unknown): tag is string => typeof tag === "string" && memo.tags.includes(tag))
+        : [];
+      return { tags: memo.tags, draftAutoTags, attachments: memo.attachments, relations: memo.relations, mcpHidden: memo.mcpHidden };
     } catch {
       return;
     }

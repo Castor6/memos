@@ -7,8 +7,10 @@ import {
   EyeIcon,
   HashIcon,
   LinkIcon,
+  ListTodoIcon,
   LucideIcon,
   SearchIcon,
+  ShieldOffIcon,
   XIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -52,6 +54,14 @@ const FILTER_CONFIGS: Record<FilterFactor, FilterConfig> = {
     icon: CheckCircleIcon,
     getLabel: (_, t) => t("memo.filters.has-task-list"),
   },
+  "property.hasIncompleteTasks": {
+    icon: ListTodoIcon,
+    getLabel: (_, t) => t("memo.filters.incomplete"),
+  },
+  mcpHidden: {
+    icon: ShieldOffIcon,
+    getLabel: (_, t) => t("memo.mcp-privacy.label"),
+  },
   "property.hasCode": {
     icon: CodeIcon,
     getLabel: (_, t) => t("memo.filters.has-code"),
@@ -60,7 +70,7 @@ const FILTER_CONFIGS: Record<FilterFactor, FilterConfig> = {
 
 const MemoFilters = ({ className }: { className?: string }) => {
   const t = useTranslate();
-  const { filters, removeFilter } = useMemoFilterContext();
+  const { filters, removeFilter, clearAllFilters } = useMemoFilterContext();
   const { userTagsSetting } = useAuth();
 
   const handleRemoveFilter = (filter: MemoFilter) => {
@@ -85,29 +95,48 @@ const MemoFilters = ({ className }: { className?: string }) => {
         const config = FILTER_CONFIGS[filter.factor];
         const Icon = config?.icon;
         const isTag = filter.factor === "tagSearch";
+        const isPropertyChip = filter.factor === "property.hasIncompleteTasks" || filter.factor === "mcpHidden";
         const metadata = isTag && userTagsSetting ? findTagMetadata(filter.value, userTagsSetting) : undefined;
 
         return (
           <div
             key={getMemoFilterKey(filter)}
             data-tag={isTag ? filter.value : undefined}
+            data-filter-chip={isPropertyChip || undefined}
             style={isTag ? getTagStyle(metadata) : undefined}
             className="group inline-flex items-center gap-1.5 h-7 px-2.5 bg-accent/50 hover:bg-accent border border-border/50 rounded-full text-sm transition-all duration-200 hover:shadow-sm"
           >
             {metadata?.emoji ? (
               <span aria-hidden>{metadata.emoji}</span>
             ) : (
-              Icon && <Icon className={cn("w-3.5 h-3.5 shrink-0", !isTag && "text-muted-foreground")} />
+              Icon && <Icon className={cn("w-3.5 h-3.5 shrink-0", !isTag && !isPropertyChip && "text-muted-foreground")} />
             )}
-            <span className={cn("font-medium max-w-32 truncate", !isTag && "text-foreground/80")}>{getFilterDisplayText(filter)}</span>
+            <span className={cn("font-medium max-w-32 truncate", !isTag && !isPropertyChip && "text-foreground/80")}>
+              {getFilterDisplayText(filter)}
+            </span>
             <span className="ml-0.5 -mr-1">
-              <Button variant="ghost" size="icon-sm" onClick={() => handleRemoveFilter(filter)} aria-label="Remove filter">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => handleRemoveFilter(filter)}
+                aria-label={t("memo.filters.remove", { name: getFilterDisplayText(filter) })}
+              >
                 <XIcon className="w-3 h-3" />
               </Button>
             </span>
           </div>
         );
       })}
+      <Button
+        variant="ghost"
+        size="sm"
+        className="gap-1 px-1.5 text-xs font-normal text-muted-foreground hover:bg-muted hover:text-foreground"
+        onClick={clearAllFilters}
+        aria-label={t("memo.filters.clear-all")}
+      >
+        <XIcon className="size-3" aria-hidden />
+        {t("memo.filters.clear")}
+      </Button>
     </div>
   );
 };

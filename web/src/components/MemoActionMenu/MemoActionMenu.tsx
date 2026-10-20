@@ -180,10 +180,7 @@ const MemoActionMenu = (props: MemoActionMenuProps) => {
           <>
             <DropdownMenuItem onClick={handleToggleMcpHidden}>
               <ShieldOffIcon className="size-4" />
-              <div className="flex flex-col">
-                <span>{t(memo.mcpHidden ? "memo.mcp-privacy.disable" : "memo.mcp-privacy.enable")}</span>
-                <span className="max-w-64 text-xs text-muted-foreground">{t("memo.mcp-privacy.description")}</span>
-              </div>
+              {t(memo.mcpHidden ? "memo.mcp-privacy.disable" : "memo.mcp-privacy.enable")}
             </DropdownMenuItem>
             {/* Archive/Restore (non-comment) */}
             {!isComment && (

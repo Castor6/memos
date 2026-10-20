@@ -66,6 +66,7 @@ function SelectContent({
   return (
     <SelectPrimitive.Portal>
       <SelectPrimitive.Positioner
+        className="isolate z-dropdown"
         align={align}
         alignItemWithTrigger={alignItemWithTrigger}
         alignOffset={alignOffset}
@@ -100,20 +101,23 @@ function SelectLabel({ className, ...props }: SelectPrimitive.GroupLabel.Props) 
   );
 }
 
-function SelectItem({ className, children, ...props }: SelectPrimitive.Item.Props) {
+function SelectItem({ className, children, indicator = true, ...props }: SelectPrimitive.Item.Props & { indicator?: boolean }) {
   return (
     <SelectPrimitive.Item
       data-slot="select-item"
       className={cn(
         "data-highlighted:bg-accent data-highlighted:text-accent-foreground [&_svg:not([class*='text-'])]:text-muted-foreground relative flex w-full cursor-default items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm outline-hidden select-none data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        !indicator && "pr-2 data-selected:bg-accent data-selected:text-primary data-selected:font-medium",
         className,
       )}
       {...props}
     >
       <SelectPrimitive.ItemText className="shrink-0 whitespace-nowrap">{children}</SelectPrimitive.ItemText>
-      <SelectPrimitive.ItemIndicator render={<span className="absolute right-2 flex size-3.5 items-center justify-center" />}>
-        <CheckIcon className="size-4" />
-      </SelectPrimitive.ItemIndicator>
+      {indicator && (
+        <SelectPrimitive.ItemIndicator render={<span className="absolute right-2 flex size-3.5 items-center justify-center" />}>
+          <CheckIcon className="size-4" />
+        </SelectPrimitive.ItemIndicator>
+      )}
     </SelectPrimitive.Item>
   );
 }

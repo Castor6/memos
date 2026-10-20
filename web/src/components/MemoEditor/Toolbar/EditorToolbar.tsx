@@ -11,6 +11,7 @@ import { validationService } from "../services";
 import { useEditorContext, useEditorSelector } from "../state";
 import type { EditorToolbarProps } from "../types";
 import { CommandMenu } from "./CommandMenu";
+import { EditorWordCount } from "./EditorWordCount";
 import { FormattingToolbar } from "./FormattingToolbar";
 import InsertMenu from "./InsertMenu";
 import QuickTools from "./QuickTools";
@@ -110,6 +111,7 @@ export const EditorToolbar: FC<EditorToolbarProps> = ({
           <TooltipContent>{t("memo.mcp-privacy.description")}</TooltipContent>
         </Tooltip>
         {narrow && <span className="flex-1" />}
+        <EditorWordCount />
         {onCancel && (
           <Button variant="ghost" size="sm" onClick={onCancel} disabled={isSaving}>
             {t("common.cancel")}

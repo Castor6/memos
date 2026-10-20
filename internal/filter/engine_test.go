@@ -210,3 +210,20 @@ func TestTodoScopeRendersForEveryDialect(t *testing.T) {
 		}
 	}
 }
+
+func TestMCPHiddenRendersForEveryDialect(t *testing.T) {
+	t.Parallel()
+	engine, err := NewEngine(NewSchema())
+	require.NoError(t, err)
+	for _, dialect := range []DialectName{DialectSQLite, DialectMySQL, DialectPostgres} {
+		for _, expression := range []string{"mcp_hidden", "!mcp_hidden", "mcp_hidden == true", "mcp_hidden == false", "mcp_hidden != true", `mcp_hidden && has_incomplete_tasks && tag in ["work", "project"]`} {
+			t.Run(string(dialect)+"/"+expression, func(t *testing.T) {
+				stmt, err := engine.CompileToStatement(context.Background(), expression, RenderOptions{Dialect: dialect})
+				require.NoError(t, err)
+				require.Contains(t, stmt.SQL, "mcp_hidden")
+			})
+		}
+	}
+	_, err = engine.Compile(context.Background(), `mcp_hidden == "true"`)
+	require.Error(t, err)
+}
