@@ -52,7 +52,7 @@ const TagsSection = (props: Props) => {
           <SelectTrigger size="sm" aria-label={t("memo.filters.tag-mode")}>
             <SelectValue>{t(tagMatchMode === "all" ? "memo.filters.intersection" : "memo.filters.union")}</SelectValue>
           </SelectTrigger>
-          <SelectContent align="end">
+          <SelectContent align="end" data-tag-filter-select>
             <SelectGroup>
               <SelectItem value="any" indicator={false}>
                 {t("memo.filters.union")}
