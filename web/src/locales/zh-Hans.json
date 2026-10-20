@@ -257,6 +257,12 @@
     "direction-desc": "倒序",
     "display-time": "展示时间",
     "filters": {
+      "remove": "移除筛选 {{name}}",
+      "incomplete": "未完成",
+      "tag-mode": "标签组合方式",
+      "union": "并集",
+      "intersection": "交集",
+      "clear-all": "清空筛选",
       "has-code": "有代码",
       "has-link": "有链接",
       "has-task-list": "有待办",

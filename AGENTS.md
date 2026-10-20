@@ -31,6 +31,7 @@ Memos is a self-hosted note-taking app.
 - `docs/README.md` is a navigation entry, not a mandatory reading list. Read `docs/development.md` when running or verifying locally; read deployment documentation only for deployment/upstream work.
 - 多会话并行修改代码时使用独立 worktree。
 - Default UI verification to the Codex in-app browser with local disposable data: desktop 1440×900; the user's iPhone 15 Pro Max uses a 430px-wide layout, checked at heights 739 and 932 (see `docs/development.md`). Verify no persistent left sidebar on mobile. Restore viewport overrides afterward. Use the regular Chrome profile only for a problem specific to it.
+- 涉及前端样式或布局的修改，必须向用户展示效果图。需求对齐阶段默认在现有界面截图上做静态改图，不为出图另建可交互展示或提前实现功能；交付时提供桌面和手机布局的实际页面截图，设计预览需明确标注，不能代替实际运行验证。截图存放于本地忽略目录，不提交仓库。
 - Narrow viewport checks do not establish iPhone/Safari, software keyboard, touch or PWA behavior; record any required real-device checks explicitly.
 
 ## 内置微信客服模块

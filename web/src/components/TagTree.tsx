@@ -106,8 +106,6 @@ const TagItemContainer = (props: TagItemContainerProps) => {
     if (isActive) {
       removeFilter((f: MemoFilter) => f.factor === "tagSearch" && f.value === tag.text);
     } else {
-      // Remove all existing tag filters first, then add the new one
-      removeFilter((f: MemoFilter) => f.factor === "tagSearch");
       addFilter({
         factor: "tagSearch",
         value: tag.text,
@@ -124,7 +122,9 @@ const TagItemContainer = (props: TagItemContainerProps) => {
     <>
       <TagSettingsMenu tag={tag.text}>
         <div className="relative flex flex-row justify-between items-center w-full leading-6 py-0 mt-px text-sm select-none shrink-0">
-          <div
+          <button
+            type="button"
+            aria-pressed={isActive}
             className={`flex flex-row justify-start items-center truncate shrink leading-5 mr-1 cursor-pointer transition-colors ${
               isActive ? "text-primary" : "text-muted-foreground"
             }`}
@@ -136,7 +136,7 @@ const TagItemContainer = (props: TagItemContainerProps) => {
             <span className={`truncate hover:opacity-80 ${isActive ? "font-medium" : ""}`}>
               {tag.key} {tag.amount > 1 && <span className="opacity-60">({tag.amount})</span>}
             </span>
-          </div>
+          </button>
           <div className="flex flex-row justify-end items-center">
             {hasSubTags ? (
               <span

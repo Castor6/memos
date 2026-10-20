@@ -36,7 +36,7 @@ export const useMemoFilters = (options: UseMemoFiltersOptions = {}): string | un
   const { creatorName, isTodo, includeShortcuts = false, includePinned = false, visibilities } = options;
 
   const { shortcuts } = useAuth();
-  const { filters, shortcut: currentShortcut } = useMemoFilterContext();
+  const { filters, tagMatchMode, shortcut: currentShortcut } = useMemoFilterContext();
 
   // Get selected shortcut if needed
   const selectedShortcut = useMemo(() => {
@@ -60,15 +60,18 @@ export const useMemoFilters = (options: UseMemoFiltersOptions = {}): string | un
 
     // Add shortcut filter if enabled and selected
     if (includeShortcuts && selectedShortcut?.filter) {
-      conditions.push(selectedShortcut.filter);
+      conditions.push(`(${selectedShortcut.filter})`);
+    }
+
+    const tags = filters.filter((filter) => filter.factor === "tagSearch").map((filter) => escapeFilterValue(filter.value));
+    if (tags.length > 0) {
+      conditions.push(tagMatchMode === "all" ? tags.map((tag) => `tag in [${tag}]`).join(" && ") : `tag in [${tags.join(", ")}]`);
     }
 
     // Add active filters from context
     for (const filter of filters) {
       if (filter.factor === "contentSearch") {
         conditions.push(`content.contains(${escapeFilterValue(filter.value)})`);
-      } else if (filter.factor === "tagSearch") {
-        conditions.push(`tag in [${escapeFilterValue(filter.value)}]`);
       } else if (filter.factor === "pinned") {
         if (includePinned) {
           conditions.push(`pinned`);
@@ -79,6 +82,10 @@ export const useMemoFilters = (options: UseMemoFiltersOptions = {}): string | un
         conditions.push(`has_task_list`);
       } else if (filter.factor === "property.hasCode") {
         conditions.push(`has_code`);
+      } else if (filter.factor === "property.hasIncompleteTasks") {
+        conditions.push("has_incomplete_tasks");
+      } else if (filter.factor === "mcpHidden") {
+        conditions.push("mcp_hidden");
       } else if (filter.factor === "displayTime") {
         const filterDate = new Date(filter.value);
         const filterUtcTimestamp = filterDate.getTime() + filterDate.getTimezoneOffset() * 60 * 1000;
@@ -96,5 +103,5 @@ export const useMemoFilters = (options: UseMemoFiltersOptions = {}): string | un
     }
 
     return conditions.length > 0 ? conditions.join(" && ") : undefined;
-  }, [creatorName, includeShortcuts, includePinned, visibilities, selectedShortcut, filters]);
+  }, [creatorName, includeShortcuts, includePinned, visibilities, selectedShortcut, filters, tagMatchMode]);
 };

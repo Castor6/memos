@@ -6,6 +6,8 @@ import type { LocalFile } from "../types/attachment";
 export type LoadingKey = "saving" | "uploading" | "loading";
 
 export interface EditorState {
+  /** Identifies a new draft after save/reset for derived UI state. */
+  generation: number;
   content: string;
   metadata: {
     tags?: string[];
@@ -51,6 +53,7 @@ export type EditorAction =
 
 // Module-private template for createInitialState.
 const defaultState: EditorState = {
+  generation: 0,
   content: "",
   metadata: {
     visibility: Visibility.PRIVATE,

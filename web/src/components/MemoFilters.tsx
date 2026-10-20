@@ -7,8 +7,10 @@ import {
   EyeIcon,
   HashIcon,
   LinkIcon,
+  ListTodoIcon,
   LucideIcon,
   SearchIcon,
+  ShieldOffIcon,
   XIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -52,6 +54,14 @@ const FILTER_CONFIGS: Record<FilterFactor, FilterConfig> = {
     icon: CheckCircleIcon,
     getLabel: (_, t) => t("memo.filters.has-task-list"),
   },
+  "property.hasIncompleteTasks": {
+    icon: ListTodoIcon,
+    getLabel: (_, t) => t("memo.filters.incomplete"),
+  },
+  mcpHidden: {
+    icon: ShieldOffIcon,
+    getLabel: (_, t) => t("memo.mcp-privacy.label"),
+  },
   "property.hasCode": {
     icon: CodeIcon,
     getLabel: (_, t) => t("memo.filters.has-code"),
@@ -60,7 +70,7 @@ const FILTER_CONFIGS: Record<FilterFactor, FilterConfig> = {
 
 const MemoFilters = ({ className }: { className?: string }) => {
   const t = useTranslate();
-  const { filters, removeFilter } = useMemoFilterContext();
+  const { filters, removeFilter, clearAllFilters } = useMemoFilterContext();
   const { userTagsSetting } = useAuth();
 
   const handleRemoveFilter = (filter: MemoFilter) => {
@@ -101,13 +111,21 @@ const MemoFilters = ({ className }: { className?: string }) => {
             )}
             <span className={cn("font-medium max-w-32 truncate", !isTag && "text-foreground/80")}>{getFilterDisplayText(filter)}</span>
             <span className="ml-0.5 -mr-1">
-              <Button variant="ghost" size="icon-sm" onClick={() => handleRemoveFilter(filter)} aria-label="Remove filter">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => handleRemoveFilter(filter)}
+                aria-label={t("memo.filters.remove", { name: getFilterDisplayText(filter) })}
+              >
                 <XIcon className="w-3 h-3" />
               </Button>
             </span>
           </div>
         );
       })}
+      <Button variant="ghost" size="sm" onClick={clearAllFilters} aria-label={t("memo.filters.clear-all")}>
+        {t("memo.filters.clear-all")}
+      </Button>
     </div>
   );
 };

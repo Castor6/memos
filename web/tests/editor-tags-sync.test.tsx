@@ -11,7 +11,14 @@ vi.mock("@/hooks/useUserQueries", () => ({ useTagCounts: () => ({ data: {} }) })
 function Content({ editing = false }: { editing?: boolean }) {
   const { actions, dispatch } = useEditorContext();
   const tags = useEditorSelector((state) => state.metadata.tags);
-  return <><button onClick={() => dispatch(actions.setMetadata({ tags: [...(tags ?? []), "手动"] }))}>手动添加</button><EditorTags editing={editing} /></>;
+  return <>
+    <button onClick={() => dispatch(actions.setMetadata({ tags: [...(tags ?? []), "手动"] }))}>手动添加</button>
+    <button onClick={() => {
+      dispatch(actions.reset());
+      dispatch(actions.setMetadata({ tags: filters.current.map((filter) => filter.value) }));
+    }}>保存并新建</button>
+    <EditorTags editing={editing} />
+  </>;
 }
 const ui = (editing = false) => <EditorProvider><Content editing={editing} /></EditorProvider>;
 
@@ -42,5 +49,31 @@ describe("filter-derived editor tags", () => {
     filters.current = [{ factor: "tagSearch", value: "无关筛选" }];
     rerender(ui(true));
     expect(screen.queryByRole("button", { name: "移除标签 无关筛选" })).toBeNull();
+  });
+  it("inherits multiple tags and withdraws only their automatic additions", () => {
+    filters.current = [{ factor: "tagSearch", value: "工作" }, { factor: "tagSearch", value: "项目" }];
+    const { rerender } = render(ui());
+    fireEvent.click(screen.getByText("手动添加"));
+    expect(screen.getByRole("button", { name: "移除标签 工作" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "移除标签 项目" })).toBeInTheDocument();
+    filters.current = [{ factor: "tagSearch", value: "项目" }];
+    rerender(ui());
+    expect(screen.queryByRole("button", { name: "移除标签 工作" })).toBeNull();
+    expect(screen.getByRole("button", { name: "移除标签 项目" })).toBeInTheDocument();
+    filters.current = [];
+    rerender(ui());
+    expect(screen.queryByRole("button", { name: "移除标签 项目" })).toBeNull();
+    expect(screen.getByRole("button", { name: "移除标签 手动" })).toBeInTheDocument();
+  });
+  it("treats restored filter tags as automatic in the new draft after saving", () => {
+    filters.current = [];
+    const { rerender } = render(ui());
+    fireEvent.click(screen.getByText("手动添加"));
+    filters.current = [{ factor: "tagSearch", value: "手动" }];
+    rerender(ui());
+    fireEvent.click(screen.getByText("保存并新建"));
+    filters.current = [];
+    rerender(ui());
+    expect(screen.queryByRole("button", { name: "移除标签 手动" })).toBeNull();
   });
 });

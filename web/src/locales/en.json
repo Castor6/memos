@@ -305,6 +305,12 @@
     "direction-desc": "Descending",
     "display-time": "Display Time",
     "filters": {
+      "remove": "Remove filter {{name}}",
+      "incomplete": "Incomplete",
+      "tag-mode": "Tag matching",
+      "union": "Union",
+      "intersection": "Intersection",
+      "clear-all": "Clear filters",
       "has-code": "hasCode",
       "has-link": "hasLink",
       "has-task-list": "hasTaskList",

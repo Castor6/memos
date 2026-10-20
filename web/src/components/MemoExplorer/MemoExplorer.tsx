@@ -3,6 +3,7 @@ import useCurrentUser from "@/hooks/useCurrentUser";
 import { cn } from "@/lib/utils";
 import type { StatisticsData } from "@/types/statistics";
 import StatisticsView from "../StatisticsView";
+import PropertyFilters from "./PropertyFilters";
 import ShortcutsSection from "./ShortcutsSection";
 import TagsSection from "./TagsSection";
 
@@ -79,6 +80,7 @@ const MemoExplorer = (props: Props) => {
       {features.search && <SearchBar isTodo={isTodo} />}
       <div className="mt-1 px-1 w-full">
         {features.statistics && <StatisticsView statisticsData={statisticsData} itemLabel={isTodo ? "待办" : undefined} />}
+        {features.tags && <PropertyFilters />}
         {features.shortcuts && currentUser && <ShortcutsSection isTodo={isTodo} />}
         {features.tags && <TagsSection readonly={context === "explore"} tagCount={tagCount} />}
       </div>

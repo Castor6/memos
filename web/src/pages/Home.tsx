@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useLocation } from "react-router-dom";
 import MemoEditor from "@/components/MemoEditor";
 import { deriveDefaultCreateTimeFromFilters } from "@/components/MemoEditor/utils/deriveDefaultCreateTime";
 import MemoView from "@/components/MemoView";
@@ -13,6 +14,7 @@ import { useTranslate } from "@/utils/i18n";
 
 const Home = ({ isTodo = false }: { isTodo?: boolean }) => {
   const user = useCurrentUser();
+  const location = useLocation();
   const t = useTranslate();
   const { filters } = useMemoFilterContext();
   const defaultCreateTime = useMemo(() => deriveDefaultCreateTimeFromFilters(filters), [filters]);
@@ -35,7 +37,14 @@ const Home = ({ isTodo = false }: { isTodo?: boolean }) => {
         <PagedMemoList
           isTodo={isTodo}
           renderer={(memo: Memo, { compact }) => (
-            <MemoView key={getMemoKey(memo)} memo={memo} showVisibility showPinned compact={compact} />
+            <MemoView
+              key={getMemoKey(memo)}
+              memo={memo}
+              parentPage={`${location.pathname}${location.search}`}
+              showVisibility
+              showPinned
+              compact={compact}
+            />
           )}
           listSort={listSort}
           orderBy={orderBy}

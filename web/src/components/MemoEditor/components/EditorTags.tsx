@@ -20,6 +20,7 @@ export default function EditorTags({
   onFocusContent?: () => void;
 }) {
   const { actions, dispatch } = useEditorContext();
+  const generation = useEditorSelector((state) => state.generation);
   const tags = useEditorSelector((state) => state.metadata.tags ?? EMPTY_TAGS);
   const { userTagsSetting } = useAuth();
   const { filters } = useMemoFilterContext();
@@ -34,8 +35,14 @@ export default function EditorTags({
   const selectedFilter = filters.filter((filter) => filter.factor === "tagSearch").map((filter) => filter.value);
   const filterKey = selectedFilter.join("\u0000");
   const autoTags = useRef(new Set<string>());
+  const previousGeneration = useRef(generation);
   const previousFilter = useRef<string | undefined>(undefined);
   useEffect(() => {
+    if (previousGeneration.current !== generation) {
+      autoTags.current = new Set(selectedFilter);
+      previousFilter.current = undefined;
+      previousGeneration.current = generation;
+    }
     if (ready && !editing && previousFilter.current !== filterKey) {
       const retained = tags.filter((tag) => !autoTags.current.has(tag) || selectedFilter.includes(tag));
       autoTags.current = new Set([
@@ -45,7 +52,7 @@ export default function EditorTags({
       dispatch(actions.setMetadata({ tags: Array.from(new Set([...retained, ...selectedFilter])) }));
       previousFilter.current = filterKey;
     }
-  }, [ready, editing, filterKey, tags, selectedFilter, dispatch, actions]);
+  }, [ready, editing, generation, filterKey, tags, selectedFilter, dispatch, actions]);
   const add = (tag: string) => {
     const value = tag.trim();
     autoTags.current.delete(value);
