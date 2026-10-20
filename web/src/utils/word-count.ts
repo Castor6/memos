@@ -6,7 +6,7 @@ import { remarkTag } from "@/utils/remark-plugins/remark-tag";
 
 const HAN_CHARACTERS = /\p{Script=Han}/gu;
 const WORDS = /[\p{L}\p{M}]+(?:['’][\p{L}\p{M}]+)*|\p{N}+/gu;
-const INLINE_NODES = new Set(["paragraph", "heading", "strong", "emphasis", "delete", "link", "linkReference"]);
+const INLINE_NODES = new Set(["strong", "emphasis", "delete", "link", "linkReference"]);
 
 function htmlText(source: string): string {
   const document = new DOMParser().parseFromString(source, "text/html");
@@ -18,7 +18,8 @@ function htmlText(source: string): string {
 function textFromNodes(nodes: RootContent[]): string {
   return nodes
     .map((node): string => {
-      if (node.type === "text" || node.type === "inlineCode" || node.type === "code") return node.value;
+      if (node.type === "text" || node.type === "inlineCode") return node.value;
+      if (node.type === "code") return `\n${node.value}\n`;
       if (node.type === "html") return markdownText(htmlText(node.value));
       if ("children" in node) {
         const text = textFromNodes(node.children);

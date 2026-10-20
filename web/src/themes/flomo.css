@@ -98,10 +98,15 @@ html[data-theme="flomo"] a[id^="header-"][aria-current="page"] {
   border-radius: 8px;
 }
 
-/* Sidebar tags retain their compact, neutral navigation appearance. */
-html[data-theme="flomo"] [data-sidebar-tag] {
+/* Unselected sidebar tags retain their compact, neutral navigation appearance. */
+html[data-theme="flomo"] [data-sidebar-tag]:not([aria-pressed="true"]) {
   color: var(--muted-foreground) !important;
   background-color: transparent !important;
+  border-color: transparent !important;
+}
+html[data-theme="flomo"] [data-sidebar-tag][aria-pressed="true"] {
+  color: var(--theme-tag-fg) !important;
+  background-color: var(--theme-tag-bg) !important;
   border-color: transparent !important;
 }
 html[data-theme="flomo"] .rich-editor a {

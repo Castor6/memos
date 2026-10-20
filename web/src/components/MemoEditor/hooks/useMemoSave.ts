@@ -76,9 +76,8 @@ export function useMemoSave({
       scheduleQueryRefresh(queryClient, ...refreshKeys);
 
       dispatch(actions.reset());
-      dispatch(
-        actions.setMetadata({ isTodo, tags: filters.filter((filter) => filter.factor === "tagSearch").map((filter) => filter.value) }),
-      );
+      const filterTags = filters.filter((filter) => filter.factor === "tagSearch").map((filter) => filter.value);
+      dispatch(actions.setMetadata({ isTodo, tags: filterTags, draftAutoTags: filterTags }));
       if (!memoName && defaultVisibility) {
         dispatch(actions.setMetadata({ visibility: defaultVisibility }));
       }

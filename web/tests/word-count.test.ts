@@ -12,6 +12,12 @@ describe("countMemoWords", () => {
     expect(countMemoWords("hel**lo**")).toBe(1);
     expect(countMemoWords("\\#literal `#code`\n\n```txt\nhello world\n```")).toBe(4);
   });
+  it("keeps block boundaries inside quotes and list items", () => {
+    expect(countMemoWords("> hello\n>\n> world")).toBe(2);
+    expect(countMemoWords("- hello\n\n  world")).toBe(2);
+    expect(countMemoWords("> # hello\n> world")).toBe(2);
+    expect(countMemoWords("hel**lo**")).toBe(1);
+  });
   it("excludes media, attachments and automatic reference previews", () => {
     expect(
       countMemoWords(

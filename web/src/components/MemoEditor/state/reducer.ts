@@ -85,7 +85,7 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
       };
 
     case "RESET":
-      return { ...createInitialState(), generation: state.generation + 1 };
+      return createInitialState();
 
     default:
       return state;

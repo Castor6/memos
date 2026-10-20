@@ -6,11 +6,11 @@ import type { LocalFile } from "../types/attachment";
 export type LoadingKey = "saving" | "uploading" | "loading";
 
 export interface EditorState {
-  /** Identifies a new draft after save/reset for derived UI state. */
-  generation: number;
   content: string;
   metadata: {
     tags?: string[];
+    /** Filter-derived draft tags; never sent to the memo API. */
+    draftAutoTags?: string[];
     isTodo?: boolean;
     mcpHidden?: boolean;
     /** Privacy value when editing began; only explicit changes may overwrite it. */
@@ -53,7 +53,6 @@ export type EditorAction =
 
 // Module-private template for createInitialState.
 const defaultState: EditorState = {
-  generation: 0,
   content: "",
   metadata: {
     visibility: Visibility.PRIVATE,

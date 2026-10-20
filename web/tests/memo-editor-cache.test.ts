@@ -33,6 +33,20 @@ describe("memo editor cache", () => {
     expect(cacheService.load(key)).toBe("- [x] Draft task");
   });
 
+  it("restores only valid automatic tag provenance and preserves legacy manual tags", () => {
+    const key = "draft-tag-provenance";
+    cacheService.saveNow(key, "正文", { ...createInitialState().metadata, tags: ["自动", "手动"], draftAutoTags: ["自动"] });
+    expect(cacheService.loadMetadata(key)?.draftAutoTags).toEqual(["自动"]);
+    const entry = JSON.parse(localStorage.getItem(key)!);
+    entry.draftAutoTags = ["自动", "不存在", 42];
+    localStorage.setItem(key, JSON.stringify(entry));
+    expect(cacheService.loadMetadata(key)?.draftAutoTags).toEqual(["自动"]);
+    delete entry.draftAutoTags;
+    localStorage.setItem(key, JSON.stringify(entry));
+    expect(cacheService.loadMetadata(key)?.tags).toEqual(["自动", "手动"]);
+    expect(cacheService.loadMetadata(key)?.draftAutoTags).toEqual([]);
+  });
+
   it("removes empty draft content instead of caching it", () => {
     const key = cacheService.key("users/steven", "home-memo-editor");
 
