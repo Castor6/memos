@@ -209,6 +209,11 @@ func NewSchema() Schema {
 				CompareNeq: true,
 			},
 		},
+		"mcp_hidden": {
+			Name: "mcp_hidden", Kind: FieldKindBoolColumn, Type: FieldTypeBool,
+			Column:               Column{Table: "memo", Name: "mcp_hidden"},
+			AllowedComparisonOps: map[ComparisonOperator]bool{CompareEq: true, CompareNeq: true},
+		},
 		"visibility": {
 			Name:        "visibility",
 			Kind:        FieldKindScalar,
@@ -291,6 +296,7 @@ func NewSchema() Schema {
 		cel.Variable("updated_ts", cel.TimestampType),
 		cel.Variable("pinned", cel.BoolType),
 		cel.Variable("is_todo", cel.BoolType),
+		cel.Variable("mcp_hidden", cel.BoolType),
 		cel.Variable("tag", cel.StringType),
 		cel.Variable("tags", cel.ListType(cel.StringType)),
 		cel.Variable("visibility", cel.StringType),

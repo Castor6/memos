@@ -1172,3 +1172,21 @@ func TestMemoFilterJSONBooleanLogic(t *testing.T) {
 	memos = tc.ListWithFilter(`has_task_list && !has_link`)
 	require.Len(t, memos, 1, "Should find 1 memo (task only)")
 }
+
+func TestMemoFilterMCPHidden(t *testing.T) {
+	t.Parallel()
+	tc := NewMemoFilterTestContext(t)
+	defer tc.Close()
+	hidden := NewMemoBuilder("hidden-public", tc.User.ID).Content("Hidden public memo").Tags("work").Property(func(p *storepb.MemoPayload_Property) { p.HasIncompleteTasks = true }).Build()
+	hidden.MCPHidden = true
+	_, err := tc.Store.CreateMemo(tc.Ctx, hidden)
+	require.NoError(t, err)
+	tc.CreateMemo(NewMemoBuilder("visible-private", tc.User.ID).Visibility(store.Private).Tags("work"))
+	require.Equal(t, []string{"hidden-public"}, uids(tc.ListWithFilter(`mcp_hidden`)))
+	require.Equal(t, []string{"hidden-public"}, uids(tc.ListWithFilter(`mcp_hidden == true`)))
+	require.Equal(t, []string{"visible-private"}, uids(tc.ListWithFilter(`!mcp_hidden`)))
+	require.Equal(t, []string{"visible-private"}, uids(tc.ListWithFilter(`mcp_hidden == false`)))
+	require.Equal(t, []string{"visible-private"}, uids(tc.ListWithFilter(`mcp_hidden != true`)))
+	require.Equal(t, []string{"hidden-public"}, uids(tc.ListWithFilter(`mcp_hidden && has_incomplete_tasks && tag in ["work", "project"]`)))
+	require.Empty(t, tc.ListWithFilter(`mcp_hidden && visibility == "PRIVATE"`))
+}
