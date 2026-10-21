@@ -36,7 +36,7 @@ const About = lazyPage(() => import("@/pages/About"));
 const Archived = lazyPage(() => import("@/pages/Archived"));
 const AuthCallback = lazyWithReload(() => import("@/pages/AuthCallback"));
 const Explore = lazyPage(() => import("@/pages/Explore"));
-const Home = lazyPage(() => import("@/pages/Home"));
+const Home = lazyWithReload(() => import("@/pages/Home"));
 const Inboxes = lazyPage(() => import("@/pages/Inboxes"));
 const MemoDetail = lazyWithReload(() => import("@/pages/MemoDetail"));
 const NotFound = lazyPage(() => import("@/pages/NotFound"));

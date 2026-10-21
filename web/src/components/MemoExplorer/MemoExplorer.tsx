@@ -1,4 +1,6 @@
 import SearchBar from "@/components/SearchBar";
+import { useAuth } from "@/contexts/AuthContext";
+import { useInstance } from "@/contexts/InstanceContext";
 import useCurrentUser from "@/hooks/useCurrentUser";
 import { cn } from "@/lib/utils";
 import type { StatisticsData } from "@/types/statistics";
@@ -62,6 +64,9 @@ const getDefaultFeatures = (context: MemoExplorerContext): MemoExplorerFeatures 
 const MemoExplorer = (props: Props) => {
   const { className, isTodo = false, context = "home", features: featureOverrides = {}, statisticsData, tagCount } = props;
   const currentUser = useCurrentUser();
+  const { isInitialized: authInitialized } = useAuth();
+  const { isInitialized: instanceInitialized } = useInstance();
+  const settingsPending = !authInitialized || !instanceInitialized;
 
   // Merge default features with overrides
   const features = {
@@ -71,6 +76,8 @@ const MemoExplorer = (props: Props) => {
 
   return (
     <aside
+      inert={settingsPending}
+      aria-busy={settingsPending}
       className={cn(
         "relative w-full h-full overflow-auto [scrollbar-gutter:stable] flex flex-col justify-start items-start bg-background text-sidebar-foreground",
         className,
