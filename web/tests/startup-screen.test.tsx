@@ -221,6 +221,7 @@ describe("React startup handoff", () => {
     );
     expect(view.getByText("Something went wrong")).toBeInTheDocument();
     expect(notify).toHaveBeenCalledOnce();
+    expect((notify.mock.calls[0][0] as CustomEvent).detail).toEqual({ success: false });
     window.removeEventListener("memos:startup-ready", notify);
   });
 });

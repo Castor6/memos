@@ -87,7 +87,7 @@ const UserProfile = () => {
 
   return (
     <section className="flex min-h-screen w-full flex-col bg-background">
-      <StartupReady />
+      <StartupReady success={!!user} />
       {user ? (
         <>
           <ProfileHeader user={user} onCopyProfileLink={handleCopyProfileLink} shareLabel={t("common.share")} />
