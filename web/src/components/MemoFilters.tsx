@@ -127,16 +127,18 @@ const MemoFilters = ({ className }: { className?: string }) => {
           </div>
         );
       })}
-      <Button
-        variant="ghost"
-        size="sm"
-        className="gap-1 px-1.5 text-xs font-normal text-muted-foreground hover:bg-muted hover:text-foreground"
-        onClick={clearAllFilters}
-        aria-label={t("memo.filters.clear-all")}
-      >
-        <XIcon className="size-3" aria-hidden />
-        {t("memo.filters.clear")}
-      </Button>
+      {filters.length > 1 && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="gap-1 px-1.5 text-xs font-normal text-muted-foreground hover:bg-muted hover:text-foreground"
+          onClick={clearAllFilters}
+          aria-label={t("memo.filters.clear-all")}
+        >
+          <XIcon className="size-3" aria-hidden />
+          {t("memo.filters.clear")}
+        </Button>
+      )}
     </div>
   );
 };
