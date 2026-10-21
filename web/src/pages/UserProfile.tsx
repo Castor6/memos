@@ -5,6 +5,7 @@ import { toast } from "react-hot-toast";
 import { useParams, useSearchParams } from "react-router-dom";
 import MemoView from "@/components/MemoView";
 import PagedMemoList, { getMemoKey } from "@/components/PagedMemoList";
+import StartupReady from "@/components/StartupReady";
 import UserAvatar from "@/components/UserAvatar";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -86,6 +87,7 @@ const UserProfile = () => {
 
   return (
     <section className="flex min-h-screen w-full flex-col bg-background">
+      <StartupReady />
       {user ? (
         <>
           <ProfileHeader user={user} onCopyProfileLink={handleCopyProfileLink} shareLabel={t("common.share")} />

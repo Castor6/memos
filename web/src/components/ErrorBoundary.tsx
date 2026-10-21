@@ -1,6 +1,7 @@
 import { AlertCircle, RefreshCw } from "lucide-react";
-import { Component, type ErrorInfo, type ReactNode } from "react";
+import { Component, type ErrorInfo, type ReactNode, useEffect } from "react";
 import { useRouteError } from "react-router-dom";
+import { finishStartup } from "@/utils/startup";
 import { Button } from "./ui/button";
 
 interface Props {
@@ -25,6 +26,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error("ErrorBoundary caught an error:", error, errorInfo);
+    finishStartup();
   }
 
   handleReset = () => {
@@ -73,6 +75,7 @@ export class ErrorBoundary extends Component<Props, State> {
 // React Router errorElement for route-level errors (e.g., failed chunk loads after redeployment).
 export function ChunkLoadErrorFallback() {
   const error = useRouteError() as Error | undefined;
+  useEffect(finishStartup, []);
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">

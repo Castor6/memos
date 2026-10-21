@@ -78,7 +78,6 @@ const MemoHeader: React.FC<MemoHeaderProps> = ({ showCreator, showVisibility, sh
         ) : (
           <TimeDisplay displayTime={displayTime} timeTooltip={timeTooltip} onGotoDetail={handleGotoMemoDetailPage} />
         )}
-        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{t("memo.word-count", { count: wordCount })}</span>
         {memo.name === newMemoName && (
           <span className="ml-2 shrink-0 rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-medium leading-none text-primary">
             {t("memo.new-badge")}
@@ -87,6 +86,9 @@ const MemoHeader: React.FC<MemoHeaderProps> = ({ showCreator, showVisibility, sh
       </div>
 
       <div className="flex flex-row justify-end items-center select-none shrink-0 gap-2">
+        <span className="shrink-0 whitespace-nowrap text-xs tabular-nums text-muted-foreground">
+          {t("memo.word-count", { count: wordCount })}
+        </span>
         {currentUser && !isArchived && <ReactionSelector className="border-none w-auto h-auto block" memo={memo} />}
 
         {showVisibility && memo.visibility !== Visibility.PRIVATE && (
