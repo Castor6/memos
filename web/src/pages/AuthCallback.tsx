@@ -2,6 +2,7 @@ import { timestampDate } from "@bufbuild/protobuf/wkt";
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { setAccessToken } from "@/auth-state";
+import StartupReady from "@/components/StartupReady";
 import { authServiceClient, userServiceClient } from "@/connect";
 import { useAuth } from "@/contexts/AuthContext";
 import useNavigateTo from "@/hooks/useNavigateTo";
@@ -141,6 +142,7 @@ const AuthCallback = () => {
 
   return (
     <div className="p-4 py-24 w-full h-full flex justify-center items-center">
+      {state.errorMessage && <StartupReady />}
       <div className="max-w-lg font-mono whitespace-pre-wrap opacity-80">{state.errorMessage}</div>
     </div>
   );

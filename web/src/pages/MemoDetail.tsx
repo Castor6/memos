@@ -7,6 +7,7 @@ import { MentionResolutionProvider } from "@/components/MemoContent/MentionResol
 import { MemoDetailSidebar, MemoDetailSidebarDrawer } from "@/components/MemoDetailSidebar";
 import MemoView from "@/components/MemoView";
 import MobileHeader from "@/components/MobileHeader";
+import StartupReady from "@/components/StartupReady";
 import { useAuth } from "@/contexts/AuthContext";
 import { useInstance } from "@/contexts/InstanceContext";
 import useMediaQuery from "@/hooks/useMediaQuery";
@@ -110,6 +111,7 @@ const MemoDetail = () => {
 
   return (
     <section className="@container w-full max-w-5xl min-h-full flex flex-col justify-start items-center sm:pt-3 md:pt-6 pb-8">
+      <StartupReady />
       {!md && (
         <MobileHeader>
           <MemoDetailSidebarDrawer memo={displayMemo} onShareImageOpen={() => setShareImageDialogOpen(true)} />

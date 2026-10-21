@@ -1,6 +1,8 @@
+import type { ComponentType } from "react";
 import { createBrowserRouter, Navigate, type RouteObject } from "react-router-dom";
 import App from "@/App";
 import { ChunkLoadErrorFallback } from "@/components/ErrorBoundary";
+import StartupReady from "@/components/StartupReady";
 import MainLayout from "@/layouts/MainLayout";
 import RootLayout from "@/layouts/RootLayout";
 import { lazyWithReload } from "@/utils/lazy";
@@ -13,21 +15,37 @@ import {
 } from "./guards";
 import { ROUTES } from "./routes";
 
-const AdminSignIn = lazyWithReload(() => import("@/pages/AdminSignIn"));
-const About = lazyWithReload(() => import("@/pages/About"));
-const Archived = lazyWithReload(() => import("@/pages/Archived"));
+// Only a committed leaf page can hand the initial document over to React.
+function lazyPage<Props extends object>(load: () => Promise<{ default: ComponentType<Props> }>) {
+  return lazyWithReload(async () => {
+    const { default: Page } = await load();
+    return {
+      default: function StartupPage(props: Props) {
+        return (
+          <StartupReady>
+            <Page {...props} />
+          </StartupReady>
+        );
+      },
+    };
+  });
+}
+
+const AdminSignIn = lazyPage(() => import("@/pages/AdminSignIn"));
+const About = lazyPage(() => import("@/pages/About"));
+const Archived = lazyPage(() => import("@/pages/Archived"));
 const AuthCallback = lazyWithReload(() => import("@/pages/AuthCallback"));
-const Explore = lazyWithReload(() => import("@/pages/Explore"));
-const Home = lazyWithReload(() => import("@/pages/Home"));
-const Inboxes = lazyWithReload(() => import("@/pages/Inboxes"));
+const Explore = lazyPage(() => import("@/pages/Explore"));
+const Home = lazyPage(() => import("@/pages/Home"));
+const Inboxes = lazyPage(() => import("@/pages/Inboxes"));
 const MemoDetail = lazyWithReload(() => import("@/pages/MemoDetail"));
-const NotFound = lazyWithReload(() => import("@/pages/NotFound"));
-const PermissionDenied = lazyWithReload(() => import("@/pages/PermissionDenied"));
-const Attachments = lazyWithReload(() => import("@/pages/Attachments"));
-const Setting = lazyWithReload(() => import("@/pages/Setting"));
-const Shortcuts = lazyWithReload(() => import("@/pages/Shortcuts"));
-const SignIn = lazyWithReload(() => import("@/pages/SignIn"));
-const SignUp = lazyWithReload(() => import("@/pages/SignUp"));
+const NotFound = lazyPage(() => import("@/pages/NotFound"));
+const PermissionDenied = lazyPage(() => import("@/pages/PermissionDenied"));
+const Attachments = lazyPage(() => import("@/pages/Attachments"));
+const Setting = lazyPage(() => import("@/pages/Setting"));
+const Shortcuts = lazyPage(() => import("@/pages/Shortcuts"));
+const SignIn = lazyPage(() => import("@/pages/SignIn"));
+const SignUp = lazyPage(() => import("@/pages/SignUp"));
 const UserProfile = lazyWithReload(() => import("@/pages/UserProfile"));
 
 // Backward compatibility alias.

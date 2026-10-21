@@ -13,11 +13,188 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <style id="startup-style">
+      #startup-screen {
+        --startup-bg: #faf9f5;
+        --startup-paper: #ffffff;
+        --startup-ink: #24272e;
+        --startup-muted: #767b80;
+        --startup-edge: #dce8dc;
+        --startup-green: #25c769;
+        position: fixed;
+        inset: 0;
+        z-index: 2147483647;
+        box-sizing: border-box;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom));
+        overflow: auto;
+        background: var(--startup-bg);
+        color: var(--startup-ink);
+        font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        text-align: center;
+      }
+      html[data-theme="default-dark"] #startup-screen {
+        --startup-bg: #1d1f23;
+        --startup-paper: #2b3034;
+        --startup-ink: #eceeec;
+        --startup-muted: #b0b6b2;
+        --startup-edge: #455549;
+        --startup-green: #53d38b;
+        color-scheme: dark;
+      }
+      html[data-theme="paper"] #startup-screen { --startup-bg: #f5ede4; }
+      html[data-theme="cream"] #startup-screen { --startup-bg: #fcf9f5; }
+      html[data-theme="mint"] #startup-screen { --startup-bg: #f1f8f3; }
+      html[data-theme="flomo"] #startup-screen { --startup-bg: #f8f8f8; }
+      #startup-screen .startup-content { width: min(100%, 320px); margin: auto; }
+      #startup-screen .startup-papers {
+        position: relative;
+        width: 112px;
+        height: 132px;
+        margin: 0 auto 30px;
+        animation: startup-float 3.6s ease-in-out infinite;
+      }
+      #startup-screen .startup-paper {
+        position: absolute;
+        inset: 0;
+        border: 1px solid var(--startup-edge);
+        border-radius: 13px;
+        background: var(--startup-paper);
+        box-shadow: 0 5px 12px #142d1a0a;
+      }
+      #startup-screen .startup-paper:first-child { transform: translate(-9px, 5px) rotate(-10deg); }
+      #startup-screen .startup-paper:nth-child(2) { transform: translate(10px, 3px) rotate(8deg); }
+      #startup-screen .startup-paper:last-child {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        transform: rotate(3deg);
+        box-shadow: 0 8px 16px #142d1a0e;
+      }
+      #startup-screen .startup-logo { width: 54px; height: 54px; border-radius: 50%; margin-bottom: 3px; }
+      #startup-screen .startup-line { width: 65px; height: 4px; border-radius: 4px; background: var(--startup-edge); }
+      #startup-screen .startup-line:last-child { width: 40px; }
+      #startup-screen .startup-title { margin: 0; font-size: 25px; font-weight: 600; letter-spacing: -0.6px; }
+      #startup-screen .startup-dots { height: 28px; display: flex; align-items: center; justify-content: center; gap: 9px; margin-top: 9px; }
+      #startup-screen .startup-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--startup-green); animation: startup-dot 1.5s ease-in-out infinite; }
+      #startup-screen .startup-dot:nth-child(2) { animation-delay: 180ms; }
+      #startup-screen .startup-dot:nth-child(3) { animation-delay: 360ms; }
+      #startup-screen .startup-status { margin: 8px 0 0; color: var(--startup-muted); }
+      #startup-screen .startup-recovery { margin-top: 20px; }
+      #startup-screen .startup-recovery[hidden] { display: none; }
+      #startup-screen .startup-retry {
+        border: 1px solid var(--startup-edge);
+        border-radius: 8px;
+        padding: 8px 16px;
+        background: var(--startup-paper);
+        color: var(--startup-ink);
+        font: inherit;
+        cursor: pointer;
+      }
+      #startup-screen .startup-retry:focus-visible { outline: 2px solid var(--startup-green); outline-offset: 3px; }
+      @keyframes startup-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+      @keyframes startup-dot { 0%, 55%, 100% { transform: translateY(0); opacity: 0.35; } 27% { transform: translateY(-4px); opacity: 1; } }
+      @media (prefers-reduced-motion: reduce) {
+        #startup-screen .startup-papers, #startup-screen .startup-dot { animation: none; }
+      }
+    </style>
     <!-- memos.metadata.head -->
     <title>Memos</title>
   </head>
   <body class="text-base w-full min-h-svh">
-    <div id="root" class="relative w-full min-h-full"></div>
+    <div id="startup-screen">
+      <div class="startup-content">
+        <div class="startup-papers" aria-hidden="true">
+          <div class="startup-paper"></div>
+          <div class="startup-paper"></div>
+          <div class="startup-paper">
+            <img class="startup-logo" src="/logo.webp" width="54" height="54" alt="" />
+            <span class="startup-line"></span>
+            <span class="startup-line"></span>
+          </div>
+        </div>
+        <p class="startup-title">Memos</p>
+        <div class="startup-dots" aria-hidden="true">
+          <span class="startup-dot"></span><span class="startup-dot"></span><span class="startup-dot"></span>
+        </div>
+        <p id="startup-status" class="startup-status" role="status">正在打开 Memos…</p>
+        <div id="startup-recovery" class="startup-recovery" hidden>
+          <button id="startup-retry" class="startup-retry" type="button">重新加载</button>
+        </div>
+        <noscript>
+          <style>.startup-dots { display: none !important; } #startup-status { display: none; }</style>
+          <p>请启用 JavaScript 以打开 Memos。Please enable JavaScript to open Memos.</p>
+        </noscript>
+      </div>
+    </div>
+    <div id="root" class="relative w-full min-h-full" inert aria-hidden="true"></div>
+    <script id="startup-script">
+      (() => {
+        const screen = document.getElementById("startup-screen");
+        const root = document.getElementById("root");
+        const status = document.getElementById("startup-status");
+        const recovery = document.getElementById("startup-recovery");
+        const retry = document.getElementById("startup-retry");
+        let locale = navigator.language;
+        let theme = "system";
+        try {
+          locale = localStorage.getItem("memos-locale") || locale;
+          theme = localStorage.getItem("memos-theme") || theme;
+        } catch {
+          // Startup also works when browser storage is unavailable.
+        }
+        const themes = ["system", "default", "default-dark", "paper", "cream", "mint", "flomo"];
+        if (!themes.includes(theme)) theme = "system";
+        if (theme === "system") theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "default-dark" : "default";
+        document.documentElement.dataset.theme = theme;
+        const chinese = locale.toLowerCase().startsWith("zh");
+        status.textContent = chinese ? "正在打开 Memos…" : "Opening Memos…";
+        retry.textContent = chinese ? "重新加载" : "Reload";
+        retry.addEventListener("click", () => window.location.reload());
+
+        let pageReady = false;
+        let stylesFailed = false;
+        const styles = Array.from(document.querySelectorAll("link[data-startup-stylesheet]"));
+        let remainingStyles = styles.length;
+        const showRecovery = () => {
+          status.textContent = chinese ? "加载时间较长，请检查网络或重新加载。" : "This is taking longer than usual. Check your connection or reload.";
+          recovery.hidden = false;
+        };
+        const timeout = window.setTimeout(showRecovery, 12000);
+        const finish = () => {
+          if (!pageReady || remainingStyles || stylesFailed) return;
+          window.clearTimeout(timeout);
+          window.removeEventListener("memos:startup-ready", onPageReady);
+          root.removeAttribute("inert");
+          root.removeAttribute("aria-hidden");
+          screen.remove();
+          document.getElementById("startup-style")?.remove();
+        };
+        function onPageReady() {
+          pageReady = true;
+          finish();
+        }
+        window.addEventListener("memos:startup-ready", onPageReady);
+        for (const link of styles) {
+          link.addEventListener("load", () => {
+            link.media = "all";
+            remainingStyles -= 1;
+            finish();
+          }, { once: true });
+          link.addEventListener("error", () => {
+            stylesFailed = true;
+            showRecovery();
+          }, { once: true });
+          // Download the application's styles without blocking the inline startup screen.
+          link.media = "print";
+          link.rel = "stylesheet";
+        }
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
     <!-- memos.metadata.body -->
   </body>

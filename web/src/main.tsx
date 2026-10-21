@@ -1,7 +1,7 @@
 import "@github/relative-time-element";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
-import React, { useEffect, useRef } from "react";
+import React, { Suspense, useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
 import { Toaster } from "react-hot-toast";
 import { RouterProvider } from "react-router-dom";
@@ -66,7 +66,9 @@ function Main() {
           <AuthProvider>
             <ViewProvider>
               <AppInitializer>
-                <RouterProvider router={router} />
+                <Suspense fallback={null}>
+                  <RouterProvider router={router} />
+                </Suspense>
                 <Toaster position="top-right" />
               </AppInitializer>
             </ViewProvider>
