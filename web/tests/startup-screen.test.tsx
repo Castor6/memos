@@ -32,6 +32,7 @@ function boot({ css = false, dark = false, blockedStorage = false } = {}) {
         throw new Error("Blocked");
       },
     });
+  window.eval(window.document.getElementById("startup-appearance")!.textContent!);
   window.eval(window.document.getElementById("startup-script")!.textContent!);
   return {
     window,
