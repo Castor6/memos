@@ -4,6 +4,7 @@ import MemoEditor from "@/components/MemoEditor";
 import { deriveDefaultCreateTimeFromFilters } from "@/components/MemoEditor/utils/deriveDefaultCreateTime";
 import MemoView from "@/components/MemoView";
 import PagedMemoList, { getMemoKey } from "@/components/PagedMemoList";
+import StartupReady from "@/components/StartupReady";
 import { useMemoFilterContext } from "@/contexts/MemoFilterContext";
 import { NewMemoProvider } from "@/contexts/NewMemoContext";
 import { useMemoFilters, useMemoSorting } from "@/hooks";
@@ -33,6 +34,8 @@ const Home = ({ isTodo = false }: { isTodo?: boolean }) => {
 
   return (
     <div className="w-full min-h-full bg-background text-foreground">
+      {/* The shell can appear while PagedMemoList still protects settings-dependent content. */}
+      <StartupReady waitForSettings={false} />
       <NewMemoProvider>
         <PagedMemoList
           isTodo={isTodo}

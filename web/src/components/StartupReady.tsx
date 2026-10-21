@@ -3,13 +3,14 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useInstance } from "@/contexts/InstanceContext";
 import { finishStartup } from "@/utils/startup";
 
-const StartupReady = ({ children }: { children?: ReactNode }) => {
-  const { isInitialized: authInitialized } = useAuth();
-  const { isInitialized: instanceInitialized } = useInstance();
+const StartupReady = ({ children, waitForSettings = true }: { children?: ReactNode; waitForSettings?: boolean }) => {
+  const { isIdentityInitialized, isInitialized: authInitialized } = useAuth();
+  const { isProfileInitialized, isInitialized: instanceInitialized } = useInstance();
+  const ready = waitForSettings ? authInitialized && instanceInitialized : isIdentityInitialized && isProfileInitialized;
 
   useEffect(() => {
-    if (authInitialized && instanceInitialized) finishStartup();
-  }, [authInitialized, instanceInitialized]);
+    if (ready) finishStartup();
+  }, [ready]);
 
   return children;
 };

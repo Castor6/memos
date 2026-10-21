@@ -8,9 +8,13 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import StartupReady from "@/components/StartupReady";
 import { deferStartupStyles } from "../plugins/startup-html";
 
-const readiness = vi.hoisted(() => ({ auth: true, instance: true }));
-vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => ({ isInitialized: readiness.auth }) }));
-vi.mock("@/contexts/InstanceContext", () => ({ useInstance: () => ({ isInitialized: readiness.instance }) }));
+const readiness = vi.hoisted(() => ({ identity: true, profile: true, auth: true, instance: true }));
+vi.mock("@/contexts/AuthContext", () => ({
+  useAuth: () => ({ isIdentityInitialized: readiness.identity, isInitialized: readiness.auth }),
+}));
+vi.mock("@/contexts/InstanceContext", () => ({
+  useInstance: () => ({ isProfileInitialized: readiness.profile, isInitialized: readiness.instance }),
+}));
 
 const source = readFileSync(resolve(process.cwd(), "index.html"), "utf8");
 const windows: JSDOM[] = [];
@@ -113,8 +117,38 @@ describe("static startup screen", () => {
 
 describe("React startup handoff", () => {
   beforeEach(() => {
+    readiness.identity = true;
+    readiness.profile = true;
     readiness.auth = true;
     readiness.instance = true;
+  });
+
+  it("hands over the feed shell after identity and profile settle without waiting for settings", () => {
+    const notify = vi.fn();
+    window.addEventListener("memos:startup-ready", notify);
+    readiness.identity = false;
+    readiness.profile = false;
+    readiness.auth = false;
+    readiness.instance = false;
+    const content = () => (
+      <StartupReady waitForSettings={false}>
+        <main>Feed shell</main>
+      </StartupReady>
+    );
+    const view = render(content());
+    expect(notify).not.toHaveBeenCalled();
+    readiness.identity = true;
+    view.rerender(content());
+    expect(notify).not.toHaveBeenCalled();
+    readiness.profile = true;
+    view.rerender(content());
+    expect(view.getByText("Feed shell")).toBeInTheDocument();
+    expect(notify).toHaveBeenCalledOnce();
+    readiness.auth = true;
+    readiness.instance = true;
+    view.rerender(content());
+    expect(notify).toHaveBeenCalledOnce();
+    window.removeEventListener("memos:startup-ready", notify);
   });
 
   it("waits for both display-sensitive settings without blocking the page from starting requests", () => {
@@ -146,7 +180,7 @@ describe("React startup handoff", () => {
     window.removeEventListener("memos:startup-ready", notify);
   });
 
-  it("does not finish while the first lazy page is suspended", async () => {
+  it.each([true, false])("does not finish while the first lazy page is suspended (waitForSettings=%s)", async (waitForSettings) => {
     const notify = vi.fn();
     window.addEventListener("memos:startup-ready", notify);
     let resolve!: (value: { default: () => React.ReactNode }) => void;
@@ -158,7 +192,7 @@ describe("React startup handoff", () => {
     );
     render(
       <Suspense fallback={null}>
-        <StartupReady>
+        <StartupReady waitForSettings={waitForSettings}>
           <Page />
         </StartupReady>
       </Suspense>,
