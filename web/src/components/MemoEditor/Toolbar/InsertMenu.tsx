@@ -1,5 +1,5 @@
 import { uniqBy } from "lodash-es";
-import { FileIcon, ImageIcon, LinkIcon, LoaderIcon, MapPinIcon, MicIcon, PanelTopCloseIcon, PlusIcon } from "lucide-react";
+import { FileIcon, ImageIcon, LinkIcon, LoaderIcon, MapPinIcon, MicIcon, PlusIcon } from "lucide-react";
 import { type RefObject, useCallback, useEffect, useRef, useState } from "react";
 import { LinkMemoDialog, LocationDialog } from "@/components/MemoMetadata";
 import type { MapPoint } from "@/components/map/types";
@@ -121,15 +121,6 @@ const InsertMenu = (props: InsertMenuProps & { controllerRef: RefObject<EditorCo
 
   // Insert actions (add content).
   const insertItems = [
-    {
-      key: "details",
-      label: "折叠区",
-      icon: PanelTopCloseIcon,
-      onClick: () => {
-        controller?.restoreSelection?.();
-        controller?.run("insertDetails");
-      },
-    },
     { key: "url", label: "链接", icon: LinkIcon, onClick: () => setURLDialogOpen(true) },
     { key: "media", label: t("attachment-library.tabs.media"), icon: ImageIcon, onClick: handleMediaUploadClick },
     { key: "audio", label: t("editor.audio-recorder.trigger"), icon: MicIcon, onClick: props.onAudioRecorderClick },
@@ -157,7 +148,7 @@ const InsertMenu = (props: InsertMenuProps & { controllerRef: RefObject<EditorCo
         <DropdownMenuContent
           align="start"
           finalFocus={() => {
-            if (!activeAction.current || activeAction.current === "details") props.controllerRef.current?.focus();
+            if (!activeAction.current) props.controllerRef.current?.focus();
             return false;
           }}
         >
