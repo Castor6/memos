@@ -1,12 +1,11 @@
-import { Suspense, useEffect } from "react";
+import { Suspense, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useDelayedFlag } from "@/hooks/useDelayedFlag";
 import { useTranslate } from "@/utils/i18n";
 import { lazyWithReload } from "@/utils/lazy";
-import { revealStartupShell } from "@/utils/startup";
-import { loadHomePage } from "./home-page";
+import { getLoadedHomePage, loadHomePage } from "./home-page";
 
-const Home = lazyWithReload(loadHomePage);
+const LazyHome = lazyWithReload(loadHomePage);
 
 const FeedPlaceholder = () => {
   const t = useTranslate();
@@ -41,13 +40,15 @@ const FeedPlaceholder = () => {
 };
 
 // This leaf stays inside the identity and private-instance route guards. Its
-// local boundary lets navigation and the sidebar commit while Home loads.
+// local boundary lets navigation and the sidebar commit while Home loads; on
+// startup they stay behind the static screen until Home reports it is ready.
 const FeedRoute = ({ isTodo = false }: { isTodo?: boolean }) => {
-  useEffect(revealStartupShell, []);
-
+  // React holds content back for 300 ms after committing a Suspense fallback, so
+  // an already-loaded module must render directly instead of suspending once.
+  const [Page] = useState(() => getLoadedHomePage()?.default ?? LazyHome);
   return (
     <Suspense fallback={<FeedPlaceholder />}>
-      <Home isTodo={isTodo} />
+      <Page isTodo={isTodo} />
     </Suspense>
   );
 };

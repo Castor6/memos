@@ -5,16 +5,17 @@ import { finishStartup } from "@/utils/startup";
 
 const StartupReady = ({
   children,
-  waitForSettings = true,
   success = true,
+  pending = false,
 }: {
   children?: ReactNode;
-  waitForSettings?: boolean;
   success?: boolean;
+  /** Keeps the startup screen while page-specific content is still loading. */
+  pending?: boolean;
 }) => {
-  const { isIdentityInitialized, isInitialized: authInitialized } = useAuth();
-  const { isProfileInitialized, isInitialized: instanceInitialized } = useInstance();
-  const ready = waitForSettings ? authInitialized && instanceInitialized : isIdentityInitialized && isProfileInitialized;
+  const { isInitialized: authInitialized } = useAuth();
+  const { isInitialized: instanceInitialized } = useInstance();
+  const ready = authInitialized && instanceInitialized && !pending;
 
   useEffect(() => {
     if (ready) finishStartup(success);
