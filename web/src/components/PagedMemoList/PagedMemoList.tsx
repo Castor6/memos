@@ -41,8 +41,6 @@ interface Props {
   enabled?: boolean;
   /** Route-owned content rendered before the list and inside column one in grid mode. */
   renderLeading?: (options: { useGrid: boolean }) => ReactNode;
-  /** Called once the first page, its empty state, or its error can be shown. */
-  onContentReady?: () => void;
 }
 
 function useAutoFetchWhenNotScrollable({
@@ -158,11 +156,6 @@ const PagedMemoList = (props: Props) => {
   const isDisplayPending = isLoading || !authInitialized || !instanceInitialized;
   // Only show the spinner once loading exceeds the delay, so fast loads don't flash it.
   const showLoader = useDelayedFlag(isDisplayPending, LOADING_INDICATOR_DELAY_MS);
-
-  const { onContentReady } = props;
-  useEffect(() => {
-    if (!isDisplayPending) onContentReady?.();
-  }, [isDisplayPending, onContentReady]);
 
   // Flatten pages into a single array of memos
   const memos = useMemo(() => data?.pages.flatMap((page) => page.memos) || [], [data]);

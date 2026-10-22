@@ -8,7 +8,7 @@ import { useUpdateUserGeneralSetting } from "@/hooks/useUserQueries";
 import { getActiveSpace, switchSpace } from "@/lib/personal-space";
 
 export default function SpaceSwitcher() {
-  const { currentUser, userGeneralSetting, refetchSettings, isInitialized } = useAuth();
+  const { currentUser, userGeneralSetting, refetchSettings } = useAuth();
   const update = useUpdateUserGeneralSetting(currentUser?.name);
   const [name, setName] = useState("");
   const [open, setOpen] = useState(false);
@@ -20,7 +20,6 @@ export default function SpaceSwitcher() {
       </label>
       <select
         id="personal-space"
-        disabled={!isInitialized}
         className="max-w-52 rounded-md border bg-card px-3 py-1.5 text-sm"
         value={getActiveSpace()}
         onChange={(event) => switchSpace(event.target.value)}
@@ -33,16 +32,14 @@ export default function SpaceSwitcher() {
         ))}
       </select>
       <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger disabled={!isInitialized} render={<Button variant="ghost" size="sm" />}>
-          新建空间
-        </PopoverTrigger>
+        <PopoverTrigger render={<Button variant="ghost" size="sm" />}>新建空间</PopoverTrigger>
         <PopoverContent className="p-3 w-64" align="start">
           <form
             className="flex flex-col gap-3"
             onSubmit={async (event) => {
               event.preventDefault();
               const title = name.trim();
-              if (!isInitialized || !title) return;
+              if (!title) return;
               try {
                 const id = crypto.randomUUID();
                 await update.mutateAsync({
@@ -66,7 +63,7 @@ export default function SpaceSwitcher() {
               placeholder="例如：公司"
               aria-label="空间名称"
             />
-            <Button type="submit" disabled={!isInitialized || update.isPending || !name.trim()}>
+            <Button type="submit" disabled={update.isPending || !name.trim()}>
               创建
             </Button>
           </form>

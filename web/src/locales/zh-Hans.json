@@ -284,7 +284,6 @@
     "load-more": "加载更多",
     "load-error": "笔记加载失败，请重试。已有笔记不会丢失。",
     "retry": "重试",
-    "startup-slow": "加载时间较长，请检查网络或重新加载。",
     "no-archived-memos": "没有已归档备忘录。",
     "no-memos": "无备忘录",
     "new-badge": "新",

@@ -6,7 +6,6 @@ import StartupReady from "@/components/StartupReady";
 import MainLayout from "@/layouts/MainLayout";
 import RootLayout from "@/layouts/RootLayout";
 import { lazyWithReload } from "@/utils/lazy";
-import FeedRoute from "./FeedRoute";
 import {
   LandingRoute,
   RequireAuthRoute,
@@ -17,13 +16,13 @@ import {
 import { ROUTES } from "./routes";
 
 // Only a committed leaf page can hand the initial document over to React.
-function lazyPage<Props extends object>(load: () => Promise<{ default: ComponentType<Props> }>, success = true) {
+function lazyPage<Props extends object>(load: () => Promise<{ default: ComponentType<Props> }>) {
   return lazyWithReload(async () => {
     const { default: Page } = await load();
     return {
       default: function StartupPage(props: Props) {
         return (
-          <StartupReady success={success}>
+          <StartupReady>
             <Page {...props} />
           </StartupReady>
         );
@@ -37,10 +36,11 @@ const About = lazyPage(() => import("@/pages/About"));
 const Archived = lazyPage(() => import("@/pages/Archived"));
 const AuthCallback = lazyWithReload(() => import("@/pages/AuthCallback"));
 const Explore = lazyPage(() => import("@/pages/Explore"));
+const Home = lazyPage(() => import("@/pages/Home"));
 const Inboxes = lazyPage(() => import("@/pages/Inboxes"));
 const MemoDetail = lazyWithReload(() => import("@/pages/MemoDetail"));
-const NotFound = lazyPage(() => import("@/pages/NotFound"), false);
-const PermissionDenied = lazyPage(() => import("@/pages/PermissionDenied"), false);
+const NotFound = lazyPage(() => import("@/pages/NotFound"));
+const PermissionDenied = lazyPage(() => import("@/pages/PermissionDenied"));
 const Attachments = lazyPage(() => import("@/pages/Attachments"));
 const Setting = lazyPage(() => import("@/pages/Setting"));
 const Shortcuts = lazyPage(() => import("@/pages/Shortcuts"));
@@ -95,7 +95,7 @@ export const routeConfig: RouteObject[] = [
             children: [
               {
                 element: <LandingRoute />,
-                children: [{ index: true, element: <FeedRoute /> }],
+                children: [{ index: true, element: <Home /> }],
               },
               {
                 element: <RequireInstanceInitializationRoute />,
@@ -107,7 +107,7 @@ export const routeConfig: RouteObject[] = [
                 element: <RequireAuthRoute />,
                 children: [
                   { path: Routes.ARCHIVED, element: <Archived /> },
-                  { path: "todos", element: <FeedRoute isTodo /> },
+                  { path: "todos", element: <Home isTodo /> },
                   {
                     element: <RequireFullInitializationRoute />,
                     children: [{ path: Routes.SHORTCUTS, element: <Shortcuts /> }],

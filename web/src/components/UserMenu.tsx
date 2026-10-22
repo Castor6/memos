@@ -40,7 +40,7 @@ const UserMenu = (props: Props) => {
   const t = useTranslate();
   const navigateTo = useNavigateTo();
   const currentUser = useCurrentUser();
-  const { userGeneralSetting, refetchSettings, logout, isInitialized } = useAuth();
+  const { userGeneralSetting, refetchSettings, logout } = useAuth();
   const { mutate: updateUserGeneralSetting } = useUpdateUserGeneralSetting(currentUser?.name);
   const sseStatus = useSSEConnectionStatus();
   const currentLocale = getLocaleWithFallback(userGeneralSetting?.locale);
@@ -107,7 +107,7 @@ const UserMenu = (props: Props) => {
       <DropdownMenuTrigger
         aria-label="用户菜单"
         nativeButton={false}
-        disabled={!currentUser || !isInitialized}
+        disabled={!currentUser}
         render={
           <div
             className={cn("w-auto flex flex-row justify-start items-center cursor-pointer text-foreground", collapsed ? "px-1" : "px-3")}

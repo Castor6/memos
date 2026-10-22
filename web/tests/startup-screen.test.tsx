@@ -9,12 +9,8 @@ import StartupReady from "@/components/StartupReady";
 import { deferStartupStyles } from "../plugins/startup-html";
 
 const readiness = vi.hoisted(() => ({ auth: true, instance: true }));
-vi.mock("@/contexts/AuthContext", () => ({
-  useAuth: () => ({ isInitialized: readiness.auth }),
-}));
-vi.mock("@/contexts/InstanceContext", () => ({
-  useInstance: () => ({ isInitialized: readiness.instance }),
-}));
+vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => ({ isInitialized: readiness.auth }) }));
+vi.mock("@/contexts/InstanceContext", () => ({ useInstance: () => ({ isInitialized: readiness.instance }) }));
 
 const source = readFileSync(resolve(process.cwd(), "index.html"), "utf8");
 const windows: JSDOM[] = [];
@@ -32,7 +28,6 @@ function boot({ css = false, dark = false, blockedStorage = false } = {}) {
         throw new Error("Blocked");
       },
     });
-  window.eval(window.document.getElementById("startup-appearance")!.textContent!);
   window.eval(window.document.getElementById("startup-script")!.textContent!);
   return {
     window,
@@ -122,22 +117,6 @@ describe("React startup handoff", () => {
     readiness.instance = true;
   });
 
-  it("keeps the startup screen while page content is still pending after settings settle", () => {
-    const notify = vi.fn();
-    window.addEventListener("memos:startup-ready", notify);
-    const content = (pending: boolean) => (
-      <StartupReady pending={pending}>
-        <main>Feed</main>
-      </StartupReady>
-    );
-    const view = render(content(true));
-    expect(view.getByText("Feed")).toBeInTheDocument();
-    expect(notify).not.toHaveBeenCalled();
-    view.rerender(content(false));
-    expect(notify).toHaveBeenCalledOnce();
-    window.removeEventListener("memos:startup-ready", notify);
-  });
-
   it("waits for both display-sensitive settings without blocking the page from starting requests", () => {
     const notify = vi.fn();
     window.addEventListener("memos:startup-ready", notify);
@@ -207,7 +186,6 @@ describe("React startup handoff", () => {
     );
     expect(view.getByText("Something went wrong")).toBeInTheDocument();
     expect(notify).toHaveBeenCalledOnce();
-    expect((notify.mock.calls[0][0] as CustomEvent).detail).toEqual({ success: false });
     window.removeEventListener("memos:startup-ready", notify);
   });
 });

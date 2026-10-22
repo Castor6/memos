@@ -7,7 +7,6 @@ import SpaceSwitcher from "@/components/SpaceSwitcher";
 import { userServiceClient } from "@/connect";
 import { useAuth } from "@/contexts/AuthContext";
 import { useInstance } from "@/contexts/InstanceContext";
-import { MemoExplorerLoadingProvider } from "@/contexts/MemoExplorerLoadingContext";
 import useCurrentUser from "@/hooks/useCurrentUser";
 import { useFilteredMemoStats } from "@/hooks/useFilteredMemoStats";
 import useMediaQuery from "@/hooks/useMediaQuery";
@@ -78,11 +77,7 @@ const MainLayout = () => {
   // auxiliary statistics behind full settings initialization, and do not fetch
   // mobile drawer data until the user actually opens it.
   const statsEnabled = showMemoExplorer && authInitialized && instanceInitialized && (md || mobileExplorerOpen);
-  const {
-    statistics,
-    tags,
-    loading: statsLoading,
-  } = useFilteredMemoStats({
+  const { statistics, tags } = useFilteredMemoStats({
     userName: statsUserName,
     context,
     isTodo,
@@ -105,9 +100,7 @@ const MainLayout = () => {
       <div className={MAIN_CONTENT_CLASS_NAME}>
         <div className={cn("w-full mx-auto px-4 sm:px-6 pt-2 md:pt-6 pb-8")}>
           <SpaceSwitcher />
-          <MemoExplorerLoadingProvider value={statsLoading}>
-            <Outlet />
-          </MemoExplorerLoadingProvider>
+          <Outlet />
         </div>
       </div>
     </section>
