@@ -12,6 +12,7 @@ import {
   ListOrderedIcon,
   ListTodoIcon,
   Minimize2Icon,
+  PanelTopCloseIcon,
   QuoteIcon,
   SquareCodeIcon,
   StrikethroughIcon,
@@ -31,6 +32,7 @@ export const PARAGRAPH_ITEMS: CommandItem[] = [
   { id: "heading3", label: "标题 3", icon: Heading3Icon },
   { id: "blockquote", label: "引用段落", icon: QuoteIcon },
   { id: "codeBlock", label: "代码块", icon: SquareCodeIcon },
+  { id: "insertDetails", label: "折叠区", icon: PanelTopCloseIcon },
 ];
 export const LIST_ITEMS: CommandItem[] = [
   { id: "bulletList", label: "无序列表", icon: ListIcon },
