@@ -105,6 +105,10 @@ func TestMCPHiddenMigration(t *testing.T) {
 	// Recreate the immediately preceding schema without keeping a duplicate SQL fixture.
 	_, err = s.GetDriver().GetDB().ExecContext(ctx, "ALTER TABLE memo DROP COLUMN mcp_hidden")
 	require.NoError(t, err)
+	for _, column := range []string{"kind", "filename", "file_content", "required"} {
+		_, err = s.GetDriver().GetDB().ExecContext(ctx, "ALTER TABLE wechat_kf_replies DROP COLUMN "+column)
+		require.NoError(t, err)
+	}
 	_, err = s.UpsertInstanceSetting(ctx, &storepb.InstanceSetting{
 		Key:   storepb.InstanceSettingKey_BASIC,
 		Value: &storepb.InstanceSetting_BasicSetting{BasicSetting: &storepb.InstanceBasicSetting{SchemaVersion: "0.30.6"}},

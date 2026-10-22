@@ -28,11 +28,16 @@ import (
 )
 
 type fakeRemote struct {
-	mu        sync.Mutex
-	message   core.Message
-	sends     int
-	sendError error
-	closed    int
+	mu          sync.Mutex
+	message     core.Message
+	sends       int
+	sendError   error
+	uploads     int
+	files       int
+	uploadError error
+	lastFile    core.Media
+	texts       []string
+	closed      int
 }
 
 func (f *fakeRemote) Sync(context.Context, string, string) (core.Page, error) {
@@ -44,10 +49,25 @@ func (f *fakeRemote) Sync(context.Context, string, string) (core.Page, error) {
 func (*fakeRemote) Download(context.Context, string) (core.Media, error) {
 	return core.Media{Data: []byte("file content"), Filename: "example.txt", Type: "text/plain"}, nil
 }
-func (f *fakeRemote) SendText(context.Context, string, string, string) error {
+func (f *fakeRemote) SendText(_ context.Context, _, _ string, content string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.sends++
+	f.texts = append(f.texts, content)
+	return f.sendError
+}
+func (f *fakeRemote) UploadFile(_ context.Context, file core.Media) (string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.uploads++
+	f.lastFile = file
+	return "uploaded-file", f.uploadError
+}
+func (f *fakeRemote) SendFile(context.Context, string, string, string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.sends++
+	f.files++
 	return f.sendError
 }
 func (f *fakeRemote) Close() { f.mu.Lock(); defer f.mu.Unlock(); f.closed++ }

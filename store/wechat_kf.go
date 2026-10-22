@@ -41,6 +41,8 @@ type WeChatJob struct {
 // WeChatReply is an independently persisted result receipt.
 type WeChatReply struct {
 	ID, User, Content, State, Error string
+	Kind, Filename, FileContent     string
+	Required                        bool
 	Attempts                        int
 	NextAt, CreatedAt               int64
 }
@@ -149,7 +151,10 @@ func (s *Store) AcquireWeChatConsumer(ctx context.Context, owner string, revisio
 			return err
 		}
 		acquired = true
-		_, err = tx.ExecContext(ctx, "UPDATE wechat_kf_replies SET state='unknown', error='进程在发送期间中断，结果不确定' WHERE state='sending'")
+		if _, err = tx.ExecContext(ctx, "UPDATE wechat_kf_replies SET state='pending' WHERE state='preparing'"); err != nil {
+			return err
+		}
+		_, err = tx.ExecContext(ctx, "UPDATE wechat_kf_replies SET state='unknown', file_content=NULL, error='进程在发送期间中断，结果不确定' WHERE state='sending'")
 		return err
 	})
 	return acquired, err
@@ -323,7 +328,27 @@ func (s *Store) wechatEvent(ctx context.Context, tx *sql.Tx, message wechatkf.Me
 		}
 	}
 	if kind == "msg_send_fail" {
-		_, err = tx.ExecContext(ctx, s.wechatSQL("UPDATE wechat_kf_replies SET state='delivery_failed', error=? WHERE id=? AND user_id=?"), "微信发送失败类型 "+strconv.FormatInt(wechatNumber(event["fail_type"]), 10), wechatString(event["fail_msgid"]), user)
+		failedID := wechatString(event["fail_msgid"])
+		var replyKind string
+		err = tx.QueryRowContext(ctx, s.wechatSQL("SELECT kind FROM wechat_kf_replies WHERE id=? AND user_id=?"), failedID, user).Scan(&replyKind)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		failureType := strconv.FormatInt(wechatNumber(event["fail_type"]), 10)
+		_, err = tx.ExecContext(ctx, s.wechatSQL("UPDATE wechat_kf_replies SET state='delivery_failed', file_content=NULL, error=? WHERE id=? AND user_id=?"), "微信发送失败类型 "+failureType, failedID, user)
+		if err != nil {
+			return err
+		}
+		if replyKind == "file" {
+			// Different event IDs may report the same failed send. Key the notice
+			// by the original reply so duplicates never create more notices.
+			return s.wechatReply(ctx, tx, "delivery:"+failedID, user, WeChatReply{
+				Content: "微信未能投递 Markdown 文件（失败类型 " + failureType + "）。", Required: true,
+			}, now)
+		}
 	}
 	return err
 }
@@ -357,94 +382,6 @@ func (s *Store) NextWeChatJob(ctx context.Context, now int64) (*WeChatJob, error
 	}
 	return &job, nil
 }
-func (s *Store) wechatReply(ctx context.Context, tx *sql.Tx, jobID, user, content string, now int64) error {
-	if content == "" {
-		return nil
-	}
-	id := wechatkf.ReplyID(jobID)
-	exists, err := s.wechatExists(ctx, tx, "SELECT 1 FROM wechat_kf_replies WHERE id=?", id)
-	if err != nil || exists {
-		return err
-	}
-	_, err = tx.ExecContext(ctx, s.wechatSQL("INSERT INTO wechat_kf_replies(id,user_id,content,created_at,error) VALUES(?,?,?,?,?)"), id, user, content, now, "")
-	return err
-}
-
-// CompleteWeChatJob atomically clears raw content and queues at most one receipt.
-func (s *Store) CompleteWeChatJob(ctx context.Context, owner string, revision int64, job WeChatJob, memo, reply string, now int64) error {
-	return s.wechatTx(ctx, owner, revision, func(tx *sql.Tx) error {
-		_, err := tx.ExecContext(ctx, s.wechatSQL("UPDATE wechat_kf_jobs SET state='done',payload=NULL,error='',memo=? WHERE id=?"), memo, job.ID)
-		if err != nil {
-			return err
-		}
-		return s.wechatReply(ctx, tx, job.ID, job.User, reply, now)
-	})
-}
-
-// FailWeChatJob retains a resumable draft and queues a final error after 12 attempts.
-func (s *Store) FailWeChatJob(ctx context.Context, owner string, revision int64, job WeChatJob, memo, detail, reply string, now int64) error {
-	attempts := job.Attempts + 1
-	state := "pending"
-	if attempts >= 12 {
-		state = "failed"
-	}
-	if memo == "" {
-		memo = job.Memo
-	}
-	return s.wechatTx(ctx, owner, revision, func(tx *sql.Tx) error {
-		_, err := tx.ExecContext(ctx, s.wechatSQL("UPDATE wechat_kf_jobs SET state=?,attempts=?,next_at=?,error=?,memo=? WHERE id=?"), state, attempts, now+int64(min(3600, 10*(1<<min(attempts, 9)))), detail, memo, job.ID)
-		if err != nil {
-			return err
-		}
-		if state == "failed" {
-			return s.wechatReply(ctx, tx, job.ID, job.User, reply, now)
-		}
-		return nil
-	})
-}
-
-// ReserveWeChatReply spends quota before dispatch; crashes remain unknown on restart.
-func (s *Store) ReserveWeChatReply(ctx context.Context, owner string, revision, now int64, allowed map[string]bool) (*WeChatReply, error) {
-	var reply *WeChatReply
-	err := s.wechatTx(ctx, owner, revision, func(tx *sql.Tx) error {
-		_, err := tx.ExecContext(ctx, s.wechatSQL("UPDATE wechat_kf_replies SET state='expired',error='回复窗口已过期' WHERE state='pending' AND (created_at<=? OR user_id IN (SELECT user_id FROM wechat_kf_windows WHERE latest<=?))"), now-48*3600, now-48*3600)
-		if err != nil {
-			return err
-		}
-		var row WeChatReply
-		err = tx.QueryRowContext(ctx, s.wechatSQL("SELECT r.id,r.user_id,r.content,r.state,r.attempts,r.next_at,r.created_at,r.error FROM wechat_kf_replies r JOIN wechat_kf_windows w ON r.user_id=w.user_id WHERE r.state='pending' AND r.next_at<=? AND w.used<5 AND w.latest>? ORDER BY r.created_at,r.id LIMIT 1"), now, now-48*3600).Scan(&row.ID, &row.User, &row.Content, &row.State, &row.Attempts, &row.NextAt, &row.CreatedAt, &row.Error)
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-		if !allowed[row.User] {
-			_, err = tx.ExecContext(ctx, s.wechatSQL("UPDATE wechat_kf_replies SET state='cancelled',error='发送者已移出白名单' WHERE id=?"), row.ID)
-			return err
-		}
-		if _, err = tx.ExecContext(ctx, s.wechatSQL("UPDATE wechat_kf_windows SET used=used+1 WHERE user_id=?"), row.User); err != nil {
-			return err
-		}
-		if _, err = tx.ExecContext(ctx, s.wechatSQL("UPDATE wechat_kf_replies SET state='sending',attempts=attempts+1 WHERE id=?"), row.ID); err != nil {
-			return err
-		}
-		row.Attempts++
-		row.State = "sending"
-		reply = &row
-		return nil
-	})
-	return reply, err
-}
-
-// FinishWeChatReply preserves a delivery-failure event that raced with the API result.
-func (s *Store) FinishWeChatReply(ctx context.Context, owner string, revision int64, reply WeChatReply, state, detail string, now int64) error {
-	return s.wechatTx(ctx, owner, revision, func(tx *sql.Tx) error {
-		_, err := tx.ExecContext(ctx, s.wechatSQL("UPDATE wechat_kf_replies SET state=?,error=?,next_at=? WHERE id=? AND state='sending'"), state, detail, now+int64(min(3600, 60*(1<<min(reply.Attempts, 6)))), reply.ID)
-		return err
-	})
-}
-
 func (s *Store) wechatCounts(ctx context.Context, table string) (map[string]int64, error) {
 	counts := map[string]int64{}
 	rows, err := s.driver.GetDB().QueryContext(ctx, "SELECT state,COUNT(*) FROM "+table+" GROUP BY state")
