@@ -223,6 +223,52 @@ describe("<PagedMemoList>", () => {
   });
 });
 
+it("reports content readiness once settings and the first page can be shown together", () => {
+  feed.memos = [memo];
+  feed.isLoading = true;
+  feed.isError = false;
+  readiness.auth = false;
+  readiness.instance = true;
+  view.maxColumns = 1;
+  const client = new QueryClient();
+  const shownWhenReady: boolean[] = [];
+  const onContentReady = vi.fn(() => shownWhenReady.push(screen.queryByText("hello") !== null));
+  const content = () => (
+    <QueryClientProvider client={client}>
+      <PagedMemoList renderer={(m) => <div key={m.name}>{m.content}</div>} onContentReady={onContentReady} />
+    </QueryClientProvider>
+  );
+  const { rerender } = render(content());
+  feed.isLoading = false;
+  rerender(content());
+  expect(onContentReady).not.toHaveBeenCalled();
+  readiness.auth = true;
+  feed.isLoading = true;
+  rerender(content());
+  expect(onContentReady).not.toHaveBeenCalled();
+  feed.isLoading = false;
+  rerender(content());
+  expect(onContentReady).toHaveBeenCalledOnce();
+  expect(shownWhenReady).toEqual([true]);
+});
+
+it("reports content readiness when the first page fails", () => {
+  feed.memos = [];
+  feed.isLoading = false;
+  feed.isError = true;
+  readiness.auth = true;
+  readiness.instance = true;
+  view.maxColumns = 1;
+  const onContentReady = vi.fn();
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <PagedMemoList renderer={() => <div />} onContentReady={onContentReady} />
+    </QueryClientProvider>,
+  );
+  expect(screen.getByRole("alert")).toBeInTheDocument();
+  expect(onContentReady).toHaveBeenCalledOnce();
+});
+
 it("keeps the editor mounted while a new filter loads", () => {
   readiness.auth = true;
   readiness.instance = true;

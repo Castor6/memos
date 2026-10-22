@@ -30,11 +30,11 @@ function boot({ previous = "", path = "/", blocked = false, dark = false } = {})
   return {
     window,
     document,
-    mode: document.documentElement.dataset.startupMode,
+    mode: () => document.documentElement.dataset.startupMode,
     ready: (success = true) => window.dispatchEvent(new window.CustomEvent("memos:startup-ready", { detail: { success } })),
-    shell: () => window.dispatchEvent(new window.Event("memos:startup-shell-ready")),
     css: (type = "load") => document.querySelector("link[data-startup-stylesheet]")!.dispatchEvent(new window.Event(type)),
     visible: () => !!document.getElementById("startup-screen"),
+    contentDisplay: () => window.getComputedStyle(document.querySelector(".startup-content")!).display,
   };
 }
 afterEach(() => {
@@ -50,30 +50,28 @@ describe("version-aware document startup", () => {
     expect(stampStartupBuild(source.replace("/src/main.tsx", "/assets/changed.js"), "1.0.0")).not.toBe(stampStartupBuild(source, "1.0.0"));
     expect(html).not.toContain("__MEMOS_BUILD_ID__");
   });
-  it.each(["/", "/home", "/home/", "/todos", "/todos/"])("uses the inert shell on a successful same-build feed %s", (path) => {
+  it.each(["/", "/home", "/home/", "/todos", "/todos/"])("covers a successful same-build feed %s with only the background", (path) => {
     const app = boot({ previous: buildId, path });
-    expect(app.mode).toBe("warm");
-    const shell = app.document.querySelector(".startup-shell")!;
-    expect(shell.hasAttribute("inert")).toBe(true);
-    expect(shell.textContent!.trim()).toBe("");
-    expect(shell.querySelector("button,a,input,img")).toBeNull();
+    expect(app.mode()).toBe("warm");
+    expect(app.contentDisplay()).toBe("none");
   });
   it.each(["/auth", "/memos/123", "/settings", "/home/extra"])("keeps B on non-feed %s", (path) => {
-    expect(boot({ previous: buildId, path }).mode).toBe("cold");
+    const app = boot({ previous: buildId, path });
+    expect(app.mode()).toBe("cold");
+    expect(app.contentDisplay()).not.toBe("none");
   });
   it("keeps B for first launch, changed builds, and blocked storage, with the system theme", () => {
-    expect(boot().mode).toBe("cold");
-    expect(boot({ previous: "a".repeat(64) }).mode).toBe("cold");
+    expect(boot().mode()).toBe("cold");
+    expect(boot({ previous: "a".repeat(64) }).mode()).toBe("cold");
     const app = boot({ blocked: true, dark: true });
-    expect(app.mode).toBe("cold");
+    expect(app.mode()).toBe("cold");
     expect(app.document.documentElement.dataset.theme).toBe("default-dark");
     app.css();
     app.ready();
     expect(app.visible()).toBe(false);
   });
-  it("ignores shell readiness on a new build and records success only after CSS", () => {
+  it("records success on a new build only after the page and CSS are both ready", () => {
     const app = boot();
-    app.shell();
     app.ready();
     expect(app.visible()).toBe(true);
     expect(app.window.localStorage.getItem(key)).toBeNull();
@@ -81,22 +79,54 @@ describe("version-aware document startup", () => {
     expect(app.visible()).toBe(false);
     expect(app.window.localStorage.getItem(key)).toBe(buildId);
   });
-  it("hands a warm launch to the real shell after CSS but waits for terminal success to write", () => {
+  it("keeps a routine reopening covered until the page is ready", () => {
     const app = boot({ previous: buildId });
     const write = vi.spyOn(app.window.Storage.prototype, "setItem");
-    app.shell();
-    expect(app.visible()).toBe(true);
     app.css();
-    expect(app.visible()).toBe(false);
+    expect(app.visible()).toBe(true);
     expect(write).not.toHaveBeenCalled();
     app.ready();
+    expect(app.visible()).toBe(false);
     expect(write).toHaveBeenCalledExactlyOnceWith(key, buildId);
+  });
+  it("keeps the covered root painted with transitions disabled until it is revealed", () => {
+    const app = boot({ previous: buildId });
+    const root = app.document.getElementById("root")!;
+    const cell = app.document.createElement("button");
+    cell.style.transition = "background-color 150ms";
+    root.append(cell);
+    expect(app.window.getComputedStyle(root).visibility).not.toBe("hidden");
+    expect(app.window.getComputedStyle(cell).getPropertyValue("transition")).toBe("none");
+    app.css();
+    app.ready();
+    expect(root.hasAttribute("inert")).toBe(false);
+    expect(app.window.getComputedStyle(cell).getPropertyValue("transition")).toBe("background-color 150ms");
+  });
+  it("shows the full startup screen only after a routine reopening stalls for two seconds", () => {
+    vi.useFakeTimers();
+    const app = boot({ previous: buildId });
+    vi.advanceTimersByTime(1999);
+    expect(app.mode()).toBe("warm");
+    vi.advanceTimersByTime(1);
+    expect(app.mode()).toBe("cold");
+    expect(app.contentDisplay()).not.toBe("none");
+    app.css();
+    app.ready();
+    expect(app.visible()).toBe(false);
+  });
+  it("never shows the full startup screen when a routine reopening finishes in time", () => {
+    vi.useFakeTimers();
+    const app = boot({ previous: buildId });
+    app.css();
+    app.ready();
+    vi.advanceTimersByTime(12000);
+    expect(app.mode()).toBe("warm");
+    expect(app.visible()).toBe(false);
   });
   it.each([false, true])("does not mark terminal failures successful (warm=%s)", (warm) => {
     const app = boot({ previous: warm ? buildId : "" });
     const write = vi.spyOn(app.window.Storage.prototype, "setItem");
     app.css();
-    app.shell();
     app.ready(false);
     expect(app.visible()).toBe(false);
     expect(write).not.toHaveBeenCalled();
@@ -109,20 +139,21 @@ describe("version-aware document startup", () => {
     expect(app.visible()).toBe(false);
     expect(app.window.localStorage.getItem(key)).toBeNull();
   });
-  it("preserves recovery and never records success when CSS fails", () => {
+  it("shows recovery immediately and never records success when CSS fails on a routine reopening", () => {
     const app = boot({ previous: buildId });
     const write = vi.spyOn(app.window.Storage.prototype, "setItem");
-    app.shell();
     app.ready();
     app.css("error");
     expect(app.visible()).toBe(true);
     expect(write).not.toHaveBeenCalled();
+    expect(app.mode()).toBe("cold");
     expect(app.document.getElementById("startup-recovery")!.hidden).toBe(false);
   });
   it("offers recovery on a stalled warm launch", () => {
     vi.useFakeTimers();
     const app = boot({ previous: buildId });
     vi.advanceTimersByTime(12000);
+    expect(app.mode()).toBe("cold");
     expect(app.document.getElementById("startup-recovery")!.hidden).toBe(false);
   });
   it("does not overwrite a successful newer build completed in another window", () => {

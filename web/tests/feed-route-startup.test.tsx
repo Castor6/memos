@@ -9,10 +9,12 @@ const state = vi.hoisted(() => ({
   user: undefined as { name: string } | undefined,
   load: vi.fn(),
   resolve: undefined as ((page: { default: () => React.ReactNode }) => void) | undefined,
+  loaded: undefined as { default: () => React.ReactNode } | undefined,
 }));
 vi.mock("@/hooks/useCurrentUser", () => ({ default: () => state.user }));
 vi.mock("@/utils/i18n", () => ({ useTranslate: () => (key: string) => key }));
 vi.mock("@/router/home-page", () => ({
+  getLoadedHomePage: () => state.loaded,
   loadHomePage: () => {
     state.load();
     return new Promise((resolve) => {
@@ -54,27 +56,24 @@ describe("feed route startup boundary", () => {
     ["/", "Public feed"],
     ["/todos", "Sign in"],
   ])("does not import or hand over a guarded feed for anonymous %s", async (path, destination) => {
-    const shell = vi.fn();
-    window.addEventListener("memos:startup-shell-ready", shell);
+    const ready = vi.fn();
+    window.addEventListener("memos:startup-ready", ready);
     const view = mount(path);
     expect(await view.findByText(destination)).toBeInTheDocument();
     expect(state.load).not.toHaveBeenCalled();
-    expect(shell).not.toHaveBeenCalled();
-    window.removeEventListener("memos:startup-shell-ready", shell);
+    expect(ready).not.toHaveBeenCalled();
+    window.removeEventListener("memos:startup-ready", ready);
   });
 
-  it("commits the verified route shell while Home is suspended without announcing a successful page", async () => {
+  it("keeps the startup screen while Home is suspended behind the committed route frame", async () => {
     vi.useFakeTimers();
     state.user = { name: "users/test" };
-    const shell = vi.fn();
     const ready = vi.fn();
-    window.addEventListener("memos:startup-shell-ready", shell);
     window.addEventListener("memos:startup-ready", ready);
     const view = mount("/todos");
     expect(view.getByText("Navigation")).toBeInTheDocument();
     expect(view.getByText("Sidebar")).toBeInTheDocument();
     expect(view.container.querySelector("[data-feed-placeholder]")).not.toBeNull();
-    expect(shell).toHaveBeenCalledOnce();
     expect(ready).not.toHaveBeenCalled();
     expect(view.queryByRole("button", { name: "memo.retry" })).not.toBeInTheDocument();
     act(() => vi.advanceTimersByTime(12000));
@@ -85,10 +84,20 @@ describe("feed route startup boundary", () => {
     });
     expect(view.getByText("Loaded feed")).toBeInTheDocument();
     expect(view.container.querySelector("[data-feed-placeholder]")).toBeNull();
-    expect(shell).toHaveBeenCalledOnce();
     expect(view.queryByRole("button", { name: "memo.retry" })).not.toBeInTheDocument();
-    window.removeEventListener("memos:startup-shell-ready", shell);
+    expect(ready).not.toHaveBeenCalled();
     window.removeEventListener("memos:startup-ready", ready);
     vi.useRealTimers();
+  });
+
+  it("renders an already loaded Home in the first commit without a placeholder", () => {
+    state.user = { name: "users/test" };
+    state.loaded = { default: () => <p>Preloaded feed</p> };
+    state.load.mockClear();
+    const view = mount("/todos");
+    expect(view.getByText("Preloaded feed")).toBeInTheDocument();
+    expect(view.container.querySelector("[data-feed-placeholder]")).toBeNull();
+    expect(state.load).not.toHaveBeenCalled();
+    state.loaded = undefined;
   });
 });
