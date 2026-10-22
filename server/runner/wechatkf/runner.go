@@ -20,16 +20,19 @@ type Remote interface {
 	Sync(context.Context, string, string) (core.Page, error)
 	Download(context.Context, string) (core.Media, error)
 	SendText(context.Context, string, string, string) error
+	UploadFile(context.Context, core.Media) (string, error)
+	SendFile(context.Context, string, string, string) error
 	Close()
 }
 
 // Runner owns no independent database or long-term attachment storage.
 type Runner struct {
-	store  *store.Store
-	secret string
-	notes  func(core.Config) core.Notes
-	remote func(core.Config) (Remote, error)
-	wake   chan struct{}
+	store   *store.Store
+	secret  string
+	notes   func(core.Config) core.Notes
+	remote  func(core.Config) (Remote, error)
+	convert core.ArticleConverter
+	wake    chan struct{}
 }
 
 // New creates a disabled-by-default worker; Run follows encrypted stored settings.
@@ -128,6 +131,9 @@ func (r *Runner) session(ctx context.Context, config core.Config, revision int64
 		slog.Error("wechat_kf_binding_invalid")
 		return
 	}
+	if r.convert != nil {
+		processor.SetArticleConverter(r.convert)
+	}
 	var renew sync.WaitGroup
 	renew.Add(1)
 	go func() {
@@ -224,34 +230,51 @@ func (r *Runner) tick(ctx context.Context, owner string, revision int64, config 
 				out.MemoID = job.Memo
 			}
 			reply := ""
-			if config.Receipts {
+			if config.Receipts || out.RequiredReply {
 				reply = core.FailureReply(job.Kind, out, err, job.Attempts+1)
 			}
-			if err = r.store.FailWeChatJob(ctx, owner, revision, *job, out.MemoID, safeReason(err), reply, nowSec); err != nil {
+			if err = r.store.FailWeChatJob(ctx, owner, revision, *job, out.MemoID, safeReason(err), reply, nowSec, out.RequiredReply); err != nil {
 				return err
 			}
 		} else {
-			reply := out.Reply
-			if !config.Receipts || out.Ignored {
-				reply = ""
+			reply := store.WeChatReply{Kind: "text", Content: out.Reply, Required: out.RequiredReply}
+			if out.File != nil {
+				reply.Kind = "file"
+				reply.Filename = out.File.Filename
+				reply.FileContent = string(out.File.Data)
 			}
-			if err = r.store.CompleteWeChatJob(ctx, owner, revision, *job, out.MemoID, reply, nowSec); err != nil {
+			if (!config.Receipts && !out.RequiredReply) || out.Ignored {
+				reply = store.WeChatReply{}
+			}
+			if err = r.store.CompleteWeChatResult(ctx, owner, revision, *job, out.MemoID, reply, nowSec); err != nil {
 				return err
 			}
 		}
-	}
-	if !config.Receipts {
-		return nil
 	}
 	allowed := map[string]bool{}
 	for _, user := range config.AllowedUsers {
 		allowed[user] = true
 	}
-	reply, err := r.store.ReserveWeChatReply(ctx, owner, revision, nowSec, allowed)
+	reply, err := r.store.ReserveWeChatReply(ctx, owner, revision, time.Now().Unix(), allowed, config.Receipts)
 	if err != nil || reply == nil {
 		return err
 	}
-	err = remote.SendText(ctx, reply.User, reply.ID, reply.Content)
+	if reply.Kind == "file" {
+		mediaID, uploadErr := remote.UploadFile(ctx, core.Media{Data: []byte(reply.FileContent), Filename: reply.Filename, Type: "text/markdown; charset=utf-8"})
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if uploadErr != nil {
+			return r.store.FinishWeChatFileUpload(ctx, owner, revision, *reply, safeReason(uploadErr), time.Now().Unix())
+		}
+		started, startErr := r.store.StartWeChatFileReply(ctx, owner, revision, *reply, time.Now().Unix())
+		if startErr != nil || !started {
+			return startErr
+		}
+		err = remote.SendFile(ctx, reply.User, reply.ID, mediaID)
+	} else {
+		err = remote.SendText(ctx, reply.User, reply.ID, reply.Content)
+	}
 	// If cancelled after dispatch, leave "sending" for recovery as "unknown".
 	if ctx.Err() != nil {
 		return ctx.Err()
@@ -265,6 +288,8 @@ func (r *Runner) tick(ctx context.Context, owner string, revision int64, config 
 			state = "failed"
 			if reply.Attempts < 4 {
 				state = "pending"
+			} else if reply.Kind == "file" {
+				return r.store.FallbackWeChatFileReply(ctx, owner, revision, *reply, detail, time.Now().Unix())
 			}
 		}
 	}

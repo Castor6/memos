@@ -4,6 +4,7 @@ go 1.26.2
 
 require (
 	connectrpc.com/connect v1.19.2
+	github.com/JohannesKaufmann/html-to-markdown/v2 v2.5.2
 	github.com/at-wat/ebml-go v0.18.0
 	github.com/aws/aws-sdk-go-v2 v1.41.6
 	github.com/aws/aws-sdk-go-v2/config v1.32.16
@@ -31,10 +32,10 @@ require (
 	github.com/testcontainers/testcontainers-go/modules/mysql v0.42.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.42.0
 	github.com/yuin/goldmark v1.8.2
-	golang.org/x/crypto v0.50.0
+	golang.org/x/crypto v0.51.0
 	golang.org/x/image v0.39.0
 	golang.org/x/mod v0.35.0
-	golang.org/x/net v0.53.0
+	golang.org/x/net v0.55.0
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/sync v0.20.0
 	google.golang.org/genai v1.54.0
@@ -52,6 +53,7 @@ require (
 	dario.cat/mergo v1.0.2 // indirect
 	filippo.io/edwards25519 v1.2.0 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c // indirect
+	github.com/JohannesKaufmann/dom v0.3.1 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/signin v1.0.10 // indirect
@@ -146,8 +148,8 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/mattn/go-isatty v0.0.22 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
-	golang.org/x/sys v0.43.0 // indirect
-	golang.org/x/text v0.36.0
+	golang.org/x/sys v0.45.0 // indirect
+	golang.org/x/text v0.37.0
 	golang.org/x/time v0.15.0 // indirect
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v3 v3.0.1

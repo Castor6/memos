@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+
+	"github.com/usememos/memos/internal/wechatarticle"
 )
 
 // Notes is implemented by Memos' existing business services, never by self-HTTP.
@@ -39,6 +41,7 @@ type Processor struct {
 	binding  Binding
 	notes    Notes
 	download Download
+	convert  ArticleConverter
 }
 
 // NewProcessor copies the allowlist so callers cannot mutate it after construction.
@@ -53,14 +56,22 @@ func NewProcessor(binding Binding, notes Notes, download Download) (*Processor, 
 	}
 	binding.AllowedUsers = append([]string(nil), binding.AllowedUsers...)
 	binding.DefaultTags = append([]string(nil), binding.DefaultTags...)
-	return &Processor{binding: binding, notes: notes, download: download}, nil
+	return &Processor{binding: binding, notes: notes, download: download, convert: wechatarticle.Convert}, nil
 }
+
+// ArticleConverter converts a public article without sending a user-visible reply.
+type ArticleConverter func(context.Context, string) (wechatarticle.Result, error)
+
+// SetArticleConverter replaces the converter before the processor starts running.
+func (p *Processor) SetArticleConverter(convert ArticleConverter) { p.convert = convert }
 
 // Outcome is recorded by the queue before a result receipt can be sent.
 type Outcome struct {
-	Ignored bool
-	MemoID  string
-	Reply   string
+	Ignored       bool
+	MemoID        string
+	Reply         string
+	File          *Media
+	RequiredReply bool
 }
 
 // Process saves one input as one private memo and its attachments. A successful
@@ -84,6 +95,8 @@ func (p *Processor) ProcessWithProgress(ctx context.Context, message Message, pr
 		return Outcome{}, errors.New("missing WeChat message ID")
 	}
 	kind := stringValue(message["msgtype"])
+	articleURL := articleCardURL(message)
+	out := Outcome{RequiredReply: articleURL != ""}
 	if kind == "text" {
 		if text, ok := object(message["text"]); ok && stringValue(text["content"]) == "1" {
 			return Outcome{Ignored: true}, nil
@@ -91,16 +104,16 @@ func (p *Processor) ProcessWithProgress(ctx context.Context, message Message, pr
 	}
 	clip, err := Render(message, p.binding.DefaultTags, p.binding.ChatTag, func(_, kind string) (string, error) { return "[" + Label(kind) + "：待保存]", nil })
 	if err != nil {
-		return Outcome{}, failure("解析消息", err)
+		return out, failure("解析消息", err)
 	}
 	if clip.Unsupported {
 		return Outcome{Reply: Label(kind) + "保存失败：" + strings.Join(clip.Issues, "；")}, nil
 	}
 	uid := StableID(p.binding.CorpID, p.binding.KFID, id)
 	if err := p.notes.Ensure(ctx, uid, clip); err != nil {
-		return Outcome{}, failure("创建笔记", err)
+		return out, failure("创建笔记", err)
 	}
-	out := Outcome{MemoID: uid}
+	out.MemoID = uid
 	if progress != nil {
 		if err := progress(uid); err != nil {
 			return out, failure("记录笔记进度", err)
@@ -115,6 +128,18 @@ func (p *Processor) ProcessWithProgress(ctx context.Context, message Message, pr
 	if err := p.notes.Finish(ctx, uid, clip); err != nil {
 		return out, failure("更新笔记", err)
 	}
+	if articleURL != "" {
+		file, err := p.articleFile(ctx, articleURL)
+		if ctx.Err() != nil {
+			return out, ctx.Err()
+		}
+		if err != nil {
+			out.Reply = "文章转换失败：" + failure("转换正文", err).Reason + "。原链接已保存。"
+		} else {
+			out.File = &file
+		}
+		return out, nil
+	}
 	out.Reply = Label(kind) + "保存成功"
 	if len(clip.Issues) > 0 {
 		out.Reply = Label(kind) + "部分保存：" + strings.Join(clip.Issues, "；")
@@ -127,7 +152,7 @@ type Failure struct{ Stage, Reason string }
 
 func (f *Failure) Error() string { return f.Stage + "：" + f.Reason }
 
-func failure(stage string, err error) error {
+func failure(stage string, err error) *Failure {
 	var safe *Failure
 	if errors.As(err, &safe) {
 		return safe
