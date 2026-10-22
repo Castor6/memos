@@ -2,6 +2,7 @@ package wechatkf
 
 import (
 	"context"
+	"os"
 	"strings"
 	"testing"
 	"unicode/utf8"
@@ -18,13 +19,14 @@ func articleMessage() Message {
 }
 
 func TestArticleCardReturnsFileAndKeepsCardMemo(t *testing.T) {
+	const body = "正文\n\n![图片](https://mmbiz.qpic.cn/image)\n\n来源：作者在原文中的说明\n\n[原文链接](https://mp.weixin.qq.com/s/example)"
 	notes := &recordingNotes{}
 	p, err := NewProcessor(Binding{CorpID: "corp", KFID: "kf", AllowedUsers: []string{"self"}}, notes, nil)
 	require.NoError(t, err)
 	p.SetArticleConverter(func(_ context.Context, source string) (wechatarticle.Result, error) {
 		require.Equal(t, 1, notes.finished)
 		require.Equal(t, "https://mp.weixin.qq.com/s/example", source)
-		return wechatarticle.Result{Title: "标题/文件:*?", Markdown: "正文\n\n![图片](https://mmbiz.qpic.cn/image)"}, nil
+		return wechatarticle.Result{Title: "标题/文件:*?", Markdown: body}, nil
 	})
 	out, err := p.Process(context.Background(), articleMessage())
 	require.NoError(t, err)
@@ -34,11 +36,71 @@ func TestArticleCardReturnsFileAndKeepsCardMemo(t *testing.T) {
 	require.NotNil(t, out.File)
 	require.Equal(t, "标题_文件___.md", out.File.Filename)
 	require.Equal(t, "text/markdown; charset=utf-8", out.File.Type)
-	require.Contains(t, string(out.File.Data), "# 标题/文件:")
-	require.Contains(t, string(out.File.Data), "来源：<https://mp.weixin.qq.com/s/example>")
-	require.Contains(t, string(out.File.Data), "![图片](https://mmbiz.qpic.cn/image)")
+	require.Equal(t, "# 标题/文件:\\*?\n\n"+body+"\n", string(out.File.Data))
 	require.Contains(t, notes.content, "卡片标题")
+	require.Contains(t, notes.content, "https://mp.weixin.qq.com/s/example")
 	require.NotContains(t, notes.content, "![图片]")
+}
+
+func TestArticleFileMetadata(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		result   wechatarticle.Result
+		expected string
+	}{
+		{
+			name: "all available fields",
+			result: wechatarticle.Result{
+				Author: "作者", AccountName: "公众号", PublishedAt: "2026年10月22日 13:54", IPLocation: "美国",
+			},
+			expected: "作者 · 公众号 · 2026年10月22日 13:54 · 美国",
+		},
+		{
+			name:     "missing fields are omitted",
+			result:   wechatarticle.Result{AccountName: "公众号", IPLocation: "广东"},
+			expected: "公众号 · 广东",
+		},
+		{
+			name:     "metadata stays on one plain text line",
+			result:   wechatarticle.Result{Author: "作者\n\n# 注释", AccountName: "[公众号](https://example.com) <b>名</b>"},
+			expected: "作者 \\# 注释 · \\[公众号\\]\\(https://example\\.com\\) &lt;b&gt;名&lt;/b&gt;",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			p, err := NewProcessor(Binding{CorpID: "corp", KFID: "kf", AllowedUsers: []string{"self"}}, &recordingNotes{}, nil)
+			require.NoError(t, err)
+			p.SetArticleConverter(func(context.Context, string) (wechatarticle.Result, error) {
+				result := test.result
+				result.Title, result.Markdown = "文章标题", "原文正文\n"
+				return result, nil
+			})
+			out, err := p.Process(context.Background(), articleMessage())
+			require.NoError(t, err)
+			require.NotNil(t, out.File)
+			require.Equal(t, "# 文章标题\n\n"+test.expected+"\n\n原文正文\n", string(out.File.Data))
+		})
+	}
+}
+
+func TestLiveArticleCardMarkdown(t *testing.T) {
+	address := os.Getenv("MEMOS_WECHAT_ARTICLE_URL")
+	if address == "" {
+		t.Skip("Optional live comparison downloads a public article through the production Go converter")
+	}
+	notes := &recordingNotes{}
+	p, err := NewProcessor(Binding{CorpID: "corp", KFID: "kf", AllowedUsers: []string{"self"}}, notes, nil)
+	require.NoError(t, err)
+	message := articleMessage()
+	message["link"] = map[string]any{"title": "Article comparison", "url": address}
+	out, err := p.Process(t.Context(), message)
+	require.NoError(t, err)
+	require.NotNil(t, out.File, out.Reply)
+	require.Empty(t, out.Reply)
+	require.Equal(t, 1, notes.finished)
+	t.Logf("filename=%q markdown_bytes=%d images=%d", out.File.Filename, len(out.File.Data), strings.Count(string(out.File.Data), "!["))
+	if output := os.Getenv("MEMOS_WECHAT_ARTICLE_OUTPUT"); output != "" {
+		require.NoError(t, os.WriteFile(output, out.File.Data, 0600))
+	}
 }
 
 func TestArticleConversionRequiresAuthorizedTopLevelCard(t *testing.T) {

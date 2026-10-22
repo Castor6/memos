@@ -25,8 +25,12 @@ const MaxMarkdownBytes = 1 << 20
 
 // Result contains extracted metadata and the original article body as Markdown.
 type Result struct {
-	Title    string
-	Markdown string
+	Title       string
+	Markdown    string
+	Author      string
+	AccountName string
+	PublishedAt string
+	IPLocation  string
 }
 
 // Error contains only a safe user-facing reason, never a URL or upstream body.
@@ -186,6 +190,7 @@ func Extract(address, raw string) (Result, error) {
 	if plainText(content) == "" && !hasImage {
 		return fail("文章没有可转换的正文，纯音视频或互动内容暂不支持")
 	}
+	metadata := articleMetadata(nodes, content)
 	prepare(content, u)
 	if title == "" {
 		title = fallbackTitle
@@ -221,7 +226,8 @@ func Extract(address, raw string) (Result, error) {
 		return fail("转换后的 Markdown 超过 1 MB 大小限制")
 	}
 	body = string(readableReferenceNumbers([]byte(body)))
-	return Result{Title: title, Markdown: body + "\n"}, nil
+	metadata.Title, metadata.Markdown = title, body+"\n"
+	return metadata, nil
 }
 
 func attribute(node *html.Node, name string) string {
