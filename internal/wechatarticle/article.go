@@ -220,6 +220,7 @@ func Extract(address, raw string) (Result, error) {
 	if len(body)+1 > MaxMarkdownBytes {
 		return fail("转换后的 Markdown 超过 1 MB 大小限制")
 	}
+	body = string(readableReferenceNumbers([]byte(body)))
 	return Result{Title: title, Markdown: body + "\n"}, nil
 }
 
