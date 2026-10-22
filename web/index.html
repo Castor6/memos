@@ -2,27 +2,6 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="memos-build-id" content="__MEMOS_BUILD_ID__" />
-    <script id="startup-appearance">
-      (() => {
-        let theme = "system";
-        let previousBuild = "";
-        try {
-          theme = localStorage.getItem("memos-theme") || theme;
-          previousBuild = localStorage.getItem("memos-successful-build") || "";
-        } catch {
-          // An unavailable version record keeps the full startup screen.
-        }
-        const themes = ["system", "default", "default-dark", "paper", "cream", "mint", "flomo"];
-        if (!themes.includes(theme)) theme = "system";
-        if (theme === "system") theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "default-dark" : "default";
-        document.documentElement.dataset.theme = theme;
-        const buildId = document.querySelector('meta[name="memos-build-id"]').content;
-        const feedRoute = /^\/(?:home\/?|todos\/?)?$/.test(window.location.pathname);
-        const warm = feedRoute && /^[a-f0-9]{64}$/.test(buildId) && previousBuild === buildId;
-        document.documentElement.dataset.startupMode = warm ? "warm" : "cold";
-      })();
-    </script>
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
@@ -35,12 +14,6 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <style id="startup-style">
-      /* The opaque screen covers the root. Hiding the root instead would let
-         transitioned descendants, such as the sidebar and editor, appear a frame late. */
-      #root[inert] { position: fixed; inset: 0; overflow: hidden; }
-      /* Values that settle behind the screen, such as calendar counts, must not
-         still be transitioning when it is removed. */
-      #root[inert] * { transition: none !important; }
       #startup-screen {
         --startup-bg: #faf9f5;
         --startup-paper: #ffffff;
@@ -123,7 +96,6 @@
         cursor: pointer;
       }
       #startup-screen .startup-retry:focus-visible { outline: 2px solid var(--startup-green); outline-offset: 3px; }
-      html[data-startup-mode="warm"] #startup-screen .startup-content { display: none; }
       @keyframes startup-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
       @keyframes startup-dot { 0%, 55%, 100% { transform: translateY(0); opacity: 0.35; } 27% { transform: translateY(-4px); opacity: 1; } }
       @media (prefers-reduced-motion: reduce) {
@@ -136,20 +108,18 @@
   <body class="text-base w-full min-h-svh">
     <div id="startup-screen">
       <div class="startup-content">
-        <div class="startup-brand">
-          <div class="startup-papers" aria-hidden="true">
-            <div class="startup-paper"></div>
-            <div class="startup-paper"></div>
-            <div class="startup-paper">
-              <img class="startup-logo" src="/logo.webp" width="54" height="54" alt="" />
-              <span class="startup-line"></span>
-              <span class="startup-line"></span>
-            </div>
+        <div class="startup-papers" aria-hidden="true">
+          <div class="startup-paper"></div>
+          <div class="startup-paper"></div>
+          <div class="startup-paper">
+            <img class="startup-logo" src="/logo.webp" width="54" height="54" alt="" />
+            <span class="startup-line"></span>
+            <span class="startup-line"></span>
           </div>
-          <p class="startup-title">Memos</p>
-          <div class="startup-dots" aria-hidden="true">
-            <span class="startup-dot"></span><span class="startup-dot"></span><span class="startup-dot"></span>
-          </div>
+        </div>
+        <p class="startup-title">Memos</p>
+        <div class="startup-dots" aria-hidden="true">
+          <span class="startup-dot"></span><span class="startup-dot"></span><span class="startup-dot"></span>
         </div>
         <p id="startup-status" class="startup-status" role="status">正在打开 Memos…</p>
         <div id="startup-recovery" class="startup-recovery" hidden>
@@ -170,61 +140,42 @@
         const recovery = document.getElementById("startup-recovery");
         const retry = document.getElementById("startup-retry");
         let locale = navigator.language;
-        let previousBuild = null;
+        let theme = "system";
         try {
           locale = localStorage.getItem("memos-locale") || locale;
-          previousBuild = localStorage.getItem("memos-successful-build");
+          theme = localStorage.getItem("memos-theme") || theme;
         } catch {
           // Startup also works when browser storage is unavailable.
         }
+        const themes = ["system", "default", "default-dark", "paper", "cream", "mint", "flomo"];
+        if (!themes.includes(theme)) theme = "system";
+        if (theme === "system") theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "default-dark" : "default";
+        document.documentElement.dataset.theme = theme;
         const chinese = locale.toLowerCase().startsWith("zh");
         status.textContent = chinese ? "正在打开 Memos…" : "Opening Memos…";
         retry.textContent = chinese ? "重新加载" : "Reload";
         retry.addEventListener("click", () => window.location.reload());
 
-        const buildId = document.querySelector('meta[name="memos-build-id"]').content;
         let pageReady = false;
-        let pageSucceeded = false;
-        let dismissed = false;
         let stylesFailed = false;
         const styles = Array.from(document.querySelectorAll("link[data-startup-stylesheet]"));
         let remainingStyles = styles.length;
-        // A routine reopening keeps only the background unless it stalls or fails.
-        const showFullScreen = () => {
-          document.documentElement.dataset.startupMode = "cold";
-        };
-        const fallback = document.documentElement.dataset.startupMode === "warm" ? window.setTimeout(showFullScreen, 2000) : undefined;
         const showRecovery = () => {
-          showFullScreen();
           status.textContent = chinese ? "加载时间较长，请检查网络或重新加载。" : "This is taking longer than usual. Check your connection or reload.";
           recovery.hidden = false;
         };
         const timeout = window.setTimeout(showRecovery, 12000);
         const finish = () => {
-          if (dismissed || !pageReady || remainingStyles || stylesFailed) return;
-          if (pageSucceeded && /^[a-f0-9]{64}$/.test(buildId)) {
-            try {
-              const currentBuild = localStorage.getItem("memos-successful-build");
-              // Do not overwrite a newer build completed by another open window.
-              if (currentBuild === previousBuild || currentBuild === buildId) localStorage.setItem("memos-successful-build", buildId);
-            } catch {
-              // A blocked or full store must never block a successful launch.
-            }
-          }
-          window.removeEventListener("memos:startup-ready", onPageReady);
-          dismissed = true;
+          if (!pageReady || remainingStyles || stylesFailed) return;
           window.clearTimeout(timeout);
-          window.clearTimeout(fallback);
-          // Styles committed in this task must settle while transitions are still disabled.
-          void root.offsetHeight;
+          window.removeEventListener("memos:startup-ready", onPageReady);
           root.removeAttribute("inert");
           root.removeAttribute("aria-hidden");
           screen.remove();
           document.getElementById("startup-style")?.remove();
         };
-        function onPageReady(event) {
+        function onPageReady() {
           pageReady = true;
-          pageSucceeded = event.detail?.success !== false;
           finish();
         }
         window.addEventListener("memos:startup-ready", onPageReady);

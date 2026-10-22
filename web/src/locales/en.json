@@ -332,7 +332,6 @@
     "load-more": "Load more",
     "load-error": "Unable to load memos. Your existing notes are still available.",
     "retry": "Retry",
-    "startup-slow": "This is taking longer than usual. Check your connection or reload.",
     "no-archived-memos": "No archived memos.",
     "no-memos": "No memos.",
     "new-badge": "New",

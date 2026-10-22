@@ -26,7 +26,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error("ErrorBoundary caught an error:", error, errorInfo);
-    finishStartup(false);
+    finishStartup();
   }
 
   handleReset = () => {
@@ -75,7 +75,7 @@ export class ErrorBoundary extends Component<Props, State> {
 // React Router errorElement for route-level errors (e.g., failed chunk loads after redeployment).
 export function ChunkLoadErrorFallback() {
   const error = useRouteError() as Error | undefined;
-  useEffect(() => finishStartup(false), []);
+  useEffect(finishStartup, []);
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">

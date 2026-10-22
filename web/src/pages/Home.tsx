@@ -1,11 +1,9 @@
-import { useCallback, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useLocation } from "react-router-dom";
 import MemoEditor from "@/components/MemoEditor";
 import { deriveDefaultCreateTimeFromFilters } from "@/components/MemoEditor/utils/deriveDefaultCreateTime";
 import MemoView from "@/components/MemoView";
 import PagedMemoList, { getMemoKey } from "@/components/PagedMemoList";
-import StartupReady from "@/components/StartupReady";
-import { useMemoExplorerLoading } from "@/contexts/MemoExplorerLoadingContext";
 import { useMemoFilterContext } from "@/contexts/MemoFilterContext";
 import { NewMemoProvider } from "@/contexts/NewMemoContext";
 import { useMemoFilters, useMemoSorting } from "@/hooks";
@@ -20,9 +18,6 @@ const Home = ({ isTodo = false }: { isTodo?: boolean }) => {
   const t = useTranslate();
   const { filters } = useMemoFilterContext();
   const defaultCreateTime = useMemo(() => deriveDefaultCreateTimeFromFilters(filters), [filters]);
-  const explorerLoading = useMemoExplorerLoading();
-  const [listReady, setListReady] = useState(false);
-  const markListReady = useCallback(() => setListReady(true), []);
 
   const memoFilter = useMemoFilters({
     isTodo,
@@ -38,12 +33,9 @@ const Home = ({ isTodo = false }: { isTodo?: boolean }) => {
 
   return (
     <div className="w-full min-h-full bg-background text-foreground">
-      {/* Reveal the sidebar statistics, composer, and first memo page together. */}
-      <StartupReady pending={!listReady || explorerLoading} />
       <NewMemoProvider>
         <PagedMemoList
           isTodo={isTodo}
-          onContentReady={markListReady}
           renderer={(memo: Memo, { compact }) => (
             <MemoView
               key={getMemoKey(memo)}
