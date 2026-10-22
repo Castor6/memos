@@ -46,7 +46,7 @@ func (p *Processor) articleFile(ctx context.Context, source string) (Media, erro
 	if utf8.RuneCountInString(title) > 300 {
 		title = string([]rune(title)[:300])
 	}
-	markdown := "# " + literal(title) + "\n\n来源：" + urlReference(source) + "\n\n" + strings.TrimSpace(result.Markdown) + "\n"
+	markdown := "# " + literal(title) + "\n\n" + strings.TrimSpace(result.Markdown) + "\n"
 	if len(markdown) > 1<<20 {
 		return Media{}, &Failure{Stage: "转换正文", Reason: "转换后的文章超过 1 MB 限制"}
 	}

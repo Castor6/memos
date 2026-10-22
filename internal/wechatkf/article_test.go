@@ -18,13 +18,14 @@ func articleMessage() Message {
 }
 
 func TestArticleCardReturnsFileAndKeepsCardMemo(t *testing.T) {
+	const body = "正文\n\n![图片](https://mmbiz.qpic.cn/image)\n\n来源：作者在原文中的说明\n\n[原文链接](https://mp.weixin.qq.com/s/example)"
 	notes := &recordingNotes{}
 	p, err := NewProcessor(Binding{CorpID: "corp", KFID: "kf", AllowedUsers: []string{"self"}}, notes, nil)
 	require.NoError(t, err)
 	p.SetArticleConverter(func(_ context.Context, source string) (wechatarticle.Result, error) {
 		require.Equal(t, 1, notes.finished)
 		require.Equal(t, "https://mp.weixin.qq.com/s/example", source)
-		return wechatarticle.Result{Title: "标题/文件:*?", Markdown: "正文\n\n![图片](https://mmbiz.qpic.cn/image)"}, nil
+		return wechatarticle.Result{Title: "标题/文件:*?", Markdown: body}, nil
 	})
 	out, err := p.Process(context.Background(), articleMessage())
 	require.NoError(t, err)
@@ -34,10 +35,9 @@ func TestArticleCardReturnsFileAndKeepsCardMemo(t *testing.T) {
 	require.NotNil(t, out.File)
 	require.Equal(t, "标题_文件___.md", out.File.Filename)
 	require.Equal(t, "text/markdown; charset=utf-8", out.File.Type)
-	require.Contains(t, string(out.File.Data), "# 标题/文件:")
-	require.Contains(t, string(out.File.Data), "来源：<https://mp.weixin.qq.com/s/example>")
-	require.Contains(t, string(out.File.Data), "![图片](https://mmbiz.qpic.cn/image)")
+	require.Equal(t, "# 标题/文件:\\*?\n\n"+body+"\n", string(out.File.Data))
 	require.Contains(t, notes.content, "卡片标题")
+	require.Contains(t, notes.content, "https://mp.weixin.qq.com/s/example")
 	require.NotContains(t, notes.content, "![图片]")
 }
 

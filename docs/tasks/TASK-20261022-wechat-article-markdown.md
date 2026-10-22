@@ -2,7 +2,7 @@
 
 - 记录日期：2026-10-22
 - 模块与关键词：微信客服、公众号卡片、正文提取、Markdown、文件回传
-- 维护归属：本会话；功能分支 `feat/wechat-article-markdown`（从原讨论分支继续）
+- 维护归属：当前会话；后续修正分支 `fix/wechat-markdown-source`（初始实现分支为 `feat/wechat-article-markdown`）
 - 调查基线：`main` 的 `b8f7aea00`；文档使用独立 worktree。
 - 关联文档：[内置微信客服](../wechat-kf-integration.md)、[内置主任务](TASK-20260919-wechat-kf-integration.md)、[公众号链接预览](TASK-20260919-wechat-link-preview.md)
 
@@ -175,3 +175,18 @@
 在 `internal/wechatarticle/references.go` 使用项目已有 Goldmark 识别普通文本中的数字编号，只移除冗余转义；跳过代码、链接和图片标签，保留相邻 Markdown 语法所需的转义。改写前后 GFM 渲染结果必须相同，否则保留原文，避免把参考条目或普通文字意外转换成链接。处理受现有 1 MiB 输出上限约束，没有增加依赖或修改镜像。
 
 本地转换器、微信核心及 runner 测试通过，新回归覆盖嵌套角标、重复编号、文末相邻节点、代码、链接、图片、引用定义和跨行链接语法。修正样文为 19,963 字节，仅比此前 Go 结果少 11 个反斜杠，其余字节完全一致；11 个编号的数量和顺序与 Python 相同，规范已知 URL/图片参数/尾换行后全文逐字符一致。产物保存在忽略目录 `tmp/wechat-md-research/go-citations-fixed.md`。修复继续归入 [PR #87](https://github.com/Castor6/memos/pull/87)。
+
+## 2026-10-22：去掉回传文件额外添加的来源链接
+
+用户反馈已验证微信客服的 MD 文件发送正常，并要求文件仅保留文章原内容，不要标题下方额外添加的来源链接。该要求替代上文初始实现中「标题、来源和正文」的文件格式；原文章标题、正文已有的链接与图片仍需保留。用户反馈证明此次文件发送成功，不扩展为全部文章、设备或手机保存流程已验收。
+
+主工作区已切至 `main` 并快进拉取到 `7970b644`。本次在独立 worktree 的 `fix/wechat-markdown-source` 分支修改 `internal/wechatkf/article.go`，只去掉文件封装时拼接的「来源」行，标题后直接接转换后的正文。正文转换、卡片笔记保存和文件投递流程不变；不改写已经生成或发送的文件。
+
+验收要求：文件内容为文章标题与原文正文；正文内原有「来源」文字、链接和图片保留；Memos 中原卡片笔记仍包含链接。调整现有处理器测试，以完整文件内容断言覆盖这些要求，并同步模块文档与应用 patch 发布说明。
+
+本次验证（2026-10-22，基于 `7970b644` 的修正工作区）：
+
+- `go test -race ./internal/wechatkf ./internal/wechatarticle ./server/runner/wechatkf` 通过，覆盖文件内容、文章转换和文件投递流程。
+- `go test -v -race ./internal/...` 全部通过。
+- 使用 Node 24 执行根 `corepack pnpm install --frozen-lockfile`、`corepack pnpm changeset --empty` 并补充仅 `memos-personal` 的 patch 说明；`corepack pnpm check:release origin/main` 通过，差异空白检查通过。
+- 本次使用构造消息及临时数据验证，没有向真实微信发送消息或执行部署；新格式在包含本修正的版本发布后生效。
