@@ -2,6 +2,27 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta name="memos-build-id" content="__MEMOS_BUILD_ID__" />
+    <script id="startup-appearance">
+      (() => {
+        let theme = "system";
+        let previousBuild = "";
+        try {
+          theme = localStorage.getItem("memos-theme") || theme;
+          previousBuild = localStorage.getItem("memos-successful-build") || "";
+        } catch {
+          // An unavailable version record keeps the full startup screen.
+        }
+        const themes = ["system", "default", "default-dark", "paper", "cream", "mint", "flomo"];
+        if (!themes.includes(theme)) theme = "system";
+        if (theme === "system") theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "default-dark" : "default";
+        document.documentElement.dataset.theme = theme;
+        const buildId = document.querySelector('meta[name="memos-build-id"]').content;
+        const feedRoute = /^\/(?:home\/?|todos\/?)?$/.test(window.location.pathname);
+        const warm = feedRoute && /^[a-f0-9]{64}$/.test(buildId) && previousBuild === buildId;
+        document.documentElement.dataset.startupMode = warm ? "warm" : "cold";
+      })();
+    </script>
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
@@ -14,6 +35,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <style id="startup-style">
+      #root[inert] { position: fixed; inset: 0; overflow: hidden; visibility: hidden; }
       #startup-screen {
         --startup-bg: #faf9f5;
         --startup-paper: #ffffff;
@@ -96,6 +118,81 @@
         cursor: pointer;
       }
       #startup-screen .startup-retry:focus-visible { outline: 2px solid var(--startup-green); outline-offset: 3px; }
+      #startup-screen .startup-shell { display: none; }
+      html[data-startup-mode="warm"] #startup-screen { display: block; padding: 0; overflow: hidden; }
+      html[data-startup-mode="warm"] #startup-screen .startup-brand { display: none; }
+      html[data-startup-mode="warm"] #startup-screen .startup-content {
+        position: absolute;
+        left: 320px;
+        right: 0;
+        bottom: max(24px, env(safe-area-inset-bottom));
+        width: auto;
+        padding: 12px 24px;
+        box-sizing: border-box;
+        background: var(--startup-bg);
+      }
+      html[data-startup-mode="warm"] #startup-screen .startup-shell {
+        --shell-block: color-mix(in srgb, var(--startup-ink) 8%, transparent);
+        display: flex;
+        min-height: 100%;
+        text-align: left;
+        pointer-events: none;
+        user-select: none;
+      }
+      #startup-screen .shell-nav {
+        flex: 0 0 64px;
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 22px;
+        padding: 28px 12px;
+        border-right: 1px solid var(--startup-edge);
+      }
+      #startup-screen .shell-nav span { width: 24px; height: 24px; border-radius: 7px; background: var(--shell-block); }
+      #startup-screen .shell-nav span:first-child { width: 30px; height: 30px; border-radius: 50%; }
+      #startup-screen .shell-sidebar {
+        flex: 0 0 256px;
+        box-sizing: border-box;
+        padding: 29px 16px;
+        border-right: 1px solid var(--startup-edge);
+      }
+      #startup-screen .shell-line { display: block; width: 72%; height: 8px; margin-bottom: 15px; border-radius: 5px; background: var(--shell-block); }
+      #startup-screen .shell-line-short { width: 34%; }
+      #startup-screen .shell-search { height: 33px; margin: 22px 0; border-radius: 10px; background: var(--shell-block); }
+      #startup-screen .shell-calendar { height: 160px; margin: 20px 0 28px; border-radius: 10px; background: var(--shell-block); opacity: 0.65; }
+      #startup-screen .shell-sidebar .shell-line { margin-bottom: 27px; }
+      #startup-screen .shell-main { flex: 1; min-width: 0; box-sizing: border-box; padding: 28px 24px 150px; }
+      #startup-screen .shell-mobile-header { display: none; }
+      #startup-screen .shell-space { width: 108px; height: 24px; margin-bottom: 24px; border-radius: 7px; background: var(--shell-block); }
+      #startup-screen .shell-editor, #startup-screen .shell-card {
+        box-sizing: border-box;
+        border: 1px solid var(--startup-edge);
+        border-radius: 12px;
+        background: var(--startup-paper);
+        padding: 20px;
+      }
+      #startup-screen .shell-editor { height: 210px; margin-bottom: 12px; }
+      #startup-screen .shell-editor .shell-line:last-child { width: 28%; margin-top: 120px; }
+      #startup-screen .shell-card { height: 142px; margin-bottom: 12px; }
+      #startup-screen .shell-card .shell-line:first-child { width: 20%; margin-bottom: 28px; }
+      #startup-screen .shell-card .shell-line:last-child { width: 52%; }
+      @media (max-width: 767px) {
+        #startup-screen .shell-sidebar { display: none; }
+        html[data-startup-mode="warm"] #startup-screen .startup-content { left: 64px; }
+      }
+      @media (max-width: 639px) {
+        #startup-screen .shell-nav { display: none; }
+        #startup-screen .shell-main { padding: 20px 16px 150px; }
+        #startup-screen .shell-mobile-header { display: flex; justify-content: space-between; align-items: center; height: 26px; margin-bottom: 28px; }
+        #startup-screen .shell-mobile-header span { height: 22px; width: 28px; border-radius: 6px; background: var(--shell-block); }
+        #startup-screen .shell-mobile-header span:first-child { width: 100px; }
+        #startup-screen .shell-space { margin-bottom: 20px; }
+        #startup-screen .shell-editor { height: 200px; }
+        #startup-screen .shell-editor .shell-line:last-child { margin-top: 110px; }
+        #startup-screen .shell-card { height: 128px; }
+        html[data-startup-mode="warm"] #startup-screen .startup-content { left: 0; }
+      }
       @keyframes startup-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
       @keyframes startup-dot { 0%, 55%, 100% { transform: translateY(0); opacity: 0.35; } 27% { transform: translateY(-4px); opacity: 1; } }
       @media (prefers-reduced-motion: reduce) {
@@ -107,19 +204,38 @@
   </head>
   <body class="text-base w-full min-h-svh">
     <div id="startup-screen">
-      <div class="startup-content">
-        <div class="startup-papers" aria-hidden="true">
-          <div class="startup-paper"></div>
-          <div class="startup-paper"></div>
-          <div class="startup-paper">
-            <img class="startup-logo" src="/logo.webp" width="54" height="54" alt="" />
-            <span class="startup-line"></span>
-            <span class="startup-line"></span>
-          </div>
+      <div class="startup-shell" aria-hidden="true" inert>
+        <div class="shell-nav"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        <div class="shell-sidebar">
+          <span class="shell-line shell-line-short"></span>
+          <div class="shell-search"></div>
+          <div class="shell-calendar"></div>
+          <span class="shell-line shell-line-short"></span>
+          <span class="shell-line"></span><span class="shell-line"></span><span class="shell-line"></span><span class="shell-line"></span>
         </div>
-        <p class="startup-title">Memos</p>
-        <div class="startup-dots" aria-hidden="true">
-          <span class="startup-dot"></span><span class="startup-dot"></span><span class="startup-dot"></span>
+        <div class="shell-main">
+          <div class="shell-mobile-header"><span></span><span></span></div>
+          <div class="shell-space"></div>
+          <div class="shell-editor"><span class="shell-line shell-line-short"></span><span class="shell-line"></span></div>
+          <div class="shell-card"><span class="shell-line"></span><span class="shell-line"></span><span class="shell-line"></span></div>
+          <div class="shell-card"><span class="shell-line"></span><span class="shell-line"></span><span class="shell-line"></span></div>
+        </div>
+      </div>
+      <div class="startup-content">
+        <div class="startup-brand">
+          <div class="startup-papers" aria-hidden="true">
+            <div class="startup-paper"></div>
+            <div class="startup-paper"></div>
+            <div class="startup-paper">
+              <img class="startup-logo" src="/logo.webp" width="54" height="54" alt="" />
+              <span class="startup-line"></span>
+              <span class="startup-line"></span>
+            </div>
+          </div>
+          <p class="startup-title">Memos</p>
+          <div class="startup-dots" aria-hidden="true">
+            <span class="startup-dot"></span><span class="startup-dot"></span><span class="startup-dot"></span>
+          </div>
         </div>
         <p id="startup-status" class="startup-status" role="status">正在打开 Memos…</p>
         <div id="startup-recovery" class="startup-recovery" hidden>
@@ -140,23 +256,24 @@
         const recovery = document.getElementById("startup-recovery");
         const retry = document.getElementById("startup-retry");
         let locale = navigator.language;
-        let theme = "system";
+        let previousBuild = null;
         try {
           locale = localStorage.getItem("memos-locale") || locale;
-          theme = localStorage.getItem("memos-theme") || theme;
+          previousBuild = localStorage.getItem("memos-successful-build");
         } catch {
           // Startup also works when browser storage is unavailable.
         }
-        const themes = ["system", "default", "default-dark", "paper", "cream", "mint", "flomo"];
-        if (!themes.includes(theme)) theme = "system";
-        if (theme === "system") theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "default-dark" : "default";
-        document.documentElement.dataset.theme = theme;
         const chinese = locale.toLowerCase().startsWith("zh");
         status.textContent = chinese ? "正在打开 Memos…" : "Opening Memos…";
         retry.textContent = chinese ? "重新加载" : "Reload";
         retry.addEventListener("click", () => window.location.reload());
 
+        const buildId = document.querySelector('meta[name="memos-build-id"]').content;
+        const warm = document.documentElement.dataset.startupMode === "warm";
+        let shellReady = false;
         let pageReady = false;
+        let pageSucceeded = false;
+        let dismissed = false;
         let stylesFailed = false;
         const styles = Array.from(document.querySelectorAll("link[data-startup-stylesheet]"));
         let remainingStyles = styles.length;
@@ -166,19 +283,39 @@
         };
         const timeout = window.setTimeout(showRecovery, 12000);
         const finish = () => {
-          if (!pageReady || remainingStyles || stylesFailed) return;
+          if (remainingStyles || stylesFailed) return;
+          if (pageReady) {
+            if (pageSucceeded && /^[a-f0-9]{64}$/.test(buildId)) {
+              try {
+                const currentBuild = localStorage.getItem("memos-successful-build");
+                // Do not overwrite a newer build completed by another open window.
+                if (currentBuild === previousBuild || currentBuild === buildId) localStorage.setItem("memos-successful-build", buildId);
+              } catch {
+                // A blocked or full store must never block a successful launch.
+              }
+            }
+            window.removeEventListener("memos:startup-ready", onPageReady);
+            window.removeEventListener("memos:startup-shell-ready", onShellReady);
+          }
+          if (dismissed || (!pageReady && !(warm && shellReady))) return;
+          dismissed = true;
           window.clearTimeout(timeout);
-          window.removeEventListener("memos:startup-ready", onPageReady);
           root.removeAttribute("inert");
           root.removeAttribute("aria-hidden");
           screen.remove();
           document.getElementById("startup-style")?.remove();
         };
-        function onPageReady() {
+        function onPageReady(event) {
           pageReady = true;
+          pageSucceeded = event.detail?.success !== false;
+          finish();
+        }
+        function onShellReady() {
+          shellReady = true;
           finish();
         }
         window.addEventListener("memos:startup-ready", onPageReady);
+        window.addEventListener("memos:startup-shell-ready", onShellReady);
         for (const link of styles) {
           link.addEventListener("load", () => {
             link.media = "all";

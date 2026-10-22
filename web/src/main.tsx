@@ -16,6 +16,7 @@ import { useLiveMemoRefresh } from "@/hooks/useLiveMemoRefresh";
 import { useTokenRefreshOnFocus } from "@/hooks/useTokenRefreshOnFocus";
 import { queryClient } from "@/lib/query-client";
 import router from "./router";
+import { preloadInitialHomePage } from "./router/home-page";
 import { applyLocaleEarly } from "./utils/i18n";
 import { applyThemeEarly } from "./utils/theme";
 
@@ -33,6 +34,7 @@ function AppInitializer({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (initStartedRef.current) return;
     initStartedRef.current = true;
+    preloadInitialHomePage(window.location.pathname);
 
     const init = async () => {
       await Promise.all([initInstance(), initAuth()]);

@@ -32,6 +32,7 @@ function boot({ css = false, dark = false, blockedStorage = false } = {}) {
         throw new Error("Blocked");
       },
     });
+  window.eval(window.document.getElementById("startup-appearance")!.textContent!);
   window.eval(window.document.getElementById("startup-script")!.textContent!);
   return {
     window,
@@ -220,6 +221,7 @@ describe("React startup handoff", () => {
     );
     expect(view.getByText("Something went wrong")).toBeInTheDocument();
     expect(notify).toHaveBeenCalledOnce();
+    expect((notify.mock.calls[0][0] as CustomEvent).detail).toEqual({ success: false });
     window.removeEventListener("memos:startup-ready", notify);
   });
 });

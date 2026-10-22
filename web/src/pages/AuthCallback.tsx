@@ -142,7 +142,7 @@ const AuthCallback = () => {
 
   return (
     <div className="p-4 py-24 w-full h-full flex justify-center items-center">
-      {state.errorMessage && <StartupReady />}
+      {state.errorMessage && <StartupReady success={false} />}
       <div className="max-w-lg font-mono whitespace-pre-wrap opacity-80">{state.errorMessage}</div>
     </div>
   );
