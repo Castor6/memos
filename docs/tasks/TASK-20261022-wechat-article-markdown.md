@@ -190,3 +190,31 @@
 - `go test -v -race ./internal/...` 全部通过。
 - 使用 Node 24 执行根 `corepack pnpm install --frozen-lockfile`、`corepack pnpm changeset --empty` 并补充仅 `memos-personal` 的 patch 说明；`corepack pnpm check:release origin/main` 通过，差异空白检查通过。
 - 本次使用构造消息及临时数据验证，没有向真实微信发送消息或执行部署；新格式在包含本修正的版本发布后生效。
+
+## 2026-10-22：核查标题下文章信息能否提取
+
+用户暂停 PR 提交以补充需求，并提供[原文章链接](https://mp.weixin.qq.com/s/d-RExDOWPtsB2aT2egmRWw)，询问标题下第二行能否获取。本轮只核查可提取性，没有增加元数据输出行为或创建 PR。
+
+使用现有文章抓取器的普通请求头取得该页 HTML（HTTP 200）。作者「十字路口」在 `js_author_name_text` / author meta 中，公众号「十字路口Crossing」在 `js_name` / nickname 中。发布时间虽然对应 DOM 为空，但页面脚本含 `createTime` 和 `ct`，可取得 `2026-10-22 13:54`（北京时间）；地区 DOM 为空，但 `window.ip_wording.countryName` 为「美国」，且 `show_ip_wording` 为 1。因此这四项可直接从返回页面解析，无需运行页面脚本或增加浏览器依赖。
+
+截图耳机图标旁「19 人」对应听过人数；页面脚本使用 `tts_heard_person_cnt`，但本次普通请求返回空值后按 0 处理，不能把它当作真实人数，也不能承诺从当前抓取结果恢复截图数字。建议文章 MD 保留作者、公众号、发布时间和公开显示的地区，收听人数不作为固定文章信息。是否添加以及最终格式仍待本轮需求确定；该样文事实不代表所有微信模板都具有相同字段。
+
+原始页面仅保存于本地忽略目录 `tmp/wechat-md-metadata/`，未提交第三方全文；本轮未运行应用测试或调用微信发送接口。
+
+## 2026-10-22：确认使用 Go 模块补齐文章信息并交付实测 MD
+
+用户要求在项目现有 Go 模块实现作者、公众号、发布时间和 IP 属地提取，放在标题下面，并提供实际生成的 MD。该要求在移除附加来源链接的基础上扩展文件格式：标题后增加一行可获取的文章信息，再接原文正文，缺失字段直接省略，不虚构内容。
+
+前一轮只是 curl 下载与 Python 检查页面字段，不属于 Go 模块实测。本轮必须以 `wechatkf.NewProcessor` 默认使用的 `wechatarticle.Convert` 完成真实在线抓取、Go 解析及最终文件封装；测试中的笔记保存使用内存替身，避免写入用户笔记或向微信发送消息。文章全文与运行产物只存放本地忽略目录。
+
+实施结果：`wechatarticle.Result` 增加四项可选信息，优先读取正文外的文章头部节点，再从顶层静态脚本数据回退；不执行脚本，不读取字符串示例、局部函数或推荐对象中的同名字段。时间优先采用页面明确时间，回退到 `ct` 时间戳按北京时间格式化，只有日期时保留日期精度。IP 属地遵循 `show_ip_wording` 和 `is_over_sea`，国内取省份、国外取国家；缺失及隐藏时省略。`wechatkf.articleFile` 在标题和正文之间用「 · 」拼接已取得字段，并转义 Markdown 特殊字符。
+
+2026-10-22，在 `7970b644` 基线加本分支修正的工作区完成以下验证：
+
+- 显式设置 `MEMOS_WECHAT_ARTICLE_URL` 为用户提供的公开链接、`MEMOS_WECHAT_ARTICLE_OUTPUT` 为本地文件，再运行 `go test -count=1 -v ./internal/wechatkf -run '^TestLiveArticleCardMarkdown$'`。未注入转换替身，完整走项目 Go 下载、解析和文件封装；实测通过，文件为 `AI 社交的另一种生意.md`，20,069 字节、6 张图片引用，正文 19,963 字节。
+- 实际文件标题下为「十字路口 · 十字路口Crossing · 2026年10月22日 13:54 · 美国」，未添加额外来源 URL。文件存于忽略目录 `tmp/wechat-md-metadata/`，已提供本地预览入口。
+- `go test -v -race ./internal/...`、`go test -race ./server/runner/wechatkf` 通过。覆盖静态字段、转义、日期精度、缺失项、隐藏属地、正文原有信息以及文件投递回归。
+- 独立审查发现原页面还依据 `is_over_sea` 隐藏 IP 属地，已补条件与回归测试，并重新运行真实 Go 在线样文；结果仍为上述四项。
+- 使用 CI 同版 golangci-lint v2.11.3 检查两个修改包，修正 switch 的默认分支规范后为 0 issues。Node 24 下 `corepack pnpm check:release origin/main` 和差异空白检查通过。
+
+本轮未调用真实微信发送接口或部署；在线样文成功证明此页面和本机网络下的生成链路，不代表全部公众号模板或服务器网络均通过。

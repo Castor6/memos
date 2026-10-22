@@ -38,6 +38,8 @@ func articleMetadata(nodes []*html.Node, content *html.Node) Result {
 			result.AccountName = plainText(node)
 		case "publish_time":
 			result.PublishedAt = normalizePublishedAt(plainText(node))
+		default:
+			// Other elements do not identify article header fields.
 		}
 		if node.Data == "script" {
 			metadataScript(textContent(node), values, ip)
@@ -57,7 +59,8 @@ func articleMetadata(nodes []*html.Node, content *html.Node) Result {
 			result.PublishedAt = time.Unix(seconds, 0).In(time.FixedZone("CST", 8*60*60)).Format("2006年01月02日 15:04")
 		}
 	}
-	if values["show_ip_wording"] == "1" || values["show_ip_wording"] == "true" {
+	showIP := values["show_ip_wording"] == "1" || values["show_ip_wording"] == "true"
+	if showIP && values["is_over_sea"] != "1" && values["is_over_sea"] != "true" {
 		result.IPLocation = ip["countryName"]
 		if ip["countryId"] == "156" || ip["countryName"] == "中国" {
 			result.IPLocation = ip["provinceName"]
@@ -94,10 +97,10 @@ func metadataScript(source string, values, ip map[string]string) {
 			(tokens[i-1] == "var" || tokens[i-1] == "let" || tokens[i-1] == "const" ||
 				(i >= 2 && tokens[i-2] == "window" && tokens[i-1] == ".")) {
 			switch token {
-			case "author", "nickname", "createTime", "ct", "show_ip_wording":
+			case "author", "nickname", "createTime", "ct", "show_ip_wording", "is_over_sea":
 				value, ok := metadataLiteral(tokens[i+2])
 				end := i + 3
-				if token == "show_ip_wording" && end+1 < len(tokens) && tokens[end] == "*" && tokens[end+1] == "1" {
+				if (token == "show_ip_wording" || token == "is_over_sea") && end+1 < len(tokens) && tokens[end] == "*" && tokens[end+1] == "1" {
 					end += 2
 				}
 				if ok && (end == len(tokens) || tokens[end] == ";") {
@@ -110,6 +113,8 @@ func metadataScript(source string, values, ip map[string]string) {
 						ip[key] = value
 					}
 				}
+			default:
+				// Unrelated page variables are not article metadata.
 			}
 		}
 		switch token {
@@ -117,6 +122,8 @@ func metadataScript(source string, values, ip map[string]string) {
 			depth++
 		case "}", "]", ")":
 			depth--
+		default:
+			// Other tokens do not change the enclosing scope.
 		}
 	}
 }
