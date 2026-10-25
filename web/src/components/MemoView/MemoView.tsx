@@ -138,7 +138,7 @@ const MemoView: React.FC<MemoViewProps> = (props: MemoViewProps) => {
         onContextMenuClose={contextMenu.close}
       />
 
-      <MemoBody compact={compact} />
+      <MemoBody compact={compact} privacyEnabled={!location.pathname.startsWith("/memos/shares/")} />
 
       {previewState.items.length > 0 && (
         <Suspense fallback={null}>

@@ -22,4 +22,5 @@ export interface MemoHeaderProps {
 
 export interface MemoBodyProps {
   compact?: boolean;
+  privacyEnabled?: boolean;
 }

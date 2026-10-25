@@ -286,7 +286,10 @@
       "description": "Hidden from MCP. App access and sharing permissions are unaffected.",
       "enable": "Hide from MCP",
       "disable": "Allow MCP access",
-      "update-failed": "Failed to update MCP privacy"
+      "update-failed": "Failed to update MCP privacy",
+      "show-all": "Show all private content",
+      "hide-all": "Hide all private content",
+      "show-content": "Show this private content"
     },
     "archived-at": "Archived at",
     "click-to-hide-sensitive-content": "Click to hide sensitive content",
