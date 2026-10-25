@@ -6,9 +6,10 @@ import MemoDetailSidebar from "@/components/MemoDetailSidebar/MemoDetailSidebar"
 import { PrivateMemoVisibilityProvider } from "@/contexts/PrivateMemoVisibilityContext";
 import { AttachmentSchema } from "@/types/proto/api/v1/attachment_service_pb";
 import { State } from "@/types/proto/api/v1/common_pb";
-import { LocationSchema, MemoSchema, Visibility } from "@/types/proto/api/v1/memo_service_pb";
+import { LocationSchema, type Memo, MemoRelation_Type, MemoSchema, Visibility } from "@/types/proto/api/v1/memo_service_pb";
 
 const updateMemo = vi.hoisted(() => vi.fn());
+const relations = vi.hoisted(() => ({ resolved: {} as Record<string, Memo> }));
 
 vi.mock("copy-to-clipboard", () => ({ default: vi.fn() }));
 vi.mock("react-hot-toast", () => ({ default: { success: vi.fn() } }));
@@ -34,7 +35,7 @@ vi.mock("@/components/MemoDetailSidebar/MemoOutline", () => ({
   default: ({ headings }: { headings: unknown[] }) => <div data-testid="outline">{headings.length}</div>,
 }));
 vi.mock("@/components/MemoDetailSidebar/MemoSharePanel", () => ({ default: () => <div data-testid="share-panel" /> }));
-vi.mock("@/components/MemoMetadata/Relation/useResolvedRelationMemos", () => ({ useResolvedRelationMemos: () => ({}) }));
+vi.mock("@/components/MemoMetadata/Relation/useResolvedRelationMemos", () => ({ useResolvedRelationMemos: () => relations.resolved }));
 vi.mock("@/contexts/InstanceContext", () => ({ useInstance: () => ({ profile: { instanceUrl: "https://memos.example" } }) }));
 vi.mock("@/hooks/useCurrentUser", () => ({ default: () => ({ name: "users/alice" }) }));
 vi.mock("@/hooks/useMemoQueries", () => ({ useUpdateMemo: () => ({ mutateAsync: updateMemo }) }));
@@ -46,6 +47,7 @@ vi.mock("@/i18n", () => ({ default: { language: "en-US" } }));
 
 describe("MemoDetailSidebar", () => {
   beforeEach(() => {
+    relations.resolved = {};
     updateMemo.mockReset();
     updateMemo.mockResolvedValue(undefined);
   });
@@ -152,5 +154,43 @@ describe("MemoDetailSidebar", () => {
     expect(container.querySelector('[data-content-hidden="true"]')).toBeNull();
     expect(screen.getByText("shared-tag").closest("[inert]")).toBeNull();
     expect(screen.getByTestId("outline").closest("[inert]")).toBeNull();
+  });
+  it("conceals private targets of ordinary memos and preserves share-token rendering", () => {
+    const target = create(MemoSchema, { name: "memos/secret", snippet: "Target secret", mcpHidden: true });
+    const host = create(MemoSchema, {
+      name: "memos/ordinary",
+      creator: "users/alice",
+      relations: [
+        {
+          type: MemoRelation_Type.REFERENCE,
+          memo: { name: "memos/ordinary" },
+          relatedMemo: { name: target.name, snippet: target.snippet },
+        },
+      ],
+    });
+    relations.resolved = { [target.name]: target };
+    const { container, rerender } = render(
+      <MemoryRouter>
+        <PrivateMemoVisibilityProvider>
+          <MemoDetailSidebar memo={host} />
+        </PrivateMemoVisibilityProvider>
+      </MemoryRouter>,
+    );
+    expect(screen.getByText("Target secret").closest("[inert]")).not.toBeNull();
+    expect(container.querySelector('[title="Target secret"]')).toBeNull();
+    expect(screen.queryByRole("link", { name: "Target secret" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "memo.mcp-privacy.show-content" }));
+    expect(screen.getByRole("link", { name: "Target secret" })).toBeInTheDocument();
+
+    relations.resolved = {};
+    rerender(
+      <MemoryRouter>
+        <PrivateMemoVisibilityProvider>
+          <MemoDetailSidebar memo={host} respectPrivateVisibility={false} />
+        </PrivateMemoVisibilityProvider>
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("link", { name: "Target secret" })).toBeInTheDocument();
+    expect(screen.getByText("Target secret").closest("[inert]")).toBeNull();
   });
 });

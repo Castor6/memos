@@ -7,6 +7,7 @@ import toast from "react-hot-toast";
 import { Link } from "react-router-dom";
 import VisibilitySelector from "@/components/MemoEditor/Toolbar/VisibilitySelector";
 import { getLocationDisplayText } from "@/components/MemoMetadata/Location/locationHelpers";
+import RelationPrivacyGuard from "@/components/MemoMetadata/Relation/RelationPrivacyGuard";
 import { getRelationBuckets, getRelationMemo, type RelationDirection } from "@/components/MemoMetadata/Relation/relationHelpers";
 import { useResolvedRelationMemos } from "@/components/MemoMetadata/Relation/useResolvedRelationMemos";
 import MemoPrivacyGuard from "@/components/MemoPrivacyGuard";
@@ -14,6 +15,7 @@ import UserAvatar from "@/components/UserAvatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import VisibilityIcon from "@/components/VisibilityIcon";
 import { useInstance } from "@/contexts/InstanceContext";
+import type { PrivateMemoIdentity } from "@/contexts/PrivateMemoVisibilityContext";
 import useCurrentUser from "@/hooks/useCurrentUser";
 import { useUpdateMemo } from "@/hooks/useMemoQueries";
 import { useUser } from "@/hooks/useUserQueries";
@@ -91,23 +93,37 @@ const PropertyLabel = ({ children }: { children: React.ReactNode }) => (
 
 const PROPERTY_VALUE_CLASSES = "min-w-0 flex items-center text-[13px] leading-5 text-foreground/85";
 
-const RelationRow = ({ relation, direction, snippet }: { relation: MemoRelation; direction: RelationDirection; snippet: string }) => {
+const RelationRow = ({
+  relation,
+  direction,
+  snippet,
+  identity,
+  privacyEnabled,
+}: {
+  relation: MemoRelation;
+  direction: RelationDirection;
+  snippet: string;
+  identity?: PrivateMemoIdentity;
+  privacyEnabled: boolean;
+}) => {
   const relatedMemo = getRelationMemo(relation, direction);
   if (!relatedMemo) {
     return null;
   }
   const Icon = direction === "referencing" ? LinkIcon : MilestoneIcon;
   return (
-    <Link
-      className="flex min-w-0 items-center gap-1.5 rounded-md px-1.5 py-1 -mx-1.5 text-[13px] leading-5 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-      to={`/${relatedMemo.name}`}
-      state={{ referenceNavigation: true }}
-      title={snippet}
-      viewTransition
-    >
-      <Icon className="size-3.5 shrink-0 opacity-60" />
-      <span className="truncate">{snippet}</span>
-    </Link>
+    <RelationPrivacyGuard memo={identity} enabled={privacyEnabled}>
+      <Link
+        className="flex min-w-0 items-center gap-1.5 rounded-md px-1.5 py-1 -mx-1.5 text-[13px] leading-5 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+        to={`/${relatedMemo.name}`}
+        state={{ referenceNavigation: true }}
+        title={!privacyEnabled || identity?.mcpHidden === false ? snippet : undefined}
+        viewTransition
+      >
+        <Icon className="size-3.5 shrink-0 opacity-60" />
+        <span className="truncate">{snippet}</span>
+      </Link>
+    </RelationPrivacyGuard>
   );
 };
 
@@ -152,8 +168,8 @@ const MemoDetailSidebar = ({ memo, className, respectPrivateVisibility = true, o
       [
         ...referencing.map((relation) => getRelationMemo(relation, "referencing")),
         ...referenced.map((relation) => getRelationMemo(relation, "referenced")),
-      ].flatMap((relatedMemo) => (relatedMemo?.name && !relatedMemo.snippet ? [relatedMemo.name] : [])),
-    [referenced, referencing],
+      ].flatMap((relatedMemo) => (relatedMemo?.name && (respectPrivateVisibility || !relatedMemo.snippet) ? [relatedMemo.name] : [])),
+    [referenced, referencing, respectPrivateVisibility],
   );
   const resolvedMemos = useResolvedRelationMemos(relationMemoNames);
 
@@ -166,7 +182,7 @@ const MemoDetailSidebar = ({ memo, className, respectPrivateVisibility = true, o
     if (!relatedMemo) {
       return "";
     }
-    return relatedMemo.snippet || resolvedMemos[relatedMemo.name]?.snippet || relatedMemo.name;
+    return resolvedMemos[relatedMemo.name]?.snippet || relatedMemo.snippet || relatedMemo.name;
   };
 
   const handleTogglePin = async () => {
@@ -318,6 +334,8 @@ const MemoDetailSidebar = ({ memo, className, respectPrivateVisibility = true, o
                   relation={relation}
                   direction="referencing"
                   snippet={relationSnippet(relation, "referencing")}
+                  identity={resolvedMemos[getRelationMemo(relation, "referencing")?.name ?? ""]}
+                  privacyEnabled={respectPrivateVisibility}
                 />
               ))}
               {referenced.map((relation) => (
@@ -326,6 +344,8 @@ const MemoDetailSidebar = ({ memo, className, respectPrivateVisibility = true, o
                   relation={relation}
                   direction="referenced"
                   snippet={relationSnippet(relation, "referenced")}
+                  identity={resolvedMemos[getRelationMemo(relation, "referenced")?.name ?? ""]}
+                  privacyEnabled={respectPrivateVisibility}
                 />
               ))}
             </div>
