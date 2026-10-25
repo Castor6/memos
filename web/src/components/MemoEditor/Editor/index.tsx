@@ -6,7 +6,6 @@ import TaskItem from "@tiptap/extension-task-item";
 import TaskList from "@tiptap/extension-task-list";
 import { Markdown } from "@tiptap/markdown";
 import { EditorContent, useEditor } from "@tiptap/react";
-import StarterKit from "@tiptap/starter-kit";
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
@@ -17,6 +16,7 @@ import { InlineMedia } from "./media";
 import { PreservedContent, prepareMarkdown } from "./preserved-content";
 import { createRichFormattingController } from "./rich-formatting";
 import SelectionToolbar from "./SelectionToolbar";
+import { MemoStarterKit } from "./starter-kit";
 import "./rich-editor.css";
 
 interface EditorProps {
@@ -38,7 +38,7 @@ const Editor = forwardRef<EditorController, EditorProps>((props, ref) => {
   const editor = useEditor({
     editable: !props.readOnly,
     extensions: [
-      StarterKit.configure({
+      MemoStarterKit.configure({
         underline: false,
         trailingNode: false,
         link: { openOnClick: false },

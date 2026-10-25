@@ -15,7 +15,7 @@ interface RelationListEditorProps {
 }
 
 const RelationItemCard: FC<{
-  memo: MemoRelation["relatedMemo"];
+  memo: React.ComponentProps<typeof RelationCard>["memo"];
   onRemove?: () => void;
   parentPage?: string;
 }> = ({ memo, onRemove, parentPage }) => {
@@ -41,10 +41,7 @@ const RelationItemCard: FC<{
 const RelationListEditor: FC<RelationListEditorProps> = ({ relations, onRelationsChange, parentPage, memoName }) => {
   const referenceRelations = useMemo(() => getEditorReferenceRelations(relations, memoName), [relations, memoName]);
   const relatedMemoNames = useMemo(
-    () =>
-      referenceRelations.flatMap((relation) =>
-        relation.relatedMemo?.name && !relation.relatedMemo.snippet ? [relation.relatedMemo.name] : [],
-      ),
+    () => referenceRelations.flatMap((relation) => (relation.relatedMemo?.name ? [relation.relatedMemo.name] : [])),
     [referenceRelations],
   );
   const resolvedMemos = useResolvedRelationMemos(relatedMemoNames);
@@ -68,7 +65,7 @@ const RelationListEditor: FC<RelationListEditorProps> = ({ relations, onRelation
     >
       {referenceRelations.map((relation) => {
         const relatedMemo = relation.relatedMemo!;
-        const memo = relatedMemo.snippet ? relatedMemo : resolvedMemos[relatedMemo.name] || relatedMemo;
+        const memo = resolvedMemos[relatedMemo.name] || relatedMemo;
         return <RelationItemCard key={memo.name} memo={memo} onRemove={() => handleDeleteRelation(memo.name)} parentPage={parentPage} />;
       })}
     </MetadataSection>

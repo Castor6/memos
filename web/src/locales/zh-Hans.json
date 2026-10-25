@@ -239,7 +239,10 @@
       "description": "对 MCP 隐藏，软件内使用和分享权限不受影响",
       "enable": "设为私密",
       "disable": "取消私密",
-      "update-failed": "更新私密设置失败"
+      "update-failed": "更新私密设置失败",
+      "show-all": "显示全部私密内容",
+      "hide-all": "隐藏全部私密内容",
+      "show-content": "显示这条私密内容"
     },
     "archived-at": "归档于",
     "click-to-hide-sensitive-content": "点击隐藏 NSFW 内容",

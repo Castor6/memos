@@ -13,7 +13,7 @@ export const validationService = {
     }
 
     // Must have content, attachment, or local file
-    if (!state.content.trim() && state.metadata.attachments.length === 0 && state.localFiles.length === 0) {
+    if (!state.content.replace(/&nbsp;/g, "").trim() && state.metadata.attachments.length === 0 && state.localFiles.length === 0) {
       return { valid: false, reason: "Content, attachment, or file required" };
     }
 

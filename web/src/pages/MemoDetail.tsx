@@ -5,6 +5,7 @@ import { Link, Navigate, useLocation, useNavigate, useParams } from "react-route
 import MemoCommentSection from "@/components/MemoCommentSection";
 import { MentionResolutionProvider } from "@/components/MemoContent/MentionResolutionContext";
 import { MemoDetailSidebar, MemoDetailSidebarDrawer } from "@/components/MemoDetailSidebar";
+import MemoPrivacyGuard from "@/components/MemoPrivacyGuard";
 import MemoView from "@/components/MemoView";
 import MobileHeader from "@/components/MobileHeader";
 import StartupReady from "@/components/StartupReady";
@@ -114,7 +115,11 @@ const MemoDetail = () => {
       <StartupReady />
       {!md && (
         <MobileHeader>
-          <MemoDetailSidebarDrawer memo={displayMemo} onShareImageOpen={() => setShareImageDialogOpen(true)} />
+          <MemoDetailSidebarDrawer
+            memo={displayMemo}
+            respectPrivateVisibility={!isShareMode}
+            onShareImageOpen={() => setShareImageDialogOpen(true)}
+          />
         </MobileHeader>
       )}
       <MentionResolutionProvider contents={mentionResolutionContents} userNames={userResolutionNames}>
@@ -122,15 +127,17 @@ const MemoDetail = () => {
           <div className={cn("w-full md:w-[calc(100%-16.5rem)]")}>
             {!isShareMode && parentMemo && (
               <div className="w-auto inline-block mb-2">
-                <Link
-                  className="px-3 py-1 border border-border rounded-lg max-w-xs w-auto text-sm flex flex-row justify-start items-center flex-nowrap text-muted-foreground hover:shadow hover:opacity-80"
-                  to={`/${parentMemo.name}`}
-                  state={locationState}
-                  viewTransition
-                >
-                  <ArrowUpLeftFromCircleIcon className="w-4 h-auto shrink-0 opacity-60 mr-2" />
-                  <span className="truncate">{parentMemo.content}</span>
-                </Link>
+                <MemoPrivacyGuard memo={parentMemo}>
+                  <Link
+                    className="px-3 py-1 border border-border rounded-lg max-w-xs w-auto text-sm flex flex-row justify-start items-center flex-nowrap text-muted-foreground hover:shadow hover:opacity-80"
+                    to={`/${parentMemo.name}`}
+                    state={locationState}
+                    viewTransition
+                  >
+                    <ArrowUpLeftFromCircleIcon className="w-4 h-auto shrink-0 opacity-60 mr-2" />
+                    <span className="truncate">{parentMemo.content}</span>
+                  </Link>
+                </MemoPrivacyGuard>
               </div>
             )}
             <MemoView
@@ -145,19 +152,26 @@ const MemoDetail = () => {
               onShareImageDialogOpenChange={setShareImageDialogOpen}
             />
             {!isShareMode && (
-              <MemoCommentSection
-                memo={displayMemo}
-                comments={comments}
-                parentPage={locationState?.from}
-                hasMoreComments={hasNextComments}
-                isFetchingMoreComments={isFetchingNextComments}
-                onLoadMoreComments={fetchNextComments}
-              />
+              <MemoPrivacyGuard memo={displayMemo}>
+                <MemoCommentSection
+                  memo={displayMemo}
+                  comments={comments}
+                  parentPage={locationState?.from}
+                  hasMoreComments={hasNextComments}
+                  isFetchingMoreComments={isFetchingNextComments}
+                  onLoadMoreComments={fetchNextComments}
+                />
+              </MemoPrivacyGuard>
             )}
           </div>
           {md && (
             <div className="sticky top-0 left-0 shrink-0 -mt-6 w-60 h-full">
-              <MemoDetailSidebar className="py-6" memo={displayMemo} onShareImageOpen={() => setShareImageDialogOpen(true)} />
+              <MemoDetailSidebar
+                className="py-6"
+                memo={displayMemo}
+                respectPrivateVisibility={!isShareMode}
+                onShareImageOpen={() => setShareImageDialogOpen(true)}
+              />
             </div>
           )}
         </div>

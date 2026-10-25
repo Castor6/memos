@@ -1,5 +1,6 @@
 import { LinkIcon, MilestoneIcon } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import MetadataSection from "@/components/MemoMetadata/MetadataSection";
 import { useNearViewport } from "@/hooks/useNearViewport";
 import type { MemoRelation } from "@/types/proto/api/v1/memo_service_pb";
@@ -17,6 +18,7 @@ interface RelationListViewProps {
 
 function RelationListView({ relations, currentMemoName, parentPage, className }: RelationListViewProps) {
   const t = useTranslate();
+  const privacyEnabled = !useLocation().pathname.startsWith("/memos/shares/");
   const [activeTab, setActiveTab] = useState<"referencing" | "referenced">("referencing");
   const { ref: viewportRef, isNearViewport } = useNearViewport<HTMLDivElement>();
 
@@ -34,9 +36,9 @@ function RelationListView({ relations, currentMemoName, parentPage, className }:
     () =>
       activeRelations.flatMap((relation) => {
         const memo = getRelationMemo(relation, direction);
-        return memo?.name && !memo.snippet ? [memo.name] : [];
+        return memo?.name && (privacyEnabled || !memo.snippet) ? [memo.name] : [];
       }),
-    [activeRelations, direction],
+    [activeRelations, direction, privacyEnabled],
   );
   const resolvedMemos = useResolvedRelationMemos(activeMemoNames, { enabled: isNearViewport });
 

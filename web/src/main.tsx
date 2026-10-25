@@ -11,6 +11,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { refreshAccessToken } from "@/connect";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { InstanceProvider, useInstance } from "@/contexts/InstanceContext";
+import { PrivateMemoVisibilityProvider } from "@/contexts/PrivateMemoVisibilityContext";
 import { ViewProvider } from "@/contexts/ViewContext";
 import { useLiveMemoRefresh } from "@/hooks/useLiveMemoRefresh";
 import { useTokenRefreshOnFocus } from "@/hooks/useTokenRefreshOnFocus";
@@ -55,7 +56,7 @@ function AppInitializer({ children }: { children: React.ReactNode }) {
     return null;
   }
 
-  return <>{children}</>;
+  return <PrivateMemoVisibilityProvider key={currentUser?.name ?? "anonymous"}>{children}</PrivateMemoVisibilityProvider>;
 }
 
 function Main() {

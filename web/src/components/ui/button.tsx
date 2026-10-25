@@ -13,6 +13,8 @@ const buttonVariants = cva(
         outline: "border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground",
         filter:
           "border border-border bg-card text-muted-foreground shadow-xs hover:bg-accent aria-pressed:border-transparent aria-pressed:bg-[var(--theme-tag-bg,var(--accent))] aria-pressed:text-[var(--theme-tag-fg,var(--primary))]",
+        "filter-segment":
+          "text-muted-foreground hover:bg-accent aria-pressed:bg-[var(--theme-tag-bg,var(--accent))] aria-pressed:text-[var(--theme-tag-fg,var(--primary))] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary",
         secondary: "bg-secondary text-secondary-foreground hover:shadow-xs hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",

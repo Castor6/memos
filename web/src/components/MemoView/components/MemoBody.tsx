@@ -1,10 +1,11 @@
 import ClampedSection from "@/components/ClampedSection";
 import { Tag } from "@/components/MemoContent/Tag";
+import MemoContentMask from "@/components/MemoContentMask";
 import { LocationDisplayView, RelationListView } from "@/components/MemoMetadata";
 import { isReferenceRelation } from "@/components/MemoMetadata/Relation/relationHelpers";
 import { useAuth } from "@/contexts/AuthContext";
+import { useMemoPrivacy } from "@/contexts/PrivateMemoVisibilityContext";
 import { FILE_TITLE, fileMarkdown } from "@/lib/inline-media";
-import { cn } from "@/lib/utils";
 import { getAttachmentUrl } from "@/utils/attachment";
 import { useTranslate } from "@/utils/i18n";
 import { visibleCharacterCount } from "@/utils/remark-plugins/remark-preview";
@@ -14,21 +15,15 @@ import { useMemoHandlers } from "../hooks";
 import { useMemoViewContext } from "../MemoViewContext";
 import type { MemoBodyProps } from "../types";
 
-const BlurOverlay: React.FC<{ onClick?: () => void }> = ({ onClick }) => {
+const MemoBody: React.FC<MemoBodyProps> = ({ compact, privacyEnabled = true }) => {
   const t = useTranslate();
-  return (
-    <div className="absolute inset-0 z-10 pt-4 flex items-center justify-center" onClick={onClick}>
-      <div className="rounded-lg border border-border bg-card px-2 py-1 text-xs text-muted-foreground transition-colors hover:border-accent hover:bg-accent hover:text-foreground">
-        {t("memo.click-to-show-sensitive-content")}
-      </div>
-    </div>
-  );
-};
-
-const MemoBody: React.FC<MemoBodyProps> = ({ compact }) => {
   const { userGeneralSetting } = useAuth();
   const limit = userGeneralSetting?.previewCharacters ?? 0;
   const { memo, parentPage, showBlurredContent, blurred, readonly, openEditor, openPreview, toggleBlurVisibility } = useMemoViewContext();
+
+  const privateMemo = privacyEnabled && memo.mcpHidden;
+  const privacy = useMemoPrivacy({ ...memo, mcpHidden: Boolean(privateMemo) });
+  const hidden = privateMemo ? privacy.hidden : blurred && !showBlurredContent;
 
   const { handleMemoContentClick, handleMemoContentDoubleClick } = useMemoHandlers({ readonly, openEditor, openPreview });
 
@@ -47,13 +42,14 @@ ${fileMarkdown(getAttachmentUrl(file), FILE_TITLE + file.type, file.filename)}`,
       .join("");
 
   return (
-    <>
-      <div
-        className={cn(
-          "w-full flex flex-col justify-start items-start gap-2",
-          blurred && !showBlurredContent && "blur-lg transition-all duration-200",
-        )}
-      >
+    <MemoContentMask
+      hidden={hidden}
+      onReveal={privateMemo ? privacy.reveal : toggleBlurVisibility}
+      label={t(privateMemo ? "memo.mcp-privacy.show-content" : "memo.click-to-show-sensitive-content")}
+      showLabel={!privateMemo}
+      className="w-full"
+    >
+      <div className="w-full flex flex-col justify-start items-start gap-2">
         {/* Compact bounds the whole body — attachments included — behind one Show more.
             Reactions stay outside so they never hide under the fade. */}
         <ClampedSection enabled={Boolean(compact)} characterLimit={limit} textLength={visibleCharacterCount(content)}>
@@ -86,9 +82,7 @@ ${fileMarkdown(getAttachmentUrl(file), FILE_TITLE + file.type, file.filename)}`,
         </ClampedSection>
         <MemoReactionListView memo={memo} reactions={memo.reactions} />
       </div>
-
-      {blurred && !showBlurredContent && <BlurOverlay onClick={toggleBlurVisibility} />}
-    </>
+    </MemoContentMask>
   );
 };
 
