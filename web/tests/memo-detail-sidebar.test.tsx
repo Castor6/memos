@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import MemoDetailSidebar from "@/components/MemoDetailSidebar/MemoDetailSidebar";
+import { PrivateMemoVisibilityProvider } from "@/contexts/PrivateMemoVisibilityContext";
 import { AttachmentSchema } from "@/types/proto/api/v1/attachment_service_pb";
 import { State } from "@/types/proto/api/v1/common_pb";
 import { LocationSchema, MemoSchema, Visibility } from "@/types/proto/api/v1/memo_service_pb";
@@ -103,5 +104,53 @@ describe("MemoDetailSidebar", () => {
     expect(onShareImageOpen).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole("button", { name: "memo.share.open-panel" }));
     expect(screen.getByTestId("share-panel")).toBeInTheDocument();
+  });
+
+  it("conceals private content-derived details together without blocking share actions", () => {
+    const memo = create(MemoSchema, {
+      name: "memos/private-detail",
+      creator: "users/alice",
+      state: State.NORMAL,
+      mcpHidden: true,
+      content: "# Private heading",
+      tags: ["private-tag"],
+      location: create(LocationSchema, { placeholder: "Private place" }),
+      attachments: [create(AttachmentSchema, { name: "attachments/private", filename: "private.pdf", type: "application/pdf" })],
+    });
+    const { container } = render(
+      <MemoryRouter>
+        <PrivateMemoVisibilityProvider>
+          <MemoDetailSidebar memo={memo} onShareImageOpen={vi.fn()} />
+        </PrivateMemoVisibilityProvider>
+      </MemoryRouter>,
+    );
+
+    expect(container.querySelectorAll('[data-content-hidden="true"]')).toHaveLength(4);
+    expect(screen.queryByRole("link", { name: /private.pdf/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "memo.share.open-panel" }).closest("[inert]")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "memo.share.open-panel" }));
+    expect(screen.getByTestId("share-panel")).toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByRole("button", { name: "memo.mcp-privacy.show-content" })[0]);
+    expect(container.querySelectorAll('[data-content-hidden="true"]')).toHaveLength(0);
+    expect(screen.getByRole("link", { name: /private.pdf/ })).toBeInTheDocument();
+  });
+
+  it("keeps explicitly shared memo details readable despite the private flag", () => {
+    const memo = create(MemoSchema, {
+      name: "memos/shared-detail",
+      mcpHidden: true,
+      content: "# Shared heading",
+      tags: ["shared-tag"],
+    });
+    const { container } = render(
+      <MemoryRouter>
+        <MemoDetailSidebar memo={memo} respectPrivateVisibility={false} />
+      </MemoryRouter>,
+    );
+
+    expect(container.querySelector('[data-content-hidden="true"]')).toBeNull();
+    expect(screen.getByText("shared-tag").closest("[inert]")).toBeNull();
+    expect(screen.getByTestId("outline").closest("[inert]")).toBeNull();
   });
 });

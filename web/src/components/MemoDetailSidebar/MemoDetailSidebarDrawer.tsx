@@ -8,10 +8,11 @@ import MemoDetailSidebar from "./MemoDetailSidebar";
 
 interface Props {
   memo: Memo;
+  respectPrivateVisibility?: boolean;
   onShareImageOpen?: () => void;
 }
 
-const MemoDetailSidebarDrawer = ({ memo, onShareImageOpen }: Props) => {
+const MemoDetailSidebarDrawer = ({ memo, respectPrivateVisibility, onShareImageOpen }: Props) => {
   const location = useLocation();
   const [open, setOpen] = useState(false);
 
@@ -25,7 +26,12 @@ const MemoDetailSidebarDrawer = ({ memo, onShareImageOpen }: Props) => {
         <GanttChartIcon className="w-5 h-auto text-muted-foreground" />
       </SheetTrigger>
       <SheetContent side="right" className="w-full sm:w-80 px-4 bg-background">
-        <MemoDetailSidebar className="py-4" memo={memo} onShareImageOpen={onShareImageOpen} />
+        <MemoDetailSidebar
+          className="py-4"
+          memo={memo}
+          respectPrivateVisibility={respectPrivateVisibility}
+          onShareImageOpen={onShareImageOpen}
+        />
       </SheetContent>
     </Sheet>
   );

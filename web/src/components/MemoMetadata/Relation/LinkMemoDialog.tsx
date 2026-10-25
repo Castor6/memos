@@ -1,6 +1,7 @@
 import { timestampDate } from "@bufbuild/protobuf/wkt";
 import { LinkIcon } from "lucide-react";
 import { MemoPreview } from "@/components/MemoPreview";
+import MemoPrivacyGuard from "@/components/MemoPrivacyGuard";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { VisuallyHidden } from "@/components/ui/visually-hidden";
@@ -76,7 +77,9 @@ export const LinkMemoDialog = ({
                         {alreadyLinked && <LinkIcon className="w-3 h-3 shrink-0" />}
                         <span>{memo.createTime && timestampDate(memo.createTime).toLocaleString()}</span>
                       </div>
-                      <MemoPreview name={memo.name} content={memo.content} attachments={memo.attachments} showMemoId />
+                      <MemoPrivacyGuard memo={memo}>
+                        <MemoPreview name={memo.name} content={memo.content} attachments={memo.attachments} showMemoId />
+                      </MemoPrivacyGuard>
                     </div>
                   </div>
                 );

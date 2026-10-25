@@ -7,6 +7,7 @@ import { useEffect, useMemo } from "react";
 import { MapContainer, Marker, Popup, useMap } from "react-leaflet";
 import MarkerClusterGroup from "react-leaflet-cluster";
 import { Link } from "react-router-dom";
+import MemoPrivacyGuard from "@/components/MemoPrivacyGuard";
 import { defaultMarkerIcon, ThemedTileLayer } from "@/components/map/map-utils";
 import { useInfiniteMemos } from "@/hooks/useMemoQueries";
 import { buildMemoCreatorFilter } from "@/lib/resource-names";
@@ -150,12 +151,14 @@ const UserMemoMap = ({ creator, className }: Props) => {
                       <ArrowUpRightIcon className="h-3.5 w-3.5" />
                     </Link>
                   </div>
-                  <div className="space-y-1">
-                    <div className="line-clamp-3 text-sm leading-snug font-medium text-foreground">{memo.snippet || "No content"}</div>
-                    <div className="text-[11px] text-muted-foreground">
-                      {memo.location!.latitude.toFixed(2)}°, {memo.location!.longitude.toFixed(2)}°
+                  <MemoPrivacyGuard memo={memo}>
+                    <div className="space-y-1">
+                      <div className="line-clamp-3 text-sm leading-snug font-medium text-foreground">{memo.snippet || "No content"}</div>
+                      <div className="text-[11px] text-muted-foreground">
+                        {memo.location!.latitude.toFixed(2)}°, {memo.location!.longitude.toFixed(2)}°
+                      </div>
                     </div>
-                  </div>
+                  </MemoPrivacyGuard>
                 </div>
               </Popup>
             </Marker>

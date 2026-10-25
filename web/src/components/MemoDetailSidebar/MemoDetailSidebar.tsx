@@ -9,6 +9,7 @@ import VisibilitySelector from "@/components/MemoEditor/Toolbar/VisibilitySelect
 import { getLocationDisplayText } from "@/components/MemoMetadata/Location/locationHelpers";
 import { getRelationBuckets, getRelationMemo, type RelationDirection } from "@/components/MemoMetadata/Relation/relationHelpers";
 import { useResolvedRelationMemos } from "@/components/MemoMetadata/Relation/useResolvedRelationMemos";
+import MemoPrivacyGuard from "@/components/MemoPrivacyGuard";
 import UserAvatar from "@/components/UserAvatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import VisibilityIcon from "@/components/VisibilityIcon";
@@ -34,6 +35,7 @@ import MemoSharePanel from "./MemoSharePanel";
 interface Props {
   memo: Memo;
   className?: string;
+  respectPrivateVisibility?: boolean;
   onShareImageOpen?: () => void;
 }
 
@@ -128,12 +130,13 @@ const AttachmentRow = ({ attachment }: { attachment: Attachment }) => {
   );
 };
 
-const MemoDetailSidebar = ({ memo, className, onShareImageOpen }: Props) => {
+const MemoDetailSidebar = ({ memo, className, respectPrivateVisibility = true, onShareImageOpen }: Props) => {
   const t = useTranslate();
   const currentUser = useCurrentUser();
   const { profile } = useInstance();
   const { mutateAsync: updateMemo } = useUpdateMemo();
   const [sharePanelOpen, setSharePanelOpen] = useState(false);
+  const privacyMemo = respectPrivateVisibility ? memo : { ...memo, mcpHidden: false };
 
   const readonly = memo.creator !== currentUser?.name && !isSuperUser(currentUser);
   const editable = !readonly && memo.state === State.NORMAL;
@@ -265,67 +268,77 @@ const MemoDetailSidebar = ({ memo, className, onShareImageOpen }: Props) => {
         {memo.location && (
           <>
             <PropertyLabel>{t("common.location")}</PropertyLabel>
-            <span className={PROPERTY_VALUE_CLASSES} title={getLocationDisplayText(memo.location)}>
-              <MapPinIcon className="w-[13px] mr-1.5 shrink-0 text-muted-foreground" />
-              <span className="truncate">{getLocationDisplayText(memo.location)}</span>
-            </span>
+            <MemoPrivacyGuard memo={privacyMemo}>
+              <span className={PROPERTY_VALUE_CLASSES} title={getLocationDisplayText(memo.location)}>
+                <MapPinIcon className="w-[13px] mr-1.5 shrink-0 text-muted-foreground" />
+                <span className="truncate">{getLocationDisplayText(memo.location)}</span>
+              </span>
+            </MemoPrivacyGuard>
           </>
         )}
       </div>
 
       {memo.tags.length > 0 && (
-        <Section label={t("common.tags")} count={memo.tags.length}>
-          <div className="flex flex-wrap gap-x-0.5 gap-y-1 -mx-1.5">
-            {memo.tags.map((tag) => (
-              <span
-                key={tag}
-                className="inline-flex min-w-0 items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[13px] leading-5 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-              >
-                <span className="opacity-45">#</span>
-                <span className="truncate">{tag}</span>
-              </span>
-            ))}
-          </div>
-        </Section>
+        <MemoPrivacyGuard memo={privacyMemo}>
+          <Section label={t("common.tags")} count={memo.tags.length}>
+            <div className="flex flex-wrap gap-x-0.5 gap-y-1 -mx-1.5">
+              {memo.tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="inline-flex min-w-0 items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[13px] leading-5 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                >
+                  <span className="opacity-45">#</span>
+                  <span className="truncate">{tag}</span>
+                </span>
+              ))}
+            </div>
+          </Section>
+        </MemoPrivacyGuard>
       )}
 
       {memo.attachments.length > 0 && (
-        <Section label={t("common.attachments")} count={memo.attachments.length}>
-          <div className="flex flex-col">
-            {memo.attachments.map((attachment) => (
-              <AttachmentRow key={attachment.name} attachment={attachment as Attachment} />
-            ))}
-          </div>
-        </Section>
+        <MemoPrivacyGuard memo={privacyMemo}>
+          <Section label={t("common.attachments")} count={memo.attachments.length}>
+            <div className="flex flex-col">
+              {memo.attachments.map((attachment) => (
+                <AttachmentRow key={attachment.name} attachment={attachment as Attachment} />
+              ))}
+            </div>
+          </Section>
+        </MemoPrivacyGuard>
       )}
 
       {(referencing.length > 0 || referenced.length > 0) && (
-        <Section label={t("common.relations")} count={referencing.length + referenced.length}>
-          <div className="flex flex-col">
-            {referencing.map((relation) => (
-              <RelationRow
-                key={`referencing-${getRelationMemo(relation, "referencing")?.name}`}
-                relation={relation}
-                direction="referencing"
-                snippet={relationSnippet(relation, "referencing")}
-              />
-            ))}
-            {referenced.map((relation) => (
-              <RelationRow
-                key={`referenced-${getRelationMemo(relation, "referenced")?.name}`}
-                relation={relation}
-                direction="referenced"
-                snippet={relationSnippet(relation, "referenced")}
-              />
-            ))}
-          </div>
-        </Section>
+        <MemoPrivacyGuard memo={privacyMemo}>
+          <Section label={t("common.relations")} count={referencing.length + referenced.length}>
+            <div className="flex flex-col">
+              {referencing.map((relation) => (
+                <RelationRow
+                  key={`referencing-${getRelationMemo(relation, "referencing")?.name}`}
+                  relation={relation}
+                  direction="referencing"
+                  snippet={relationSnippet(relation, "referencing")}
+                />
+              ))}
+              {referenced.map((relation) => (
+                <RelationRow
+                  key={`referenced-${getRelationMemo(relation, "referenced")?.name}`}
+                  relation={relation}
+                  direction="referenced"
+                  snippet={relationSnippet(relation, "referenced")}
+                />
+              ))}
+            </div>
+          </Section>
+        </MemoPrivacyGuard>
       )}
 
       {headings.length > 0 && (
-        <Section label={t("memo.outline")}>
-          <MemoOutline headings={headings} />
-        </Section>
+        <MemoPrivacyGuard memo={privacyMemo}>
+          <Section label={t("memo.outline")}>
+            <MemoOutline headings={headings} />
+          </Section>
+        </MemoPrivacyGuard>
       )}
 
       {sharePanelOpen && <MemoSharePanel memoName={memo.name} open={sharePanelOpen} onClose={() => setSharePanelOpen(false)} />}
