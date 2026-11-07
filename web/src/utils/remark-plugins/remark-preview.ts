@@ -1,4 +1,4 @@
-import type { Root } from "mdast";
+import type { Root, RootContent } from "mdast";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { gfmFromMarkdown } from "mdast-util-gfm";
 import { gfm } from "micromark-extension-gfm";
@@ -11,8 +11,21 @@ interface PreviewNode {
 const segments = (text: string) =>
   Array.from(new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(text), (part) => part.segment);
 
+function trimBoundaryBlankParagraphs(tree: Root) {
+  const isBlank = (node: RootContent) =>
+    node.type === "paragraph" &&
+    !node.data &&
+    node.children.every((child) => !child.data && (child.type === "break" || (child.type === "text" && child.value.trim() === "")));
+  let start = 0;
+  let end = tree.children.length;
+  while (start < end && isBlank(tree.children[start])) start++;
+  while (end > start && isBlank(tree.children[end - 1])) end--;
+  tree.children = tree.children.slice(start, end);
+}
+
 export function visibleCharacterCount(markdown: string): number {
   const tree = fromMarkdown(markdown, { extensions: [gfm()], mdastExtensions: [gfmFromMarkdown()] });
+  trimBoundaryBlankParagraphs(tree);
   const count = (node: PreviewNode): number => {
     if (["text", "inlineCode", "code", "math", "inlineMath"].includes(node.type)) return segments(node.value || "").length;
     return node.children?.reduce((sum, child) => sum + count(child), 0) || 0;
@@ -24,6 +37,7 @@ export function visibleCharacterCount(markdown: string): number {
 export function remarkPreview({ limit = 0 }: { limit?: number } = {}) {
   return (tree: Root) => {
     if (limit <= 0) return;
+    trimBoundaryBlankParagraphs(tree);
     let remaining = limit;
     const trim = (node: PreviewNode) => {
       if (["text", "inlineCode", "code", "math", "inlineMath"].includes(node.type)) {

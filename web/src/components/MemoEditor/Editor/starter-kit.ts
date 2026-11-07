@@ -1,8 +1,8 @@
 import StarterKit from "@tiptap/starter-kit";
 
 // The default paragraph serializer omits the first empty paragraph in a run.
-// Emit its supported marker for every empty paragraph so reading and editing
-// retain the same blank lines, including at the beginning and end of a memo.
+// Emit its supported marker for every empty paragraph so saved content and editing
+// retain the same blank lines. Reading may hide document-boundary blank lines.
 export const MemoStarterKit = StarterKit.extend({
   addExtensions() {
     return (this.parent?.() ?? []).map((extension) =>

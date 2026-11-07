@@ -47,8 +47,12 @@ const (
 	maxConcurrentThumbnails     = 3
 	thumbnailFailedMarkerSuffix = ".failed"
 
-	// cacheMaxAge is the max-age value for Cache-Control headers (1 hour).
-	cacheMaxAge = "public, max-age=3600"
+	// avatarCacheControl retains the existing one-hour avatar cache policy.
+	avatarCacheControl = "public, max-age=3600"
+
+	// imageCacheControl allows private browser reuse for 30 days before revalidation.
+	imageCacheControl   = "private, max-age=2592000, must-revalidate"
+	noStoreCacheControl = "private, no-store"
 )
 
 // xssUnsafeTypes contains MIME types that could execute scripts if served directly.
@@ -135,6 +139,19 @@ func (s *FileServerService) RegisterRoutes(echoServer *echo.Echo) {
 
 // serveAttachmentFile serves attachment binary content using native HTTP.
 func (s *FileServerService) serveAttachmentFile(c *echo.Context) error {
+	c.Response().Header().Set(echo.HeaderCacheControl, noStoreCacheControl)
+	response, err := echo.UnwrapResponse(c.Response())
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to prepare attachment response").Wrap(err)
+	}
+	response.Before(func() {
+		// ServeFile may write errors directly after media headers have been set.
+		// Keep successful conditional responses cacheable even without Content-Type.
+		if response.Status != http.StatusOK && response.Status != http.StatusPartialContent && response.Status != http.StatusNotModified {
+			response.Header().Set(echo.HeaderCacheControl, noStoreCacheControl)
+		}
+	})
+
 	ctx := c.Request().Context()
 	uid := c.Param("uid")
 	wantThumbnail := c.QueryParam("thumbnail") == "true"
@@ -216,7 +233,7 @@ func (s *FileServerService) serveUserAvatar(c *echo.Context) error {
 
 	setSecurityHeaders(c)
 	c.Response().Header().Set(echo.HeaderContentType, imageType)
-	c.Response().Header().Set(echo.HeaderCacheControl, cacheMaxAge)
+	c.Response().Header().Set(echo.HeaderCacheControl, avatarCacheControl)
 
 	return c.Blob(http.StatusOK, imageType, imageData)
 }
@@ -830,7 +847,11 @@ func setSecurityHeaders(c *echo.Context) {
 func setMediaHeaders(c *echo.Context, contentType, originalType string) {
 	h := c.Response().Header()
 	h.Set(echo.HeaderContentType, contentType)
-	h.Set(echo.HeaderCacheControl, cacheMaxAge)
+	h.Set(echo.HeaderCacheControl, noStoreCacheControl)
+	// Share links retain their expiry/revocation checks on each access.
+	if strings.HasPrefix(contentType, "image/") && c.QueryParam("share_token") == "" {
+		h.Set(echo.HeaderCacheControl, imageCacheControl)
+	}
 
 	// Support HDR/wide color gamut for images and videos.
 	if strings.HasPrefix(originalType, "image/") || strings.HasPrefix(originalType, "video/") {
