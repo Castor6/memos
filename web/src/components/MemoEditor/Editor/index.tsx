@@ -17,6 +17,7 @@ import { PreservedContent, prepareMarkdown } from "./preserved-content";
 import { createRichFormattingController } from "./rich-formatting";
 import SelectionToolbar from "./SelectionToolbar";
 import { MemoStarterKit } from "./starter-kit";
+import { VisualLineEnd } from "./visual-line-end";
 import "./rich-editor.css";
 
 interface EditorProps {
@@ -48,6 +49,7 @@ const Editor = forwardRef<EditorController, EditorProps>((props, ref) => {
       Details,
       DetailsSummary,
       DetailsBody,
+      VisualLineEnd,
       TableKit,
       TaskList,
       TaskItem.configure({ nested: true }),

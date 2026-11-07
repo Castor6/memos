@@ -10,6 +10,7 @@ import { isMentionElement, isTagElement, isTaskListItemElement } from "@/types/m
 import type { LinkMetadata } from "@/types/proto/api/v1/memo_service_pb";
 import { lazyWithReload } from "@/utils/lazy";
 import { rehypeHeadingId } from "@/utils/rehype-plugins/rehype-heading-id";
+import { rehypeTrimBoundaryBlankLines } from "@/utils/rehype-plugins/rehype-trim-boundary-blank-lines";
 import { remarkDisableSetext } from "@/utils/remark-plugins/remark-disable-setext";
 import { remarkHighlight } from "@/utils/remark-plugins/remark-highlight";
 import { remarkMention } from "@/utils/remark-plugins/remark-mention";
@@ -186,7 +187,7 @@ export const MemoMarkdownRendererCore = ({
           remarkPreserveType,
           [remarkPreview, { limit: maxCharacters }],
         ]}
-        rehypePlugins={[rehypeRaw, [rehypeSanitize, SANITIZE_SCHEMA], rehypeHeadingId, ...mathRehypePlugins]}
+        rehypePlugins={[rehypeRaw, [rehypeSanitize, SANITIZE_SCHEMA], rehypeTrimBoundaryBlankLines, rehypeHeadingId, ...mathRehypePlugins]}
         components={markdownComponents}
       >
         {content}

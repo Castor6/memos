@@ -67,16 +67,7 @@ describe("empty lines in rich memo content", () => {
 
     const html = renderToStaticMarkup(<MemoMarkdownRendererCore content={markdown} resolvedMentionUsernames={new Set()} />);
     const document = new DOMParser().parseFromString(html, "text/html");
-    expect([...document.querySelectorAll("p")].map((node) => node.textContent)).toEqual([
-      "\u00a0",
-      "\u00a0",
-      "First",
-      "\u00a0",
-      "\u00a0",
-      "Last",
-      "\u00a0",
-      "\u00a0",
-    ]);
+    expect([...document.querySelectorAll("p")].map((node) => node.textContent)).toEqual(["First", "\u00a0", "\u00a0", "Last"]);
   });
 
   it("preserves editable empty lines inside a folding body", () => {
