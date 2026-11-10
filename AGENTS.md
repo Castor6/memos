@@ -29,7 +29,7 @@ Memos is a self-hosted note-taking app.
 - Add a new `.changeset/*.md` for shipped behavior changes using root `corepack pnpm changeset`. Use patch/minor/major and a Chinese user-facing summary. Changeset 只选择变化的组件：应用 `memos-personal`、扩展 `memos-web-clipper`，两者变化才同时选择；扩展独立版本/日志位于 `extensions/web-clipper/release/`，仅应用更新不升级扩展，反向亦然；扩展用 `web-clipper-v*` 独立 Release，仅扩展变化不运行镜像发布。Only the generated version PR updates release package versions and their `CHANGELOG.md`; upstream history lives in `docs/upstream/CHANGELOG.md`. Version PR merges publish one smoke-tested OCI artifact independently to ACR and GHCR only when the Memos version changes; server pull updates use `scripts/deploy/` with backup and recovery. Keep deployment credentials and host details out of this repository.
 - 涉及线上排查、部署或服务器维护时，先读取仓库根目录的 `LOCAL_OPS.md`（若存在），按其中的路径查阅私有维护说明，不做全局目录搜索。该文件仅保存在本机，使用 `.git/info/exclude` 排除，不提交私有路径或凭据；本机缺少该文件时向用户确认维护入口。
 - `docs/README.md` is a navigation entry, not a mandatory reading list. Read `docs/development.md` when running or verifying locally; read deployment documentation only for deployment/upstream work.
-- 多会话并行修改代码时使用独立 worktree。
+- 多个独立会话同时修改本仓库时，各会话使用独立 worktree。同一会话中的相关功能默认共用一个工作区，不因拆分功能或子任务额外创建 worktree。
 - Default UI verification to the Codex in-app browser with local disposable data: desktop 1440×900; the user's iPhone 15 Pro Max uses a 430px-wide layout, checked at heights 739 and 932 (see `docs/development.md`). Verify no persistent left sidebar on mobile. Restore viewport overrides afterward. Use the regular Chrome profile only for a problem specific to it.
 - 涉及前端样式或布局的修改，必须按以下流程展示效果图并交付：
   1. 打开现有版本，使用本地测试数据截取桌面和手机界面，作为设计底图。
