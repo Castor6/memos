@@ -30,7 +30,7 @@ Memos is a self-hosted note-taking app.
 - 涉及线上排查、部署或服务器维护时，先读取仓库根目录的 `LOCAL_OPS.md`（若存在），按其中的路径查阅私有维护说明，不做全局目录搜索。该文件仅保存在本机，使用 `.git/info/exclude` 排除，不提交私有路径或凭据；本机缺少该文件时向用户确认维护入口。
 - `docs/README.md` is a navigation entry, not a mandatory reading list. Read `docs/development.md` when running or verifying locally; read deployment documentation only for deployment/upstream work.
 - 多个独立会话同时修改本仓库时，各会话使用独立 worktree。同一会话中的相关功能默认共用一个工作区，不因拆分功能或子任务额外创建 worktree。
-- Default UI verification to the Codex in-app browser with local disposable data: desktop 1440×900; the user's iPhone 15 Pro Max uses a 430px-wide layout, checked at heights 739 and 932 (see `docs/development.md`). Verify no persistent left sidebar on mobile. Restore viewport overrides afterward. Use the regular Chrome profile only for a problem specific to it.
+- Default UI verification to the agent's built-in browser (e.g. the Codex in-app browser); if the agent has none, use its existing browser automation (e.g. Playwright CLI). Use local disposable data: desktop 1440×900; the user's iPhone 15 Pro Max uses a 430px-wide layout, checked at heights 739 and 932 (see `docs/development.md`). Verify no persistent left sidebar on mobile. Restore viewport overrides afterward. Use the regular Chrome profile only for a problem specific to it.
 - 涉及前端样式或布局的修改，必须按以下流程展示效果图并交付：
   1. 打开现有版本，使用本地测试数据截取桌面和手机界面，作为设计底图。
   2. 明确使用 **ImageGen** 基于现有截图做静态改图，仅调整拟议区域，保留原有导航、卡片和整体布局；不为出图另建可交互展示或提前实现功能。
