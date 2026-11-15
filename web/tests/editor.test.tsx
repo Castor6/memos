@@ -214,6 +214,30 @@ describe("keyboard and clipboard", () => {
     expect(pasted).not.toContain("](http://mail");
   });
 
+  it("drops auto-generated www/email links from rich pastes but keeps labelled links", async () => {
+    const { fireEvent } = await import("@testing-library/react");
+    const ref = createRef<EditorController>();
+    const { container } = render(<Editor ref={ref} className="x" initialContent="" placeholder="" onContentChange={vi.fn()} onFiles={vi.fn()} onSubmit={vi.fn()} />);
+    const html =
+      'abc=<a href="http://www.samsung.com/?sid=1">www.samsung.com/?sid=1</a> <a href="mailto:a@b.com">a@b.com</a> ' +
+      '<a href="https://x.com/docs">点这里</a> <a href="https://y.com">https://y.com</a>';
+    const text = "abc=www.samsung.com/?sid=1 a@b.com 点这里 https://y.com";
+    fireEvent.paste(container.querySelector(".rich-editor")!, {
+      clipboardData: {
+        files: [],
+        items: [],
+        types: ["text/html", "text/plain"],
+        getData: (type: string) => (type === "text/html" ? html : type === "text/plain" ? text : ""),
+      },
+    });
+    const pasted = ref.current!.getMarkdown();
+    expect(pasted).toContain("abc=www.samsung.com/?sid=1 a@b.com");
+    expect(pasted).not.toContain("](http://www");
+    expect(pasted).not.toContain("mailto:");
+    expect(pasted).toContain("[点这里](https://x.com/docs)");
+    expect(pasted).toContain("[https://y.com](https://y.com)");
+  });
+
   it("keeps bare domains and emails as plain text when loading Markdown", () => {
     const ref = createRef<EditorController>();
     const source = "www.example.com a@b.com foo.md";

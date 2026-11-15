@@ -92,7 +92,21 @@ function PreviewImageDialog({ open, onOpenChange, imgUrls = [], items, initialIn
       updateZoom(zoomScale + (event.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP));
     }
   };
-  const handleDoubleClick = gestures.toggleZoom;
+  const handleSurfaceClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    event.stopPropagation();
+    if (!isImagePreview || gestures.wasDragged()) {
+      return;
+    }
+    // Pointer capture retargets the click to the surface, so hit-test against the (transformed) image box.
+    const rect = gestures.imageRef.current?.getBoundingClientRect();
+    const onImage =
+      rect && event.clientX >= rect.left && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom;
+    if (onImage) {
+      gestures.toggleZoom();
+    } else {
+      handleClose();
+    }
+  };
 
   if (!itemCount || !currentItem) {
     return null;
@@ -109,11 +123,11 @@ function PreviewImageDialog({ open, onOpenChange, imgUrls = [], items, initialIn
           <DialogTitle>{currentItem.filename || "Attachment preview"}</DialogTitle>
           <DialogDescription>
             Attachment preview dialog. Press Escape to close, use left or right arrow keys to switch items, and zoom images with the
-            controls, mouse wheel, or double tap.
+            controls, mouse wheel, a click, or double tap. Click outside the image to close.
           </DialogDescription>
         </VisuallyHidden>
 
-        <div className="absolute inset-x-0 top-0 z-20 bg-linear-to-b from-background/90 via-background/50 to-transparent px-3 pb-6 pt-3 sm:px-5 sm:pt-4">
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 bg-linear-to-b from-background/90 via-background/50 to-transparent px-3 pb-6 pt-3 sm:px-5 sm:pt-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 text-foreground">
               <div className="truncate text-sm font-medium">{currentItem.filename || "Attachment"}</div>
@@ -129,7 +143,7 @@ function PreviewImageDialog({ open, onOpenChange, imgUrls = [], items, initialIn
               onClick={handleClose}
               variant="ghost"
               size="icon"
-              className="shrink-0 rounded-full bg-foreground/8 text-foreground hover:bg-foreground/12 hover:text-foreground"
+              className="pointer-events-auto shrink-0 rounded-full bg-foreground/8 text-foreground hover:bg-foreground/12 hover:text-foreground"
               aria-label="Close preview"
             >
               <X className="h-4 w-4" />
@@ -139,13 +153,10 @@ function PreviewImageDialog({ open, onOpenChange, imgUrls = [], items, initialIn
 
         <div
           data-testid={isImagePreview ? "preview-zoom-surface" : undefined}
-          className={cn(
-            "flex h-full w-full items-center justify-center px-3 pb-20 pt-16 sm:px-16 sm:pb-20 sm:pt-20",
-            isImagePreview && "cursor-zoom-in",
-          )}
+          className="flex h-full w-full items-center justify-center px-3 pb-20 pt-16 sm:px-16 sm:pb-20 sm:pt-20"
           onWheel={handleWheel}
           onClick={(event) => {
-            if (event.target === event.currentTarget && !isZoomed) {
+            if (event.target === event.currentTarget) {
               handleClose();
             }
           }}
@@ -153,10 +164,9 @@ function PreviewImageDialog({ open, onOpenChange, imgUrls = [], items, initialIn
           <div
             ref={gestures.surfaceRef}
             className={cn("flex items-center justify-center", isImagePreview ? "h-full w-full overflow-hidden" : "max-h-full max-w-full")}
-            style={isImagePreview ? { touchAction: "none", cursor: isZoomed ? "grab" : "zoom-in" } : undefined}
+            style={isImagePreview ? { touchAction: "none" } : undefined}
             {...gestures.handlers}
-            onDoubleClick={handleDoubleClick}
-            onClick={(event) => event.stopPropagation()}
+            onClick={handleSurfaceClick}
           >
             {currentItem.kind === "video" ? (
               <video
@@ -187,6 +197,7 @@ function PreviewImageDialog({ open, onOpenChange, imgUrls = [], items, initialIn
                 style={{
                   transform: `translate3d(${gestures.transform.x}px, ${gestures.transform.y}px, 0) scale(${zoomScale})`,
                   transformOrigin: "center center",
+                  cursor: isZoomed ? "grab" : "zoom-in",
                 }}
                 draggable={false}
                 loading="eager"
@@ -197,8 +208,8 @@ function PreviewImageDialog({ open, onOpenChange, imgUrls = [], items, initialIn
         </div>
 
         {isImagePreview && (
-          <div className="absolute inset-x-0 bottom-0 z-30 px-3 pb-3 pt-6">
-            <div className="mx-auto flex w-fit items-center gap-1 rounded-full border border-border bg-background/85 px-2 py-2 text-foreground shadow-lg backdrop-blur-sm">
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 px-3 pb-3 pt-6">
+            <div className="pointer-events-auto mx-auto flex w-fit items-center gap-1 rounded-full border border-border bg-background/85 px-2 py-2 text-foreground shadow-lg backdrop-blur-sm">
               {hasMultiple && !sm && (
                 <>
                   <ZoomButton label="Previous item" onClick={handlePrevious} disabled={!canGoPrevious}>
@@ -248,8 +259,8 @@ function PreviewImageDialog({ open, onOpenChange, imgUrls = [], items, initialIn
         )}
 
         {hasMultiple && !sm && !isImagePreview && (
-          <div className="absolute inset-x-0 bottom-0 z-20 px-3 pb-3 pt-6">
-            <div className="mx-auto flex max-w-xs items-center justify-between rounded-full border border-border bg-background/85 px-2 py-2 shadow-lg backdrop-blur-sm">
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 px-3 pb-3 pt-6">
+            <div className="pointer-events-auto mx-auto flex max-w-xs items-center justify-between rounded-full border border-border bg-background/85 px-2 py-2 shadow-lg backdrop-blur-sm">
               <Button
                 type="button"
                 variant="ghost"

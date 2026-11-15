@@ -13,6 +13,7 @@ import remarkGfm from "remark-gfm";
 import { memoUrlTransform, SANITIZE_SCHEMA } from "@/components/MemoContent/constants";
 import { DetailsBlock } from "@/components/MemoContent/DetailsBlock";
 import { currencySafeMathOptions, remarkCurrencySafeMath } from "@/utils/remark-plugins/remark-currency-safe-math";
+import { remarkHttpOnlyAutolinks } from "@/utils/remark-plugins/remark-http-only-autolinks";
 import { detailsFence, parseDetailsSource } from "./editable-details";
 import "katex/dist/katex.min.css";
 
@@ -112,7 +113,7 @@ function PreservedView({ node }: NodeViewProps) {
       <ReactMarkdown
         components={{ details: DetailsBlock }}
         urlTransform={memoUrlTransform}
-        remarkPlugins={[remarkCurrencySafeMath, remarkGfm, remarkBreaks]}
+        remarkPlugins={[remarkCurrencySafeMath, remarkGfm, remarkHttpOnlyAutolinks, remarkBreaks]}
         rehypePlugins={[rehypeRaw, [rehypeSanitize, SANITIZE_SCHEMA], rehypeKatex]}
       >
         {String(node.attrs.raw)}

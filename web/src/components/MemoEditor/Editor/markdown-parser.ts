@@ -1,9 +1,5 @@
 import { Marked, type marked } from "marked";
-
-const HTTP_URL = /^https?:\/\//i;
-
-/** Whether a bare URL should become a link: only explicit http(s) addresses qualify. */
-export const isHttpUrl = (url: string) => HTTP_URL.test(url);
+import { isHttpUrl } from "@/utils/http-url";
 
 /**
  * Creates the editor's own marked instance. GFM would otherwise autolink `www.` hosts and
