@@ -192,6 +192,34 @@ describe("keyboard and clipboard", () => {
     fireEvent.paste(container.querySelector('.rich-editor')!, { clipboardData: { files: [file], getData: () => "", types: [] } });
     expect(onFiles).toHaveBeenCalledWith([file]);
   });
+
+  it("auto-links only http(s) URLs in typed or pasted text", async () => {
+    const { fireEvent, act } = await import("@testing-library/react");
+    const ref = createRef<EditorController>();
+    const { container } = render(<Editor ref={ref} className="x" initialContent="" placeholder="" onContentChange={vi.fn()} onFiles={vi.fn()} onSubmit={vi.fn()} />);
+    act(() => ref.current!.insertText!("see example.com foo.md www.example.com https://a.com "));
+    const typed = ref.current!.getMarkdown();
+    expect(typed).toContain("[https://a.com](https://a.com)");
+    expect(typed).toContain("see example.com foo.md www.example.com");
+    expect(typed).not.toContain("](http://");
+
+    act(() => ref.current!.setMarkdown(""));
+    const text = "paste demo.txt mail.example.org http://b.com ";
+    fireEvent.paste(container.querySelector(".rich-editor")!, {
+      clipboardData: { files: [], items: [], types: ["text/plain"], getData: (type: string) => (type === "text/plain" ? text : "") },
+    });
+    const pasted = ref.current!.getMarkdown();
+    expect(pasted).toContain("paste demo.txt mail.example.org");
+    expect(pasted).not.toContain("](http://demo");
+    expect(pasted).not.toContain("](http://mail");
+  });
+
+  it("keeps bare domains and emails as plain text when loading Markdown", () => {
+    const ref = createRef<EditorController>();
+    const source = "www.example.com a@b.com foo.md";
+    render(<Editor ref={ref} className="x" initialContent={source} placeholder="" onContentChange={vi.fn()} onFiles={vi.fn()} onSubmit={vi.fn()} />);
+    expect(ref.current!.getMarkdown()).toBe(source);
+  });
 });
 
 

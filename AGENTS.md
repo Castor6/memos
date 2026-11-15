@@ -36,6 +36,7 @@ Memos is a self-hosted note-taking app.
   2. 明确使用 **ImageGen** 基于现有截图做静态改图，仅调整拟议区域，保留原有导航、卡片和整体布局；不为出图另建可交互展示或提前实现功能。
   3. 对照原图检查文字、图标和位置，修正误改，明确标注“设计预览”并展示给用户；用户确认方案后再实现，本会话已确认的方案无需重复确认。
   4. 实现后验证实际页面，交付桌面和手机布局的真实运行截图；设计预览不能代替实际运行验证。图片存放于本地忽略目录，不提交仓库。
+  - 当前环境没有 ImageGen 工具时，不强制第 2、3 步：说明方案后可直接实现，或先用本地临时改动截图代替设计预览；第 4 步仍必须完成。
 - Narrow viewport checks do not establish iPhone/Safari, software keyboard, touch or PWA behavior; record any required real-device checks explicitly.
 
 ## 内置微信客服模块

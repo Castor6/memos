@@ -6,11 +6,12 @@ import TaskItem from "@tiptap/extension-task-item";
 import TaskList from "@tiptap/extension-task-list";
 import { Markdown } from "@tiptap/markdown";
 import { EditorContent, useEditor } from "@tiptap/react";
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import type { EditorController } from "../types/editorController";
 import { Details, DetailsBody, DetailsSummary } from "./editable-details";
+import { createMemoMarked, isHttpUrl } from "./markdown-parser";
 import { MarkdownUnderline } from "./markdown-underline";
 import { InlineMedia } from "./media";
 import { PreservedContent, prepareMarkdown } from "./preserved-content";
@@ -36,13 +37,15 @@ const Editor = forwardRef<EditorController, EditorProps>((props, ref) => {
   const current = useRef({ ...props, enterToSave: userGeneralSetting?.enterToSave ?? false });
   current.current = { ...props, enterToSave: userGeneralSetting?.enterToSave ?? false };
   const lastEmitted = useRef(props.initialContent);
+  const [marked] = useState(createMemoMarked);
   const editor = useEditor({
     editable: !props.readOnly,
     extensions: [
       MemoStarterKit.configure({
         underline: false,
         trailingNode: false,
-        link: { openOnClick: false },
+        // Only explicit http(s) URLs become links; bare domains and file names stay plain text.
+        link: { openOnClick: false, shouldAutoLink: isHttpUrl },
         heading: { levels: [1, 2, 3, 4, 5, 6] },
       }),
       MarkdownUnderline,
@@ -57,7 +60,7 @@ const Editor = forwardRef<EditorController, EditorProps>((props, ref) => {
       InlineMedia,
       Placeholder.configure({ placeholder: () => current.current.placeholder }),
       PreservedContent,
-      Markdown.configure({ markedOptions: { breaks: true } }),
+      Markdown.configure({ marked }),
       Extension.create({
         name: "memoSaveKeys",
         priority: 1000,

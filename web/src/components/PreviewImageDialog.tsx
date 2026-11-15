@@ -102,7 +102,8 @@ function PreviewImageDialog({ open, onOpenChange, imgUrls = [], items, initialIn
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton={false}
-        className="!h-[100vh] !w-[100vw] !max-h-[100vh] !max-w-[100vw] overflow-hidden border-0 bg-black/92 p-0 shadow-none"
+        overlayClassName="bg-transparent"
+        className="!inset-0 !h-full !w-full !max-h-none !max-w-none !translate-x-0 !translate-y-0 overflow-hidden rounded-none border-0 bg-background/80 !p-0 text-foreground shadow-none backdrop-blur-xl"
       >
         <VisuallyHidden>
           <DialogTitle>{currentItem.filename || "Attachment preview"}</DialogTitle>
@@ -112,12 +113,12 @@ function PreviewImageDialog({ open, onOpenChange, imgUrls = [], items, initialIn
           </DialogDescription>
         </VisuallyHidden>
 
-        <div className="absolute inset-x-0 top-0 z-20 bg-linear-to-b from-black/70 via-black/35 to-transparent px-3 pb-6 pt-3 sm:px-5 sm:pt-4">
+        <div className="absolute inset-x-0 top-0 z-20 bg-linear-to-b from-background/90 via-background/50 to-transparent px-3 pb-6 pt-3 sm:px-5 sm:pt-4">
           <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0 text-white">
+            <div className="min-w-0 text-foreground">
               <div className="truncate text-sm font-medium">{currentItem.filename || "Attachment"}</div>
               {hasMultiple && (
-                <div className="mt-1 text-xs text-white/70">
+                <div className="mt-1 text-xs text-muted-foreground">
                   {safeIndex + 1} / {itemCount}
                 </div>
               )}
@@ -128,7 +129,7 @@ function PreviewImageDialog({ open, onOpenChange, imgUrls = [], items, initialIn
               onClick={handleClose}
               variant="ghost"
               size="icon"
-              className="shrink-0 rounded-full bg-white/10 text-white hover:bg-white/16 hover:text-white"
+              className="shrink-0 rounded-full bg-foreground/8 text-foreground hover:bg-foreground/12 hover:text-foreground"
               aria-label="Close preview"
             >
               <X className="h-4 w-4" />
@@ -139,7 +140,7 @@ function PreviewImageDialog({ open, onOpenChange, imgUrls = [], items, initialIn
         <div
           data-testid={isImagePreview ? "preview-zoom-surface" : undefined}
           className={cn(
-            "flex h-full w-full items-center justify-center px-3 pb-20 pt-16 sm:px-16 sm:pb-8 sm:pt-20",
+            "flex h-full w-full items-center justify-center px-3 pb-20 pt-16 sm:px-16 sm:pb-20 sm:pt-20",
             isImagePreview && "cursor-zoom-in",
           )}
           onWheel={handleWheel}
@@ -162,7 +163,7 @@ function PreviewImageDialog({ open, onOpenChange, imgUrls = [], items, initialIn
                 key={currentItem.id}
                 src={currentItem.sourceUrl}
                 poster={currentItem.posterUrl}
-                className="max-h-[calc(100vh-8rem)] max-w-[calc(100vw-1.5rem)] rounded-md object-contain sm:max-h-[calc(100vh-7rem)] sm:max-w-[calc(100vw-8rem)]"
+                className="max-h-[calc(100dvh-9rem)] max-w-[calc(100vw-1.5rem)] rounded-md object-contain shadow-lg sm:max-h-[calc(100dvh-10rem)] sm:max-w-[calc(100vw-8rem)]"
                 controls
                 autoPlay
                 playsInline
@@ -175,14 +176,14 @@ function PreviewImageDialog({ open, onOpenChange, imgUrls = [], items, initialIn
                 alt={`Preview live photo ${safeIndex + 1} of ${itemCount}`}
                 presentationTimestampUs={currentItem.presentationTimestampUs}
                 badgeClassName="left-3 top-3 sm:left-4 sm:top-4"
-                mediaClassName="max-h-[calc(100vh-8rem)] max-w-[calc(100vw-1.5rem)] rounded-md object-contain sm:max-h-[calc(100vh-7rem)] sm:max-w-[calc(100vw-8rem)]"
+                mediaClassName="max-h-[calc(100dvh-9rem)] max-w-[calc(100vw-1.5rem)] rounded-md object-contain shadow-lg sm:max-h-[calc(100dvh-10rem)] sm:max-w-[calc(100vw-8rem)]"
               />
             ) : (
               <img
                 ref={gestures.imageRef}
                 src={currentItem.sourceUrl}
                 alt={`Preview image ${safeIndex + 1} of ${itemCount}`}
-                className="max-h-[calc(100vh-8rem)] max-w-[calc(100vw-1.5rem)] rounded-md object-contain select-none sm:max-h-[calc(100vh-7rem)] sm:max-w-[calc(100vw-8rem)]"
+                className="max-h-full max-w-full rounded-md object-contain shadow-lg select-none"
                 style={{
                   transform: `translate3d(${gestures.transform.x}px, ${gestures.transform.y}px, 0) scale(${zoomScale})`,
                   transformOrigin: "center center",
@@ -197,29 +198,29 @@ function PreviewImageDialog({ open, onOpenChange, imgUrls = [], items, initialIn
 
         {isImagePreview && (
           <div className="absolute inset-x-0 bottom-0 z-30 px-3 pb-3 pt-6">
-            <div className="mx-auto flex w-fit items-center gap-1 rounded-full bg-black/60 px-2 py-2 text-white shadow-lg backdrop-blur-sm">
+            <div className="mx-auto flex w-fit items-center gap-1 rounded-full border border-border bg-background/85 px-2 py-2 text-foreground shadow-lg backdrop-blur-sm">
               {hasMultiple && !sm && (
                 <>
                   <ZoomButton label="Previous item" onClick={handlePrevious} disabled={!canGoPrevious}>
                     <ChevronLeft className="h-4 w-4" />
                   </ZoomButton>
-                  <div className="min-w-9 px-1 text-center text-xs font-medium tabular-nums text-white/75">
+                  <div className="min-w-9 px-1 text-center text-xs font-medium tabular-nums text-muted-foreground">
                     {safeIndex + 1}/{itemCount}
                   </div>
                   <ZoomButton label="Next item" onClick={handleNext} disabled={!canGoNext}>
                     <ChevronRight className="h-4 w-4" />
                   </ZoomButton>
-                  <div className="mx-1 h-5 w-px bg-white/18" />
+                  <div className="mx-1 h-5 w-px bg-border" />
                 </>
               )}
               <ZoomButton label="Zoom out" onClick={handleZoomOut} disabled={zoomScale === MIN_ZOOM}>
                 <ZoomOut className="h-4 w-4" />
               </ZoomButton>
-              <div className="min-w-12 px-2 text-center text-xs font-medium tabular-nums text-white/80">{zoomPercent}%</div>
+              <div className="min-w-12 px-2 text-center text-xs font-medium tabular-nums text-muted-foreground">{zoomPercent}%</div>
               <ZoomButton label="Zoom in" onClick={handleZoomIn} disabled={zoomScale === MAX_ZOOM}>
                 <ZoomIn className="h-4 w-4" />
               </ZoomButton>
-              <div className="mx-1 h-5 w-px bg-white/18" />
+              <div className="mx-1 h-5 w-px bg-border" />
               <ZoomButton label="Reset zoom" onClick={resetZoom} disabled={!isZoomed}>
                 <RotateCcw className="h-4 w-4" />
               </ZoomButton>
@@ -248,18 +249,18 @@ function PreviewImageDialog({ open, onOpenChange, imgUrls = [], items, initialIn
 
         {hasMultiple && !sm && !isImagePreview && (
           <div className="absolute inset-x-0 bottom-0 z-20 px-3 pb-3 pt-6">
-            <div className="mx-auto flex max-w-xs items-center justify-between rounded-full bg-black/55 px-2 py-2 backdrop-blur-sm">
+            <div className="mx-auto flex max-w-xs items-center justify-between rounded-full border border-border bg-background/85 px-2 py-2 shadow-lg backdrop-blur-sm">
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
                 onClick={handlePrevious}
                 disabled={!canGoPrevious}
-                className="rounded-full px-3 text-white hover:bg-white/10 hover:text-white disabled:text-white/35"
+                className="rounded-full px-3 text-foreground hover:bg-foreground/8 hover:text-foreground disabled:text-muted-foreground/50"
               >
                 Prev
               </Button>
-              <div className="px-3 text-xs text-white/75">
+              <div className="px-3 text-xs text-muted-foreground">
                 {safeIndex + 1} / {itemCount}
               </div>
               <Button
@@ -268,7 +269,7 @@ function PreviewImageDialog({ open, onOpenChange, imgUrls = [], items, initialIn
                 size="sm"
                 onClick={handleNext}
                 disabled={!canGoNext}
-                className="rounded-full px-3 text-white hover:bg-white/10 hover:text-white disabled:text-white/35"
+                className="rounded-full px-3 text-foreground hover:bg-foreground/8 hover:text-foreground disabled:text-muted-foreground/50"
               >
                 Next
               </Button>
@@ -297,7 +298,7 @@ const NavButton = ({ side, disabled, label, onClick, icon }: NavButtonProps) => 
     onClick={onClick}
     aria-label={label}
     className={cn(
-      "absolute top-1/2 z-20 hidden h-11 w-11 -translate-y-1/2 rounded-full bg-white/10 text-white backdrop-blur-sm hover:bg-white/16 hover:text-white disabled:opacity-25 sm:flex",
+      "absolute top-1/2 z-20 hidden h-11 w-11 -translate-y-1/2 rounded-full border border-border bg-background/85 text-foreground shadow-lg backdrop-blur-sm hover:bg-background hover:text-foreground disabled:opacity-35 sm:flex",
       side === "left" ? "left-4" : "right-4",
     )}
   >
@@ -323,7 +324,7 @@ const ZoomButton = ({
     disabled={disabled}
     onClick={onClick}
     aria-label={label}
-    className="h-9 w-9 rounded-full text-white hover:bg-white/12 hover:text-white disabled:text-white/35"
+    className="h-9 w-9 rounded-full text-foreground hover:bg-foreground/8 hover:text-foreground disabled:text-muted-foreground/50"
   >
     {children}
   </Button>
