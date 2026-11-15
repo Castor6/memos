@@ -125,6 +125,7 @@ func convertUserTagsSettingFromStore(setting *storepb.TagsUserSetting) *v1pb.Use
 			BackgroundColor: metadata.GetBackgroundColor(),
 			BlurContent:     metadata.GetBlurContent(),
 			Emoji:           metadata.GetEmoji(),
+			ImageGrid:       metadata.GetImageGrid(),
 		}
 	}
 	return &v1pb.UserSetting_TagsSetting{Tags: tags}
@@ -144,6 +145,7 @@ func convertUserTagsSettingToStore(setting *v1pb.UserSetting_TagsSetting) *store
 			BackgroundColor: metadata.GetBackgroundColor(),
 			BlurContent:     metadata.GetBlurContent(),
 			Emoji:           metadata.GetEmoji(),
+			ImageGrid:       metadata.GetImageGrid(),
 		}
 	}
 	return &storepb.TagsUserSetting{Tags: tags}

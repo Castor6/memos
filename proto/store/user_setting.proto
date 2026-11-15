@@ -64,6 +64,9 @@ message UserTagMetadata {
   bool blur_content = 2;
   // Optional display emoji.
   string emoji = 3;
+  // Whether images of memos with this tag are shown as a grid below the content
+  // instead of inline.
+  bool image_grid = 4;
 }
 
 message TagsUserSetting {

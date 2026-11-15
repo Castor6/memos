@@ -885,6 +885,8 @@
       "add-rule": "Add rule",
       "background-color": "Background color",
       "blur-content": "Blur content",
+      "image-grid": "Image grid",
+      "image-grid-hint": "Show memo images as a grid below the content",
       "configured-rules": "Configured rules",
       "default-color": "Default",
       "matching-rule": "Anchored regex",

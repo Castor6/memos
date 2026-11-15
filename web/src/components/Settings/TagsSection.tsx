@@ -1,6 +1,6 @@
 import { create } from "@bufbuild/protobuf";
 import { isEqual } from "lodash-es";
-import { EyeOffIcon, PaletteIcon, PlusIcon, TagIcon, TrashIcon } from "lucide-react";
+import { EyeOffIcon, LayoutGridIcon, PaletteIcon, PlusIcon, TagIcon, TrashIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-hot-toast";
 import { Badge } from "@/components/ui/badge";
@@ -40,16 +40,19 @@ interface LocalTagMeta {
   emoji?: string;
   color?: string;
   blur: boolean;
+  imageGrid: boolean;
 }
 
 const toLocalTagMeta = (meta: {
   emoji?: string;
   backgroundColor?: { red?: number; green?: number; blue?: number };
   blurContent: boolean;
+  imageGrid: boolean;
 }): LocalTagMeta => ({
   emoji: meta.emoji ?? "",
   color: colorToHex(meta.backgroundColor),
   blur: meta.blurContent,
+  imageGrid: meta.imageGrid,
 });
 
 const TagsSection = ({ tag, onSaved }: { tag?: string; onSaved?: () => void }) => {
@@ -66,12 +69,13 @@ const TagsSection = ({ tag, onSaved }: { tag?: string; onSaved?: () => void }) =
   const [newTagName, setNewTagName] = useState("");
   const [newTagColor, setNewTagColor] = useState<string | undefined>(undefined);
   const [newTagBlur, setNewTagBlur] = useState(false);
+  const [newTagImageGrid, setNewTagImageGrid] = useState(false);
 
   const editableTags = useMemo(() => {
     const entries = Object.fromEntries(Object.entries(originalSetting.tags).map(([name, meta]) => [name, toLocalTagMeta(meta)]));
     if (tag !== undefined && !entries[tag]) {
       const inherited = findTagMetadata(tag, originalSetting);
-      entries[tag] = inherited ? toLocalTagMeta(inherited) : { emoji: "", color: undefined, blur: false };
+      entries[tag] = inherited ? toLocalTagMeta(inherited) : { emoji: "", color: undefined, blur: false, imageGrid: false };
     }
     return entries;
   }, [originalSetting.tags, tag]);
@@ -112,6 +116,10 @@ const TagsSection = ({ tag, onSaved }: { tag?: string; onSaved?: () => void }) =
     setLocalTags((prev) => ({ ...prev, [tagName]: { ...prev[tagName], blur } }));
   };
 
+  const handleImageGridChange = (tagName: string, imageGrid: boolean) => {
+    setLocalTags((prev) => ({ ...prev, [tagName]: { ...prev[tagName], imageGrid } }));
+  };
+
   const handleClearColor = (tagName: string) => {
     setLocalTags((prev) => ({ ...prev, [tagName]: { ...prev[tagName], color: undefined } }));
   };
@@ -135,10 +143,11 @@ const TagsSection = ({ tag, onSaved }: { tag?: string; onSaved?: () => void }) =
       toast.error(t("setting.tags.invalid-regex"));
       return;
     }
-    setLocalTags((prev) => ({ ...prev, [name]: { color: newTagColor, blur: newTagBlur } }));
+    setLocalTags((prev) => ({ ...prev, [name]: { color: newTagColor, blur: newTagBlur, imageGrid: newTagImageGrid } }));
     setNewTagName("");
     setNewTagColor(undefined);
     setNewTagBlur(false);
+    setNewTagImageGrid(false);
   };
 
   const handleSave = async () => {
@@ -147,6 +156,7 @@ const TagsSection = ({ tag, onSaved }: { tag?: string; onSaved?: () => void }) =
         name,
         create(UserSetting_TagMetadataSchema, {
           blurContent: meta.blur,
+          imageGrid: meta.imageGrid,
           emoji: meta.emoji ?? "",
           ...(meta.color ? { backgroundColor: hexToColor(meta.color) } : {}),
         }),
@@ -195,7 +205,7 @@ const TagsSection = ({ tag, onSaved }: { tag?: string; onSaved?: () => void }) =
                 </Button>
               </div>
 
-              <div className="grid gap-2 lg:grid-cols-[minmax(16rem,1fr)_auto_auto] lg:items-center">
+              <div className="flex flex-col gap-2">
                 <div className="min-w-0">
                   <Input
                     className="font-mono"
@@ -214,32 +224,40 @@ const TagsSection = ({ tag, onSaved }: { tag?: string; onSaved?: () => void }) =
                   </datalist>
                 </div>
 
-                <div className="flex h-8 items-center gap-2 rounded-md border border-border bg-background px-2 text-sm text-muted-foreground">
-                  <PaletteIcon className="size-4" />
-                  <span>{t("setting.tags.background-color")}</span>
-                  <input
-                    type="color"
-                    className="size-6 cursor-pointer rounded border border-border bg-transparent p-0.5"
-                    value={newTagColor ?? DEFAULT_TAG_COLOR}
-                    onChange={(e) => setNewTagColor(e.target.value)}
-                    aria-label={t("setting.tags.background-color")}
-                  />
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setNewTagColor(undefined)}
-                    disabled={!newTagColor}
-                    className="h-6 px-1.5"
-                  >
-                    {t("common.clear")}
-                  </Button>
-                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex h-8 items-center gap-2 whitespace-nowrap rounded-md border border-border bg-background px-2 text-sm text-muted-foreground">
+                    <PaletteIcon className="size-4" />
+                    <span>{t("setting.tags.background-color")}</span>
+                    <input
+                      type="color"
+                      className="size-6 cursor-pointer rounded border border-border bg-transparent p-0.5"
+                      value={newTagColor ?? DEFAULT_TAG_COLOR}
+                      onChange={(e) => setNewTagColor(e.target.value)}
+                      aria-label={t("setting.tags.background-color")}
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setNewTagColor(undefined)}
+                      disabled={!newTagColor}
+                      className="h-6 px-1.5"
+                    >
+                      {t("common.clear")}
+                    </Button>
+                  </div>
 
-                <label className="flex h-8 items-center gap-2 rounded-md border border-border bg-background px-2 text-sm text-muted-foreground">
-                  <EyeOffIcon className="size-4" />
-                  <span>{t("setting.tags.blur-content")}</span>
-                  <Switch checked={newTagBlur} onCheckedChange={setNewTagBlur} />
-                </label>
+                  <label className="flex h-8 items-center gap-2 whitespace-nowrap rounded-md border border-border bg-background px-2 text-sm text-muted-foreground">
+                    <EyeOffIcon className="size-4" />
+                    <span>{t("setting.tags.blur-content")}</span>
+                    <Switch checked={newTagBlur} onCheckedChange={setNewTagBlur} />
+                  </label>
+
+                  <label className="flex h-8 items-center gap-2 whitespace-nowrap rounded-md border border-border bg-background px-2 text-sm text-muted-foreground">
+                    <LayoutGridIcon className="size-4" />
+                    <span>{t("setting.tags.image-grid")}</span>
+                    <Switch checked={newTagImageGrid} onCheckedChange={setNewTagImageGrid} />
+                  </label>
+                </div>
               </div>
             </div>
           </SettingPanel>
@@ -263,8 +281,8 @@ const TagsSection = ({ tag, onSaved }: { tag?: string; onSaved?: () => void }) =
           ) : (
             <>
               {configuredEntries.map((row) => (
-                <div key={row.name} className="grid gap-3 px-3 py-3 lg:grid-cols-[minmax(12rem,1fr)_auto_auto_auto] lg:items-center">
-                  <div className="min-w-0">
+                <div key={row.name} className="flex flex-col gap-3 px-3 py-3 lg:flex-row lg:flex-wrap lg:items-center">
+                  <div className="min-w-0 lg:min-w-[12rem] lg:flex-1">
                     <div className="flex min-w-0 items-center gap-2">
                       <TagIcon className="size-4 shrink-0 text-muted-foreground" />
                       <span className="truncate font-mono text-sm text-foreground">{row.name}</span>
@@ -309,10 +327,22 @@ const TagsSection = ({ tag, onSaved }: { tag?: string; onSaved?: () => void }) =
                     </Button>
                   </div>
 
-                  <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <label className="flex items-center gap-2 whitespace-nowrap text-sm text-muted-foreground">
                     <EyeOffIcon className="size-4" />
                     {t("setting.tags.blur-content")}
                     <Switch checked={localTags[row.name].blur} onCheckedChange={(checked) => handleBlurChange(row.name, checked)} />
+                  </label>
+
+                  <label
+                    className="flex items-center gap-2 whitespace-nowrap text-sm text-muted-foreground"
+                    title={t("setting.tags.image-grid-hint")}
+                  >
+                    <LayoutGridIcon className="size-4" />
+                    {t("setting.tags.image-grid")}
+                    <Switch
+                      checked={localTags[row.name].imageGrid}
+                      onCheckedChange={(checked) => handleImageGridChange(row.name, checked)}
+                    />
                   </label>
 
                   <Button

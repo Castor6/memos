@@ -787,10 +787,12 @@
     "tags": {
       "label": "标签",
       "title": "标签元数据",
-      "description": "为当前空间的标签设置 Emoji、颜色或内容模糊效果。标签名称支持正则表达式。",
+      "description": "为当前空间的标签设置 Emoji、颜色、内容模糊或图片底部网格。标签名称支持正则表达式。",
       "add-rule": "添加规则",
       "background-color": "背景颜色",
       "blur-content": "模糊内容",
+      "image-grid": "图片底部网格",
+      "image-grid-hint": "笔记图片不插在正文中，统一在底部以方格展示",
       "configured-rules": "已配置规则",
       "default-color": "默认",
       "matching-rule": "锚定正则",

@@ -11,6 +11,8 @@ export interface EditorState {
     tags?: string[];
     /** Filter-derived draft tags; never sent to the memo API. */
     draftAutoTags?: string[];
+    /** Attachment names shown in the bottom image grid instead of inline; kept on save without a body reference. */
+    gridAttachments?: string[];
     isTodo?: boolean;
     mcpHidden?: boolean;
     /** Privacy value when editing began; only explicit changes may overwrite it. */
