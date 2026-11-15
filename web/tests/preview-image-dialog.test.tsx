@@ -72,6 +72,23 @@ describe("<PreviewImageDialog>", () => {
     expect(screen.getByText("200%")).toBeInTheDocument();
   });
 
+  it("fits the image inside the padded surface on a themed frosted backdrop", () => {
+    render(
+      <PreviewImageDialog
+        open
+        onOpenChange={vi.fn()}
+        items={[{ id: "image-1", kind: "image", sourceUrl: "/image.jpg", posterUrl: "/image.jpg", filename: "image.jpg" }]}
+      />,
+    );
+
+    const image = screen.getByAltText("Preview image 1 of 1");
+    expect(image).toHaveClass("max-h-full", "max-w-full");
+    expect(image.className).not.toMatch(/100vh/);
+    const popup = screen.getByRole("dialog");
+    expect(popup).toHaveClass("bg-background/80", "backdrop-blur-xl", "!p-0");
+    expect(popup.className).not.toMatch(/bg-black/);
+  });
+
   it("zooms image previews with the wheel", () => {
     render(
       <PreviewImageDialog

@@ -28,8 +28,9 @@ import { useFilteredMemoStats } from "@/hooks/useFilteredMemoStats";
 
 const wrapper = ({ children }: { children: ReactNode }) => children as never;
 
+// Statistics group timestamps by local calendar date, so fixtures must use local dates too.
 const ts = (year: number, month: number, day: number) => ({
-  seconds: BigInt(Math.floor(Date.UTC(year, month - 1, day) / 1000)),
+  seconds: BigInt(Math.floor(new Date(year, month - 1, day).getTime() / 1000)),
   nanos: 0,
 });
 
