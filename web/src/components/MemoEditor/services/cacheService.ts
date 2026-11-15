@@ -35,6 +35,7 @@ function writeEntry(key: string, content: string, metadata?: EditorState["metada
             version: STRUCTURED_CACHE_ENTRY_VERSION,
             content,
             draftAutoTags: metadata.draftAutoTags,
+            gridAttachments: metadata.gridAttachments,
             memo: toJsonString(
               MemoSchema,
               create(MemoSchema, {
@@ -96,7 +97,19 @@ export const cacheService = {
       const draftAutoTags = Array.isArray(entry.draftAutoTags)
         ? entry.draftAutoTags.filter((tag: unknown): tag is string => typeof tag === "string" && memo.tags.includes(tag))
         : [];
-      return { tags: memo.tags, draftAutoTags, attachments: memo.attachments, relations: memo.relations, mcpHidden: memo.mcpHidden };
+      const gridAttachments = Array.isArray(entry.gridAttachments)
+        ? entry.gridAttachments.filter(
+            (name: unknown): name is string => typeof name === "string" && memo.attachments.some((attachment) => attachment.name === name),
+          )
+        : [];
+      return {
+        tags: memo.tags,
+        draftAutoTags,
+        gridAttachments,
+        attachments: memo.attachments,
+        relations: memo.relations,
+        mcpHidden: memo.mcpHidden,
+      };
     } catch {
       return;
     }

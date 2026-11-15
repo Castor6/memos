@@ -83,6 +83,9 @@ func TestUserTagSettings(t *testing.T) {
 					"private/.*": {
 						BlurContent: true,
 					},
+					"photo": {
+						ImageGrid: true,
+					},
 				},
 			},
 		},
@@ -100,6 +103,8 @@ func TestUserTagSettings(t *testing.T) {
 	got, err := ts.Service.GetUserSetting(userCtx, &apiv1.GetUserSettingRequest{Name: "users/tag-user/settings/TAGS"})
 	require.NoError(t, err)
 	require.Contains(t, got.GetTagsSetting().GetTags(), "bug")
+	require.True(t, got.GetTagsSetting().GetTags()["photo"].GetImageGrid())
+	require.False(t, got.GetTagsSetting().GetTags()["bug"].GetImageGrid())
 
 	resp, err := ts.Service.ListUserSettings(userCtx, &apiv1.ListUserSettingsRequest{
 		Parent: apiv1server.BuildUserName(user.Username),

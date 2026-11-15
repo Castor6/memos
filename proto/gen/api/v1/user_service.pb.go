@@ -3108,7 +3108,10 @@ type UserSetting_TagMetadata struct {
 	// Whether memos with this tag should have their content blurred.
 	BlurContent bool `protobuf:"varint,2,opt,name=blur_content,json=blurContent,proto3" json:"blur_content,omitempty"`
 	// Optional display emoji.
-	Emoji         string `protobuf:"bytes,3,opt,name=emoji,proto3" json:"emoji,omitempty"`
+	Emoji string `protobuf:"bytes,3,opt,name=emoji,proto3" json:"emoji,omitempty"`
+	// Whether images of memos with this tag are shown as a grid below the content
+	// instead of inline.
+	ImageGrid     bool `protobuf:"varint,4,opt,name=image_grid,json=imageGrid,proto3" json:"image_grid,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3162,6 +3165,13 @@ func (x *UserSetting_TagMetadata) GetEmoji() string {
 		return x.Emoji
 	}
 	return ""
+}
+
+func (x *UserSetting_TagMetadata) GetImageGrid() bool {
+	if x != nil {
+		return x.ImageGrid
+	}
+	return false
 }
 
 // User-specific tag metadata.
@@ -3494,7 +3504,8 @@ const file_api_v1_user_service_proto_rawDesc = "" +
 	"\x05state\x18\x01 \x01(\x0e2\x13.memos.api.v1.StateB\x03\xe0A\x01R\x05state\x12\x1b\n" +
 	"\x06filter\x18\x02 \x01(\tB\x03\xe0A\x01R\x06filter\"I\n" +
 	"\x18ListAllUserStatsResponse\x12-\n" +
-	"\x05stats\x18\x01 \x03(\v2\x17.memos.api.v1.UserStatsR\x05stats\"\xe6\t\n" +
+	"\x05stats\x18\x01 \x03(\v2\x17.memos.api.v1.UserStatsR\x05stats\"\x8a\n" +
+	"\n" +
 	"\vUserSetting\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12S\n" +
 	"\x0fgeneral_setting\x18\x02 \x01(\v2(.memos.api.v1.UserSetting.GeneralSettingH\x00R\x0egeneralSetting\x12V\n" +
@@ -3510,11 +3521,13 @@ const file_api_v1_user_service_proto_rawDesc = "" +
 	"\x12preview_characters\x18\b \x01(\x05B\x03\xe0A\x01R\x11previewCharacters\x1a9\n" +
 	"\vSpacesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a\x8f\x01\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a\xb3\x01\n" +
 	"\vTagMetadata\x12B\n" +
 	"\x10background_color\x18\x01 \x01(\v2\x12.google.type.ColorB\x03\xe0A\x01R\x0fbackgroundColor\x12&\n" +
 	"\fblur_content\x18\x02 \x01(\bB\x03\xe0A\x01R\vblurContent\x12\x14\n" +
-	"\x05emoji\x18\x03 \x01(\tR\x05emoji\x1a\xb7\x01\n" +
+	"\x05emoji\x18\x03 \x01(\tR\x05emoji\x12\"\n" +
+	"\n" +
+	"image_grid\x18\x04 \x01(\bB\x03\xe0A\x01R\timageGrid\x1a\xb7\x01\n" +
 	"\vTagsSetting\x12H\n" +
 	"\x04tags\x18\x01 \x03(\v2/.memos.api.v1.UserSetting.TagsSetting.TagsEntryB\x03\xe0A\x01R\x04tags\x1a^\n" +
 	"\tTagsEntry\x12\x10\n" +

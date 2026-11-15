@@ -8,7 +8,7 @@ import type { Attachment } from "@/types/proto/api/v1/attachment_service_pb";
 import { AttachmentSchema } from "@/types/proto/api/v1/attachment_service_pb";
 import type { Memo } from "@/types/proto/api/v1/memo_service_pb";
 import { MemoRelation_Type, MemoSchema } from "@/types/proto/api/v1/memo_service_pb";
-import { getAttachmentUrl } from "@/utils/attachment";
+import { getAttachmentUrl, isImage } from "@/utils/attachment";
 import type { EditorState } from "../state";
 
 /**
@@ -94,12 +94,17 @@ export const memoService = {
   ): Promise<{ memoName: string; hasChanges: boolean }> {
     // Uploads are completed in place by EditorContent before saving.
     if (state.localFiles.length) throw new Error("请等待文件上传完成");
+    const gridAttachments = state.metadata.gridAttachments ?? [];
     const allAttachments = state.metadata.attachments.filter(
       (attachment) =>
+        gridAttachments.includes(attachment.name) ||
         state.content.includes(attachment.name) ||
         state.content.includes(getAttachmentUrl(attachment)) ||
         state.content.includes(encodeURI(getAttachmentUrl(attachment))),
     );
+    // The server keeps the requested order, which is the bottom grid's display order.
+    const gridRank = (attachment: Attachment) => gridAttachments.indexOf(attachment.name);
+    allAttachments.sort((a, b) => gridRank(a) - gridRank(b));
     state = {
       ...state,
       metadata: {
@@ -157,12 +162,17 @@ export const memoService = {
    * request). Returns only the fields the reducer's INIT_MEMO case consumes —
    * UI state (mode, loading flags, …) is owned by the reducer, not by memos.
    */
-  fromMemo(memo: Memo): Pick<EditorState, "content" | "metadata" | "timestamps"> {
+  fromMemo(memo: Memo, options: { detachImages?: boolean } = {}): Pick<EditorState, "content" | "metadata" | "timestamps"> {
+    const unreferenced = memo.attachments.filter(
+      (attachment) => !memo.content.includes(attachment.name) && !memo.content.includes(getAttachmentUrl(attachment)),
+    );
+    // Image-grid memos keep unreferenced images in the editor's bottom grid instead of inlining them.
+    const gridAttachments = options.detachImages ? unreferenced.filter((attachment) => isImage(attachment.type)) : [];
     return {
       content:
         memo.content +
-        memo.attachments
-          .filter((attachment) => !memo.content.includes(attachment.name) && !memo.content.includes(getAttachmentUrl(attachment)))
+        unreferenced
+          .filter((attachment) => !gridAttachments.includes(attachment))
           .map(
             (attachment) => `
 
@@ -184,6 +194,7 @@ ${fileMarkdown(getAttachmentUrl(attachment), FILE_TITLE + attachment.type, attac
           .join(""),
       metadata: {
         tags: memo.tags,
+        gridAttachments: gridAttachments.map((attachment) => attachment.name),
         isTodo: memo.isTodo,
         mcpHidden: memo.mcpHidden,
         initialMcpHidden: memo.mcpHidden,

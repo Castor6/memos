@@ -3,11 +3,14 @@ import copy from "copy-to-clipboard";
 import { useCallback } from "react";
 import toast from "react-hot-toast";
 import { useLocation } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import { useInstance } from "@/contexts/InstanceContext";
 import { memoKeys, useDeleteMemo, useUpdateMemo } from "@/hooks/useMemoQueries";
 import useNavigateTo from "@/hooks/useNavigateTo";
 import { userKeys } from "@/hooks/useUserQueries";
 import { handleError } from "@/lib/error";
+import { memoCopyText } from "@/lib/memo-copy";
+import { hasImageGridTag } from "@/lib/tag";
 import { ROUTES } from "@/router/routes";
 import { State } from "@/types/proto/api/v1/common_pb";
 import type { Memo } from "@/types/proto/api/v1/memo_service_pb";
@@ -26,6 +29,7 @@ export const useMemoActionHandlers = ({ memo, onEdit, setDeleteDialogOpen }: Use
   const navigateTo = useNavigateTo();
   const queryClient = useQueryClient();
   const { profile } = useInstance();
+  const { userTagsSetting } = useAuth();
   const { mutateAsync: updateMemo } = useUpdateMemo();
   const { mutateAsync: deleteMemo } = useDeleteMemo();
   const isInMemoDetailPage = location.pathname.startsWith(`/${memo.name}`);
@@ -123,10 +127,12 @@ export const useMemoActionHandlers = ({ memo, onEdit, setDeleteDialogOpen }: Use
     toast.success(t("message.succeed-copy-link"));
   }, [memo.name, t, profile.instanceUrl]);
 
-  const handleCopyContent = useCallback(() => {
-    copy(memo.content);
-    toast.success(t("message.succeed-copy-content"));
-  }, [memo.content, t]);
+  const imageGrid = hasImageGridTag(memo.tags, userTagsSetting);
+  const handleCopyContent = useCallback(async () => {
+    const copied = await copy(memoCopyText(memo.content, { stripImages: imageGrid }));
+    if (copied) toast.success(t("message.succeed-copy-content"));
+    else toast.error("复制失败，请重试");
+  }, [memo.content, imageGrid, t]);
 
   const handleCheckAllTaskListItemsClick = useCallback(async () => {
     await updateMemoContent(checkAllTasks(memo.content), "Check memo task list items");

@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { hasImageGridTag } from "@/lib/tag";
 import type { Memo, Visibility } from "@/types/proto/api/v1/memo_service_pb";
 import { cacheService, memoService } from "../services";
 import { useEditorContext } from "../state";
@@ -24,6 +26,7 @@ export const useMemoInit = ({
   defaultCreateTime,
 }: UseMemoInitOptions) => {
   const { actions, dispatch } = useEditorContext();
+  const { userTagsSetting } = useAuth();
   const initializedRef = useRef(false);
   const [isInitialized, setIsInitialized] = useState(false);
 
@@ -33,7 +36,7 @@ export const useMemoInit = ({
     const key = cacheService.key(username, cacheKey);
 
     if (memo) {
-      const initialState = memoService.fromMemo(memo);
+      const initialState = memoService.fromMemo(memo, { detachImages: hasImageGridTag(memo.tags, userTagsSetting) });
       cacheService.clear(key);
       dispatch(actions.initMemo(initialState));
     } else {
@@ -56,7 +59,7 @@ export const useMemoInit = ({
     }
 
     setIsInitialized(true);
-  }, [memo, cacheKey, username, autoFocus, defaultVisibility, defaultCreateTime, actions, dispatch, editorRef]);
+  }, [memo, cacheKey, username, autoFocus, defaultVisibility, defaultCreateTime, actions, dispatch, editorRef, userTagsSetting]);
 
   return { isInitialized };
 };

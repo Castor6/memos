@@ -76,3 +76,7 @@ export const isValidTagPattern = (pattern: string): boolean => {
   }
   return true;
 };
+
+/** Whether any of the memo's tags shows images as a grid below the content. */
+export const hasImageGridTag = (tags: readonly string[] | undefined, tagsSetting: UserSetting_TagsSetting | undefined): boolean =>
+  Boolean(tagsSetting && tags?.some((tag) => findTagMetadata(tag, tagsSetting)?.imageGrid));
