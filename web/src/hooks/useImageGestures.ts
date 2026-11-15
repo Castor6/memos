@@ -126,6 +126,8 @@ export function useImageGestures(resetKey: string, enabled: boolean) {
     toggleZoom: () => {
       if (Date.now() - lastTouch.current > 500) toggleZoom();
     },
+    /** Whether the last pointer sequence moved or used several fingers, so its click is not a tap. */
+    wasDragged: () => moved.current,
     handlers: {
       onPointerDown,
       onPointerMove,

@@ -13,6 +13,7 @@ import { rehypeHeadingId } from "@/utils/rehype-plugins/rehype-heading-id";
 import { rehypeTrimBoundaryBlankLines } from "@/utils/rehype-plugins/rehype-trim-boundary-blank-lines";
 import { remarkDisableSetext } from "@/utils/remark-plugins/remark-disable-setext";
 import { remarkHighlight } from "@/utils/remark-plugins/remark-highlight";
+import { remarkHttpOnlyAutolinks } from "@/utils/remark-plugins/remark-http-only-autolinks";
 import { remarkMention } from "@/utils/remark-plugins/remark-mention";
 import { remarkPreserveType } from "@/utils/remark-plugins/remark-preserve-type";
 import { remarkPreview } from "@/utils/remark-plugins/remark-preview";
@@ -179,6 +180,7 @@ export const MemoMarkdownRendererCore = ({
           remarkDisableSetext,
           ...mathRemarkPlugins,
           remarkGfm,
+          remarkHttpOnlyAutolinks,
           remarkSplitMixedTaskLists,
           remarkBreaks,
           remarkMention,

@@ -55,21 +55,61 @@ describe("<PreviewImageDialog>", () => {
     expect(screen.getByText("100%")).toBeInTheDocument();
   });
 
-  it("toggles image zoom on double click", () => {
+  it("toggles image zoom with a single click and closes when clicking beside the image", () => {
+    const onOpenChange = vi.fn();
     render(
       <PreviewImageDialog
         open
-        onOpenChange={vi.fn()}
+        onOpenChange={onOpenChange}
         items={[{ id: "image-1", kind: "image", sourceUrl: "/image.jpg", posterUrl: "/image.jpg", filename: "image.jpg" }]}
       />,
     );
 
     const image = screen.getByAltText("Preview image 1 of 1");
+    const surface = image.parentElement!;
+    image.getBoundingClientRect = () => ({ left: 100, top: 100, right: 300, bottom: 300, width: 200, height: 200 }) as DOMRect;
+    expect(image).toHaveStyle({ cursor: "zoom-in" });
+    expect(surface.style.cursor).toBe("");
+    expect(screen.getByTestId("preview-zoom-surface")).not.toHaveClass("cursor-zoom-in");
 
-    fireEvent.doubleClick(image);
-
-    expect(image).toHaveStyle({ transform: "translate3d(0px, 0px, 0) scale(2)" });
+    fireEvent.click(surface, { clientX: 200, clientY: 200 });
+    expect(image).toHaveStyle({ transform: "translate3d(0px, 0px, 0) scale(2)", cursor: "grab" });
     expect(screen.getByText("200%")).toBeInTheDocument();
+    fireEvent.click(surface, { clientX: 200, clientY: 200 });
+    expect(screen.getByText("100%")).toBeInTheDocument();
+    expect(onOpenChange).not.toHaveBeenCalled();
+
+    fireEvent.click(surface, { clientX: 20, clientY: 20 });
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it("does not zoom or close after dragging with the mouse", () => {
+    const onOpenChange = vi.fn();
+    render(
+      <PreviewImageDialog
+        open
+        onOpenChange={onOpenChange}
+        items={[{ id: "image-1", kind: "image", sourceUrl: "/image.jpg", posterUrl: "/image.jpg", filename: "image.jpg" }]}
+      />,
+    );
+
+    const image = screen.getByAltText("Preview image 1 of 1");
+    const surface = image.parentElement!;
+    image.getBoundingClientRect = () => ({ left: 100, top: 100, right: 300, bottom: 300, width: 200, height: 200 }) as DOMRect;
+    surface.setPointerCapture = vi.fn();
+    surface.hasPointerCapture = () => false;
+    const mouse = (x: number) => ({ pointerId: 1, pointerType: "mouse", button: 0, clientX: x, clientY: 200 });
+    fireEvent.pointerDown(surface, mouse(200));
+    fireEvent.pointerMove(surface, mouse(260));
+    fireEvent.pointerUp(surface, mouse(260));
+    fireEvent.click(surface, { clientX: 260, clientY: 200 });
+    fireEvent.pointerDown(surface, mouse(20));
+    fireEvent.pointerMove(surface, mouse(80));
+    fireEvent.pointerUp(surface, mouse(80));
+    fireEvent.click(surface, { clientX: 80, clientY: 200 });
+
+    expect(screen.getByText("100%")).toBeInTheDocument();
+    expect(onOpenChange).not.toHaveBeenCalled();
   });
 
   it("fits the image inside the padded surface on a themed frosted backdrop", () => {

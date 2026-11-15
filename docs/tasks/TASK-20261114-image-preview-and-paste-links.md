@@ -58,3 +58,45 @@
 - 没有在真实的桌面 PWA（standalone 窗口）、Chrome、Safari 和 iPhone 真机上复核毛玻璃效果和预览显示，需要在设备上确认。
 - 编辑器链接行为只在 jsdom 单元测试中用真实 Tiptap 验证，没有在完整运行的应用中手动粘贴验证。
 - 阅读视图（remark-gfm）仍会把 `www.`、邮箱显示为可点击链接，只影响展示、不改写原文，本次没有改动。
+
+## 第二轮（2026-11-14，分支 `fix/http-only-links-and-preview-click`，基线 `4870bc73c`）
+
+### 背景
+
+- 用户截图反馈第一轮未达到效果：备忘录里 `www.samsung.com`、`www.example.com`、`a@b.com` 仍显示为链接。
+- 图片预览只有双击才放大；图片四周空白也显示放大镜光标，单击空白不关闭。
+- 讨论结论：电脑端单击图片放大/还原，图片外普通光标、单击关闭；手机端保持双击放大和双指缩放（用户两次确认），单击图片外同样关闭。
+
+### 成因（查本地测试库确认）
+
+- 备忘录 5 存的是纯文本 `www.example.com a@b.com`，显示成链接来自阅读视图 remark-gfm 的字面量自动链接，即第一轮“未覆盖”的那一项。
+- 备忘录 7 存的是 `abc=[www.samsung.com](http://www.samsung.com&sid=…#…)`，是真正写进去的 Markdown 链接。纯文本输入/粘贴的各条 Tiptap 路径都会经过 `shouldAutoLink`；没有约束的是带 `text/html` 的富文本粘贴，`<a>` 由 Link 的 `parseHTML` 原样保留。确切的复制来源无法从数据还原，此为推断。
+
+### 实现
+
+- `web/src/utils/http-url.ts`：`isHttpUrl` 移到公共位置，编辑器与阅读视图共用。
+- `web/src/utils/remark-plugins/remark-http-only-autolinks.ts`：紧跟 remark-gfm 运行；以 `[`、`<` 开头的显式链接保留，其余字面量自动链接只有文字为 http(s) 时保留，否则还原为原文。接入 `MemoMarkdownRenderer` 和编辑器预留块 `preserved-content`。
+- `web/src/components/MemoEditor/Editor/paste-links.ts` + `index.tsx` 的 `transformPasted`：富文本粘贴中，链接文字不是 http(s)、含 `.`/`@`、且等于 href 去掉协议后的开头部分时，只去掉链接标记，文字保持原样；“点这里”这类有自己标签的链接和 http(s) 链接保留。
+- `PreviewImageDialog`：
+  - 去掉双击处理，改为 surface 单击：命中图片（按 `getBoundingClientRect` 判断，因为 pointer capture 会把 click 目标改为 surface）切换缩放，否则关闭；拖动后不触发。
+  - 光标只设在图片上（未放大 `zoom-in`、放大后 `grab`）。
+  - 顶栏和底部工具条的全宽外层改为 `pointer-events-none`（按钮和工具条本身 `pointer-events-auto`）。否则手机上图片上下的空白被这两层透明容器挡住，点了不能关闭。
+- `useImageGestures`：只新增只读的 `wasDragged()`；手机双击、双指缩放、平移逻辑未改。触摸后 500ms 内的模拟 click 仍被忽略，所以手机单击图片不会放大。
+- 已存的备忘录 7 是显式 Markdown 链接，按规则继续显示为链接，没有迁移数据。
+
+### 验证事实
+
+- `pnpm lint`、`pnpm test`（109 个文件 / 549 个用例）、`pnpm build` 通过。
+- 新增/修改测试：
+  - `tests/remark-http-only-autolinks.test.tsx`：www/邮箱/mailto 不成链接；http(s)、显式、`<…>`、引用式链接保留。
+  - `tests/editor.test.tsx`：富文本粘贴去掉 www/邮箱自动链接，保留有标签的链接和 http(s) 链接。
+  - `tests/preview-image-dialog.test.tsx`：单击放大/还原、单击图片外关闭、拖动后不缩放不关闭、光标只在图片上；原有双指缩放、双击用例保留并通过。
+- 页面验证：本地 `./scripts/dev.sh start`，Playwright CLI（Chromium）。
+  - 桌面 1440×900：备忘录 5 的 `www.example.com`、`a@b.com` 不再是链接；图片光标为 `zoom-in`，图片外为 `auto`。单击图片 100%→200%，拖动平移后仍 200%，再单击回到 100%；从图片外拖动后不关闭；单击图片外、放大状态下单击顶部空白、关闭按钮都会关闭；工具条按钮仍可用。
+  - 手机设备模拟 iPhone 15 Pro Max（430×739、430×932，触摸）：单击图片保持 100%，双击 200%，再双击 100%，单击图片下方空白关闭；没有常驻侧栏。
+  - 截图在忽略目录 `tmp/screenshots/TASK-20261114-r2/`。
+
+### 边界
+
+- 双指缩放只有单元测试覆盖，模拟器没有做真实多指操作；iPhone Safari/PWA 的触摸行为需要真机复核。
+- 发现但未修改：编辑器保存时会把正文中的 `&`、`<`、`>` 编码成 `&amp;` 等（@tiptap/markdown 的 `encodeHtmlEntities`，修改前就存在）。阅读视图显示不受影响，但 Markdown 源文本会变化。
