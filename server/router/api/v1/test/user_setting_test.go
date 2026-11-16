@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	colorpb "google.golang.org/genproto/googleapis/type/color"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
 	apiv1 "github.com/usememos/memos/proto/gen/api/v1"
@@ -84,7 +85,10 @@ func TestUserTagSettings(t *testing.T) {
 						BlurContent: true,
 					},
 					"photo": {
-						ImageGrid: true,
+						ImageGrid: proto.Bool(true),
+					},
+					"photo/private": {
+						ImageGrid: proto.Bool(false),
 					},
 				},
 			},
@@ -104,7 +108,10 @@ func TestUserTagSettings(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, got.GetTagsSetting().GetTags(), "bug")
 	require.True(t, got.GetTagsSetting().GetTags()["photo"].GetImageGrid())
-	require.False(t, got.GetTagsSetting().GetTags()["bug"].GetImageGrid())
+	// An explicit false overrides the parent tag, while unset means follow the parent.
+	require.NotNil(t, got.GetTagsSetting().GetTags()["photo/private"].ImageGrid)
+	require.False(t, got.GetTagsSetting().GetTags()["photo/private"].GetImageGrid())
+	require.Nil(t, got.GetTagsSetting().GetTags()["bug"].ImageGrid)
 
 	resp, err := ts.Service.ListUserSettings(userCtx, &apiv1.ListUserSettingsRequest{
 		Parent: apiv1server.BuildUserName(user.Username),

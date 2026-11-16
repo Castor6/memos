@@ -95,6 +95,27 @@ function DropdownMenuCheckboxItem({ className, children, checked, ...props }: Dr
   );
 }
 
+/** Checkbox menu item laid out like a regular item, with its state shown as a switch on the right. */
+function DropdownMenuSwitchItem({ className, children, ...props }: DropdownMenuPrimitive.CheckboxItem.Props) {
+  return (
+    <DropdownMenuPrimitive.CheckboxItem
+      data-slot="dropdown-menu-switch-item"
+      className={cn(
+        "group data-highlighted:bg-accent data-highlighted:text-accent-foreground [&_svg:not([class*='text-'])]:text-muted-foreground relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        className,
+      )}
+      {...props}
+    >
+      {children}
+      <span aria-hidden className="ml-auto shrink-0 pl-4">
+        <span className="inline-flex h-4 w-7 items-center rounded-full bg-input p-0.5 transition-colors group-data-checked:bg-primary">
+          <span className="block size-3 rounded-full bg-background shadow-xs transition-transform group-data-checked:translate-x-3" />
+        </span>
+      </span>
+    </DropdownMenuPrimitive.CheckboxItem>
+  );
+}
+
 function DropdownMenuRadioGroup({ ...props }: DropdownMenuPrimitive.RadioGroup.Props) {
   return <DropdownMenuPrimitive.RadioGroup data-slot="dropdown-menu-radio-group" {...props} />;
 }
@@ -203,5 +224,6 @@ export {
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
+  DropdownMenuSwitchItem,
   DropdownMenuTrigger,
 };

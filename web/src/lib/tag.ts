@@ -39,7 +39,7 @@ const getCompiledPattern = (pattern: string): RegExp | null => {
  * 1. Exact key match (O(1) fast path, backward-compatible).
  * 2. Iterate all keys and test as anchored regex — first match wins.
  */
-export const findTagMetadata = (tag: string, tagsSetting: UserSetting_TagsSetting): UserSetting_TagMetadata | undefined => {
+export const findTagMetadata = <M = UserSetting_TagMetadata>(tag: string, tagsSetting: { tags: Record<string, M> }): M | undefined => {
   // Fast path: exact match.
   if (tagsSetting.tags[tag]) {
     return tagsSetting.tags[tag];
@@ -77,6 +77,72 @@ export const isValidTagPattern = (pattern: string): boolean => {
   return true;
 };
 
+interface ImageGridRule {
+  imageGrid?: boolean;
+}
+
+/** Effective image grid state of a tag; `source` is the ancestor tag it is inherited from. */
+export interface TagImageGrid {
+  enabled: boolean;
+  source?: string;
+}
+
+const parentTag = (tag: string): string | undefined => {
+  const index = tag.lastIndexOf("/");
+  return index > 0 ? tag.slice(0, index) : undefined;
+};
+
+/**
+ * Resolves the image grid state of a tag. A rule without an explicit value follows the
+ * parent tag, so the lookup walks up `a/b/c` → `a/b` → `a` until a rule sets the value.
+ */
+export const resolveTagImageGrid = (tag: string, tagsSetting: { tags: Record<string, ImageGridRule> }): TagImageGrid => {
+  for (let level: string | undefined = tag; level; level = parentTag(level)) {
+    const imageGrid = findTagMetadata(level, tagsSetting)?.imageGrid;
+    if (imageGrid !== undefined) {
+      return level === tag ? { enabled: imageGrid } : { enabled: imageGrid, source: level };
+    }
+  }
+  return { enabled: false };
+};
+
 /** Whether any of the memo's tags shows images as a grid below the content. */
 export const hasImageGridTag = (tags: readonly string[] | undefined, tagsSetting: UserSetting_TagsSetting | undefined): boolean =>
-  Boolean(tagsSetting && tags?.some((tag) => findTagMetadata(tag, tagsSetting)?.imageGrid));
+  Boolean(tagsSetting && tags?.some((tag) => resolveTagImageGrid(tag, tagsSetting).enabled));
+
+/**
+ * Sets the image grid state of a tag and makes all descendant rules follow it again.
+ * When the value equals the parent's, the tag's own value is cleared so it keeps following
+ * the parent. `isEmpty` lets callers drop exact rules left without any setting, unless a
+ * pattern rule would then take over the tag.
+ */
+export const applyImageGridToggle = <M extends ImageGridRule>(
+  tags: Record<string, M>,
+  tag: string,
+  enabled: boolean,
+  options: { create: (inherited?: M) => M; isEmpty?: (rule: M) => boolean },
+): Record<string, M> => {
+  const next = { ...tags };
+  const parent = parentTag(tag);
+  const inherited = parent ? resolveTagImageGrid(parent, { tags: next }).enabled : false;
+  const base = next[tag] ?? options.create(findTagMetadata(tag, { tags: next }));
+  next[tag] = { ...base, imageGrid: enabled === inherited ? undefined : enabled };
+
+  for (const name of Object.keys(next)) {
+    if (name.startsWith(`${tag}/`) && next[name].imageGrid !== undefined) {
+      next[name] = { ...next[name], imageGrid: undefined };
+    }
+  }
+
+  if (options.isEmpty) {
+    for (const name of [tag, ...Object.keys(next).filter((name) => name.startsWith(`${tag}/`))]) {
+      if (!next[name] || !options.isEmpty(next[name])) continue;
+      const { [name]: _removed, ...rest } = next;
+      // Keep the empty exact rule when removing it would let a pattern rule apply instead.
+      if (findTagMetadata(name, { tags: rest }) === undefined) {
+        delete next[name];
+      }
+    }
+  }
+  return next;
+};

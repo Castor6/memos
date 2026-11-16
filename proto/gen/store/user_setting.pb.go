@@ -362,8 +362,8 @@ type UserTagMetadata struct {
 	// Optional display emoji.
 	Emoji string `protobuf:"bytes,3,opt,name=emoji,proto3" json:"emoji,omitempty"`
 	// Whether images of memos with this tag are shown as a grid below the content
-	// instead of inline.
-	ImageGrid     bool `protobuf:"varint,4,opt,name=image_grid,json=imageGrid,proto3" json:"image_grid,omitempty"`
+	// instead of inline. Unset means the tag follows its parent tag.
+	ImageGrid     *bool `protobuf:"varint,4,opt,name=image_grid,json=imageGrid,proto3,oneof" json:"image_grid,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -420,8 +420,8 @@ func (x *UserTagMetadata) GetEmoji() string {
 }
 
 func (x *UserTagMetadata) GetImageGrid() bool {
-	if x != nil {
-		return x.ImageGrid
+	if x != nil && x.ImageGrid != nil {
+		return *x.ImageGrid
 	}
 	return false
 }
@@ -1076,13 +1076,14 @@ const file_store_user_setting_proto_rawDesc = "" +
 	"\x12preview_characters\x18\a \x01(\x05R\x11previewCharacters\x1a9\n" +
 	"\vSpacesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xa8\x01\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xbc\x01\n" +
 	"\x0fUserTagMetadata\x12=\n" +
 	"\x10background_color\x18\x01 \x01(\v2\x12.google.type.ColorR\x0fbackgroundColor\x12!\n" +
 	"\fblur_content\x18\x02 \x01(\bR\vblurContent\x12\x14\n" +
-	"\x05emoji\x18\x03 \x01(\tR\x05emoji\x12\x1d\n" +
+	"\x05emoji\x18\x03 \x01(\tR\x05emoji\x12\"\n" +
 	"\n" +
-	"image_grid\x18\x04 \x01(\bR\timageGrid\"\xa4\x01\n" +
+	"image_grid\x18\x04 \x01(\bH\x00R\timageGrid\x88\x01\x01B\r\n" +
+	"\v_image_grid\"\xa4\x01\n" +
 	"\x0fTagsUserSetting\x12:\n" +
 	"\x04tags\x18\x01 \x03(\v2&.memos.store.TagsUserSetting.TagsEntryR\x04tags\x1aU\n" +
 	"\tTagsEntry\x12\x10\n" +
@@ -1214,6 +1215,7 @@ func file_store_user_setting_proto_init() {
 		(*UserSetting_PersonalAccessTokens)(nil),
 		(*UserSetting_Tags)(nil),
 	}
+	file_store_user_setting_proto_msgTypes[2].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
