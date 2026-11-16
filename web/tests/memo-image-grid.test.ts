@@ -4,10 +4,14 @@ import { memoService } from "@/components/MemoEditor/services/memoService";
 import { createInitialState } from "@/components/MemoEditor/state";
 import { memoCopyText } from "@/lib/memo-copy";
 import { splitMemoImages } from "@/lib/memo-image-grid";
-import { hasImageGridTag } from "@/lib/tag";
+import { applyImageGridToggle, hasImageGridTag, resolveTagImageGrid } from "@/lib/tag";
 import { AttachmentSchema } from "@/types/proto/api/v1/attachment_service_pb";
 import { MemoSchema } from "@/types/proto/api/v1/memo_service_pb";
-import { UserSetting_TagMetadataSchema, UserSetting_TagsSettingSchema } from "@/types/proto/api/v1/user_service_pb";
+import {
+  type UserSetting_TagMetadata,
+  UserSetting_TagMetadataSchema,
+  UserSetting_TagsSettingSchema,
+} from "@/types/proto/api/v1/user_service_pb";
 
 const clients = vi.hoisted(() => ({ getMemo: vi.fn(), updateMemo: vi.fn(), createMemo: vi.fn() }));
 vi.mock("@/connect", () => ({ memoServiceClient: clients }));
@@ -26,6 +30,60 @@ describe("image grid tag rules", () => {
     expect(hasImageGridTag(["work", "photo/2026"], setting)).toBe(true);
     expect(hasImageGridTag(["work"], setting)).toBe(false);
     expect(hasImageGridTag(["photo/x"], undefined)).toBe(false);
+  });
+});
+
+describe("image grid tag inheritance", () => {
+  const meta = (init: Partial<UserSetting_TagMetadata> = {}) => create(UserSetting_TagMetadataSchema, init);
+  const settingOf = (tags: Record<string, UserSetting_TagMetadata>) => create(UserSetting_TagsSettingSchema, { tags });
+  const toggle = (tags: Record<string, UserSetting_TagMetadata>, tag: string, enabled: boolean) =>
+    applyImageGridToggle(tags, tag, enabled, {
+      create: (inherited) => create(UserSetting_TagMetadataSchema, inherited),
+      isEmpty: (rule) => !rule.emoji && !rule.backgroundColor && !rule.blurContent && rule.imageGrid === undefined,
+    });
+
+  it("lets child tags follow the nearest ancestor that sets a value", () => {
+    const setting = settingOf({ travel: meta({ imageGrid: true }), "travel/japan": meta({ emoji: "🗾" }) });
+    expect(resolveTagImageGrid("travel", setting)).toEqual({ enabled: true });
+    expect(resolveTagImageGrid("travel/japan", setting)).toEqual({ enabled: true, source: "travel" });
+    expect(resolveTagImageGrid("travel/japan/tokyo", setting)).toEqual({ enabled: true, source: "travel" });
+    expect(hasImageGridTag(["travel/korea"], setting)).toBe(true);
+    expect(resolveTagImageGrid("work", setting)).toEqual({ enabled: false });
+  });
+
+  it("lets a child explicitly turn the grid off and pattern rules act as ancestors", () => {
+    const setting = settingOf({
+      travel: meta({ imageGrid: true }),
+      "travel/notes": meta({ imageGrid: false }),
+      "album/.*": meta({ imageGrid: true }),
+    });
+    expect(resolveTagImageGrid("travel/notes", setting)).toEqual({ enabled: false });
+    expect(resolveTagImageGrid("travel/notes/x", setting)).toEqual({ enabled: false, source: "travel/notes" });
+    expect(resolveTagImageGrid("album/2026/may", setting)).toEqual({ enabled: true });
+  });
+
+  it("resets child overrides when a parent is toggled and drops rules left empty", () => {
+    const tags = { "travel/notes": meta({ imageGrid: false }), "travel/japan": meta({ emoji: "🗾", imageGrid: true }) };
+    const next = toggle(tags, "travel", true);
+    expect(next.travel.imageGrid).toBe(true);
+    expect(next["travel/notes"]).toBeUndefined();
+    expect(next["travel/japan"].emoji).toBe("🗾");
+    expect(next["travel/japan"].imageGrid).toBeUndefined();
+    expect(resolveTagImageGrid("travel/notes", settingOf(next))).toEqual({ enabled: true, source: "travel" });
+  });
+
+  it("stores only differences from the parent so toggling back restores following", () => {
+    const off = toggle({ travel: meta({ imageGrid: true }) }, "travel/notes", false);
+    expect(off["travel/notes"].imageGrid).toBe(false);
+    const back = toggle(off, "travel/notes", true);
+    expect(back["travel/notes"]).toBeUndefined();
+    expect(toggle(back, "travel", false)).toEqual({});
+  });
+
+  it("keeps an empty exact rule that shields the tag from a pattern rule", () => {
+    const next = toggle({ "photo/.*": meta({ imageGrid: true }) }, "photo/receipts", false);
+    expect(next["photo/receipts"]).toBeDefined();
+    expect(resolveTagImageGrid("photo/receipts", settingOf(next)).enabled).toBe(false);
   });
 });
 

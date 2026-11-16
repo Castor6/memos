@@ -4430,7 +4430,7 @@ components:
                     type: boolean
                     description: |-
                         Whether images of memos with this tag are shown as a grid below the content
-                         instead of inline.
+                         instead of inline. Unset means the tag follows its parent tag.
             description: Tag metadata for user-specific display rules.
         UserSetting_TagsSetting:
             type: object

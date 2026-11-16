@@ -12,7 +12,7 @@ import { useTagCounts, useUpdateUserSetting } from "@/hooks/useUserQueries";
 import { colorToHex } from "@/lib/color";
 import { handleError } from "@/lib/error";
 import { buildUserSettingName } from "@/lib/resource-names";
-import { findTagMetadata, isValidTagPattern } from "@/lib/tag";
+import { applyImageGridToggle, findTagMetadata, isValidTagPattern, resolveTagImageGrid } from "@/lib/tag";
 import { cn } from "@/lib/utils";
 import {
   UserSetting_Key,
@@ -40,14 +40,15 @@ interface LocalTagMeta {
   emoji?: string;
   color?: string;
   blur: boolean;
-  imageGrid: boolean;
+  // Undefined follows the parent tag.
+  imageGrid?: boolean;
 }
 
 const toLocalTagMeta = (meta: {
   emoji?: string;
   backgroundColor?: { red?: number; green?: number; blue?: number };
   blurContent: boolean;
-  imageGrid: boolean;
+  imageGrid?: boolean;
 }): LocalTagMeta => ({
   emoji: meta.emoji ?? "",
   color: colorToHex(meta.backgroundColor),
@@ -75,7 +76,10 @@ const TagsSection = ({ tag, onSaved }: { tag?: string; onSaved?: () => void }) =
     const entries = Object.fromEntries(Object.entries(originalSetting.tags).map(([name, meta]) => [name, toLocalTagMeta(meta)]));
     if (tag !== undefined && !entries[tag]) {
       const inherited = findTagMetadata(tag, originalSetting);
-      entries[tag] = inherited ? toLocalTagMeta(inherited) : { emoji: "", color: undefined, blur: false, imageGrid: false };
+      // The image grid value is not copied so the tag keeps following its parent.
+      entries[tag] = inherited
+        ? { ...toLocalTagMeta(inherited), imageGrid: undefined }
+        : { emoji: "", color: undefined, blur: false, imageGrid: undefined };
     }
     return entries;
   }, [originalSetting.tags, tag]);
@@ -116,8 +120,13 @@ const TagsSection = ({ tag, onSaved }: { tag?: string; onSaved?: () => void }) =
     setLocalTags((prev) => ({ ...prev, [tagName]: { ...prev[tagName], blur } }));
   };
 
+  // Child rules are reset to follow the toggled tag, matching the tag menu.
   const handleImageGridChange = (tagName: string, imageGrid: boolean) => {
-    setLocalTags((prev) => ({ ...prev, [tagName]: { ...prev[tagName], imageGrid } }));
+    setLocalTags((prev) =>
+      applyImageGridToggle(prev, tagName, imageGrid, {
+        create: () => ({ emoji: "", color: undefined, blur: false, imageGrid: undefined }),
+      }),
+    );
   };
 
   const handleClearColor = (tagName: string) => {
@@ -143,7 +152,7 @@ const TagsSection = ({ tag, onSaved }: { tag?: string; onSaved?: () => void }) =
       toast.error(t("setting.tags.invalid-regex"));
       return;
     }
-    setLocalTags((prev) => ({ ...prev, [name]: { color: newTagColor, blur: newTagBlur, imageGrid: newTagImageGrid } }));
+    setLocalTags((prev) => ({ ...prev, [name]: { color: newTagColor, blur: newTagBlur, imageGrid: newTagImageGrid || undefined } }));
     setNewTagName("");
     setNewTagColor(undefined);
     setNewTagBlur(false);
@@ -280,82 +289,87 @@ const TagsSection = ({ tag, onSaved }: { tag?: string; onSaved?: () => void }) =
             </div>
           ) : (
             <>
-              {configuredEntries.map((row) => (
-                <div key={row.name} className="flex flex-col gap-3 px-3 py-3 lg:flex-row lg:flex-wrap lg:items-center">
-                  <div className="min-w-0 lg:min-w-[12rem] lg:flex-1">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <TagIcon className="size-4 shrink-0 text-muted-foreground" />
-                      <span className="truncate font-mono text-sm text-foreground">{row.name}</span>
+              {configuredEntries.map((row) => {
+                const imageGrid = resolveTagImageGrid(row.name, { tags: localTags });
+                return (
+                  <div key={row.name} className="flex flex-col gap-3 px-3 py-3 lg:flex-row lg:flex-wrap lg:items-center">
+                    <div className="min-w-0 lg:min-w-[12rem] lg:flex-1">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <TagIcon className="size-4 shrink-0 text-muted-foreground" />
+                        <span className="truncate font-mono text-sm text-foreground">{row.name}</span>
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-2 pl-6 text-xs text-muted-foreground">
+                        {tag === undefined && (
+                          <>
+                            <span>{t("setting.tags.matching-rule")}</span>
+                            <span className="text-border">/</span>
+                            <span>{t("setting.tags.used-count", { count: row.count })}</span>
+                          </>
+                        )}
+                        <span>Emoji</span>
+                        <Input
+                          aria-label={`标签 ${row.name} 的 Emoji`}
+                          placeholder="Emoji"
+                          className="w-20"
+                          value={localTags[row.name].emoji || ""}
+                          maxLength={16}
+                          onChange={(event) =>
+                            setLocalTags((previous) => ({ ...previous, [row.name]: { ...previous[row.name], emoji: event.target.value } }))
+                          }
+                        />
+                      </div>
                     </div>
-                    <div className="mt-1 flex flex-wrap items-center gap-2 pl-6 text-xs text-muted-foreground">
-                      {tag === undefined && (
-                        <>
-                          <span>{t("setting.tags.matching-rule")}</span>
-                          <span className="text-border">/</span>
-                          <span>{t("setting.tags.used-count", { count: row.count })}</span>
-                        </>
-                      )}
-                      <span>Emoji</span>
-                      <Input
-                        aria-label={`标签 ${row.name} 的 Emoji`}
-                        placeholder="Emoji"
-                        className="w-20"
-                        value={localTags[row.name].emoji || ""}
-                        maxLength={16}
-                        onChange={(event) =>
-                          setLocalTags((previous) => ({ ...previous, [row.name]: { ...previous[row.name], emoji: event.target.value } }))
-                        }
-                      />
-                    </div>
-                  </div>
 
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <span
-                      className={cn("size-5 rounded-md border border-border", !localTags[row.name].color && "bg-background")}
-                      style={{ backgroundColor: localTags[row.name].color ?? DEFAULT_TAG_COLOR }}
-                      aria-hidden
-                    />
-                    <input
-                      type="color"
-                      className="size-8 cursor-pointer rounded-md border border-border bg-transparent p-0.5"
-                      value={localTags[row.name].color ?? DEFAULT_TAG_COLOR}
-                      onChange={(e) => handleColorChange(row.name, e.target.value)}
-                      aria-label={t("setting.tags.background-color")}
-                    />
-                    <Button variant="ghost" size="sm" onClick={() => handleClearColor(row.name)} disabled={!localTags[row.name].color}>
-                      {localTags[row.name].color ?? t("setting.tags.default-color")}
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <span
+                        className={cn("size-5 rounded-md border border-border", !localTags[row.name].color && "bg-background")}
+                        style={{ backgroundColor: localTags[row.name].color ?? DEFAULT_TAG_COLOR }}
+                        aria-hidden
+                      />
+                      <input
+                        type="color"
+                        className="size-8 cursor-pointer rounded-md border border-border bg-transparent p-0.5"
+                        value={localTags[row.name].color ?? DEFAULT_TAG_COLOR}
+                        onChange={(e) => handleColorChange(row.name, e.target.value)}
+                        aria-label={t("setting.tags.background-color")}
+                      />
+                      <Button variant="ghost" size="sm" onClick={() => handleClearColor(row.name)} disabled={!localTags[row.name].color}>
+                        {localTags[row.name].color ?? t("setting.tags.default-color")}
+                      </Button>
+                    </div>
+
+                    <label className="flex items-center gap-2 whitespace-nowrap text-sm text-muted-foreground">
+                      <EyeOffIcon className="size-4" />
+                      {t("setting.tags.blur-content")}
+                      <Switch checked={localTags[row.name].blur} onCheckedChange={(checked) => handleBlurChange(row.name, checked)} />
+                    </label>
+
+                    <label
+                      className="flex items-center gap-2 whitespace-nowrap text-sm text-muted-foreground"
+                      title={t("setting.tags.image-grid-hint")}
+                    >
+                      <LayoutGridIcon className="size-4" />
+                      {t("setting.tags.image-grid")}
+                      {imageGrid.source && (
+                        <span className="text-xs text-muted-foreground/80">
+                          {t("setting.tags.image-grid-inherited", { tag: imageGrid.source })}
+                        </span>
+                      )}
+                      <Switch checked={imageGrid.enabled} onCheckedChange={(checked) => handleImageGridChange(row.name, checked)} />
+                    </label>
+
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleRemoveTag(row.name)}
+                      aria-label="移除标签样式规则"
+                      title="移除标签样式规则，不删除标签或笔记"
+                    >
+                      <TrashIcon className="w-4 h-4 text-destructive" />
                     </Button>
                   </div>
-
-                  <label className="flex items-center gap-2 whitespace-nowrap text-sm text-muted-foreground">
-                    <EyeOffIcon className="size-4" />
-                    {t("setting.tags.blur-content")}
-                    <Switch checked={localTags[row.name].blur} onCheckedChange={(checked) => handleBlurChange(row.name, checked)} />
-                  </label>
-
-                  <label
-                    className="flex items-center gap-2 whitespace-nowrap text-sm text-muted-foreground"
-                    title={t("setting.tags.image-grid-hint")}
-                  >
-                    <LayoutGridIcon className="size-4" />
-                    {t("setting.tags.image-grid")}
-                    <Switch
-                      checked={localTags[row.name].imageGrid}
-                      onCheckedChange={(checked) => handleImageGridChange(row.name, checked)}
-                    />
-                  </label>
-
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleRemoveTag(row.name)}
-                    aria-label="移除标签样式规则"
-                    title="移除标签样式规则，不删除标签或笔记"
-                  >
-                    <TrashIcon className="w-4 h-4 text-destructive" />
-                  </Button>
-                </div>
-              ))}
+                );
+              })}
             </>
           )}
         </SettingList>

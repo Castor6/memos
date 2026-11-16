@@ -481,8 +481,8 @@ message UserSetting {
     // Optional display emoji.
     string emoji = 3;
     // Whether images of memos with this tag are shown as a grid below the content
-    // instead of inline.
-    bool image_grid = 4 [(google.api.field_behavior) = OPTIONAL];
+    // instead of inline. Unset means the tag follows its parent tag.
+    optional bool image_grid = 4 [(google.api.field_behavior) = OPTIONAL];
   }
 
   // User-specific tag metadata.
