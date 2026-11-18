@@ -15,7 +15,7 @@ Memos is a self-hosted note-taking app.
 ## Working Rules
 
 - Read relevant code before editing; prefer local patterns over new abstractions.
-- 开始新会话的提交工作前运行 `./scripts/install-git-hooks.sh`；已有自定义钩子时保留并检查其是否接入 `git diff --cached --check`。所有代码、文档及任务记录更新完成并暂存后，必须执行 `git diff --cached --check`；推送前执行 `git diff --check origin/main...HEAD` 检查完整 PR 差异。修正后重新暂存，不使用 `--no-verify` 绕过检查。
+- Before preparing commits in a new session, run `./scripts/install-git-hooks.sh`. Preserve any custom hooks and verify that they run `git diff --cached --check`. After staging all code, documentation and task record updates, run `git diff --cached --check`. Restage any fixes and recheck without bypassing hooks with `--no-verify`. Before pushing, run `git diff --check origin/main...HEAD` on the full PR diff.
 - Keep diffs scoped. Do not do repo-wide cleanup, dependency churn, or generated-file rewrites unless the task requires it.
 - Do not hand-edit generated proto outputs. Change `.proto` files, then run `buf generate`.
 - Add migrations for all database drivers when schema changes, and update each driver's `LATEST.sql`.
@@ -26,27 +26,18 @@ Memos is a self-hosted note-taking app.
 
 - Communicate in Chinese. Keep task records in Chinese and update them as work progresses.
 - Use focused branches and PRs targeting `Castor6/memos:main` for changes, including documentation and upstream imports. `validate` is the required CI check. See `docs/release.md` for CI, Changesets and publishing; actual deployment status is in `docs/tasks/TASK-20260916-automated-deployment.md`. Ordinary merges must not trigger production deployment.
-- Add a new `.changeset/*.md` for shipped behavior changes using root `corepack pnpm changeset`. Use patch/minor/major and a Chinese user-facing summary. Changeset 只选择变化的组件：应用 `memos-personal`、扩展 `memos-web-clipper`，两者变化才同时选择；扩展独立版本/日志位于 `extensions/web-clipper/release/`，仅应用更新不升级扩展，反向亦然；扩展用 `web-clipper-v*` 独立 Release，仅扩展变化不运行镜像发布。Only the generated version PR updates release package versions and their `CHANGELOG.md`; upstream history lives in `docs/upstream/CHANGELOG.md`. Version PR merges publish one smoke-tested OCI artifact independently to ACR and GHCR only when the Memos version changes; server pull updates use `scripts/deploy/` with backup and recovery. Keep deployment credentials and host details out of this repository.
-- 涉及线上排查、部署或服务器维护时，先读取仓库根目录的 `LOCAL_OPS.md`（若存在），按其中的路径查阅私有维护说明，不做全局目录搜索。该文件仅保存在本机，使用 `.git/info/exclude` 排除，不提交私有路径或凭据；本机缺少该文件时向用户确认维护入口。
+- Add a new `.changeset/*.md` for shipped behavior changes using root `corepack pnpm changeset`. Use patch/minor/major and a Chinese user-facing summary. Select only the changed components in the changeset: `memos-personal` for the app and `memos-web-clipper` for the extension. Select both only when both change. The extension keeps its own version and changelog in `extensions/web-clipper/release/`. A change to one component leaves the other component’s version unchanged. The extension publishes separate `web-clipper-v*` releases. Extension-only changes skip image publishing. Only the generated version PR updates release package versions and their `CHANGELOG.md`; upstream history lives in `docs/upstream/CHANGELOG.md`. Version PR merges publish one smoke-tested OCI artifact independently to ACR and GHCR only when the Memos version changes; server pull updates use `scripts/deploy/` with backup and recovery. Keep deployment credentials and host details out of this repository.
+- For production troubleshooting, deployment or server maintenance, first read `LOCAL_OPS.md` at the repository root. If it is missing, ask the user where to find the maintenance instructions. Follow the paths in that file and avoid global directory searches. Keep the file local using `.git/info/exclude` and keep private paths and credentials out of commits.
 - `docs/README.md` is a navigation entry, not a mandatory reading list. Read `docs/development.md` when running or verifying locally; read deployment documentation only for deployment/upstream work.
-- 多个独立会话同时修改本仓库时，各会话使用独立 worktree。同一会话中的相关功能默认共用一个工作区，不因拆分功能或子任务额外创建 worktree。
+- Use a separate worktree for each independent session modifying this repository concurrently. Within one session, keep related features and subtasks in the same worktree by default.
 - Default UI verification to the agent's built-in browser (e.g. the Codex in-app browser); if the agent has none, use its existing browser automation (e.g. Playwright CLI). Use local disposable data: desktop 1440×900; the user's iPhone 15 Pro Max uses a 430px-wide layout, checked at heights 739 and 932 (see `docs/development.md`). Verify no persistent left sidebar on mobile. Restore viewport overrides afterward. Use the regular Chrome profile only for a problem specific to it.
-- 涉及前端样式或布局的修改，必须按以下流程展示效果图并交付：
-  1. 打开现有版本，使用本地测试数据截取桌面和手机界面，作为设计底图。
-  2. 明确使用 **ImageGen** 基于现有截图做静态改图，仅调整拟议区域，保留原有导航、卡片和整体布局；不为出图另建可交互展示或提前实现功能。
-  3. 对照原图检查文字、图标和位置，修正误改，明确标注“设计预览”并展示给用户；用户确认方案后再实现，本会话已确认的方案无需重复确认。
-  4. 实现后验证实际页面，交付桌面和手机布局的真实运行截图；设计预览不能代替实际运行验证。图片存放于本地忽略目录，不提交仓库。
-  - 当前环境没有 ImageGen 工具时，不强制第 2、3 步：说明方案后可直接实现，或先用本地临时改动截图代替设计预览；第 4 步仍必须完成。
+- Follow this workflow for frontend styling or layout changes.
+  1. Open the current version with local test data and capture desktop and mobile screenshots as the basis for the design.
+  2. Use **ImageGen** to make static edits to the screenshots. Change only the proposed area and preserve the existing navigation, cards and overall layout. Do not build an interactive demo or implement the feature to produce the preview.
+  3. Compare the text, icons and positioning with the original screenshots and correct unintended changes. Label the result as a design preview when showing it to the user. Get approval before implementation unless the user has already approved the design in this session.
+  4. After implementation, verify the running page and deliver actual desktop and mobile screenshots. Store images in a locally ignored directory and keep them out of commits.
+  - If ImageGen is unavailable, steps 2 and 3 are optional. Explain the design and proceed with implementation, or show screenshots of temporary local edits as the preview. Step 4 is still required.
 - Narrow viewport checks do not establish iPhone/Safari, software keyboard, touch or PWA behavior; record any required real-device checks explicitly.
-
-## 内置微信客服模块
-
-- 2026-09-19 用户选择将微信客服能力以 Go 模块内置到定制 Memos，随同一应用、镜像和版本发布；主开发位置为 `~/Code/memos`，主任务见 `docs/tasks/TASK-20260919-wechat-kf-integration.md`。
-- `~/Code/wechat-kf-memos`（远端 `Castor6/wechat-kf-memos`）保留旧 Python 实现和测试，作为历史参照及必要回退入口；产品规则和开通记录已归档到 `docs/wechat-kf/legacy`；不是另一个需要永久同步开发的产品。新增内置能力及 Task 归入 Memos。
-- 维护协议兼容时读取 `docs/wechat-kf-integration.md` 和归档规则，必要时参照旧项目代码，按行为等价维护，不能因内置化遗漏白名单、幂等、重试、回执窗口或未知发送状态。迁移前若 Memos 变更影响仍在运行的旧服务，检查并完成必要兼容适配。
-- 内置剪藏复用 Memos 的笔记、标签、空间、附件和权限业务逻辑；协议处理与后台任务保持模块边界。状态通过 Memos store 与三驱动迁移管理，不绕过权限/校验直接插入笔记，不再以 Memos PAT 请求自身 HTTP API。
-- 旧队列、游标、去重和回执状态必须可迁移、可验证；切换前保留旧服务及私有备份，避免两个消费者同时处理。运行迁移、停旧服务和仓库归档分别记录实际结果，不能由文档或 PR 合并推定已完成。
-- 本机路径中的 `~` 指当前用户主目录。跨仓库操作先检查工作区并保留已有改动；迁移期配套提交/PR 互引，长期维护与发布在 Memos 内完成。
 
 ## Commands
 
@@ -167,4 +158,4 @@ cd proto && buf format -w          # Format proto files
 - Frontend CI: Node 24, pnpm 11.0.1, `pnpm lint`, `pnpm test`, `pnpm build`.
 - Web clipper CI: Node 24, pnpm 11.10.0, lint/test/build and deterministic Chromium ZIP; version PR releases include the ZIP and checksums.
 - Proto CI: `buf lint` and `buf format` check.
-- Docker: `scripts/Dockerfile`, Node 22.23.2 / Alpine 3.23 runtime（含服务端 PDF 排版组件）, non-root user, port 5230, multi-arch amd64/arm64/arm/v7.
+- Docker: `scripts/Dockerfile`, Node 22.23.2 / Alpine 3.23 runtime (including the server-side PDF typesetting components), non-root user, port 5230, multi-arch amd64/arm64/arm/v7.
